@@ -1,0 +1,17 @@
+RFC                 Chadow                     version 1.0.0
+
+
+DESCRIPTION
+
+Le protocole Chadow est un protocole d'échange de message et de fichiers.
+Le protocole Chadow permet la mise en place d'un reseau de partage de fichier en pair à pair, qui n'est pas
+complètement décentralisé.
+Le protocole Chadow se veut par essence, en ce qui concerne le partage de fichier, être expérimentatif et équivalent à une implémentation 
+limitée du protocole BitTorrent. 
+
+
+Il existe des noeuds:
+    - serveur
+    - client
+ 
+
