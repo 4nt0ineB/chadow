@@ -1,29 +1,31 @@
 RFC                         Chadow                    version 1.0.0
-
+                                                    Valentin Sebbah
+                                                     Antoine Bastos
 
 DESCRIPTION
 
-  Le protocole Chadow est un protocole d'Èchange de message et 
-  de fichiers. Il permet la mise en place d'un 
-  reseau de partage de fichier en pair ‡ pair, qui n'est pas complËtement 
-  dÈcentralisÈ. Il se veut par essence, en ce qui concerne le 
-  partage de fichier, Ítre implÈmentation expÈrimentative et didactique 
-  d'un protocole p2p type BitTorrent. 
-  La particularitÈ de chadow rÈside dans le fait que chaque client 
-  peut-Ítre un proxy pour d'autres clients
+  Le protocole Chadow est un protocole d'√©change de message et 
+  de fichiers. Il permet la mise en place d'un reseau de partage 
+  de fichier en pair √© pair, qui n'est pas compl√©tement 
+  d√©centralis√©. Il se veut par essence, en ce qui concerne le 
+  partage de fichier, √©tre impl√©mentation exp√©rimentative et 
+  didactique d'un protocole p2p type BitTorrent. La particularit√© 
+  de chadow r√©side dans le fait que chaque client peut servir de 
+  proxy pour d'autres clients.
 
 SOMMAIRE
 
   Conventions.....................................................
-  Connection......................................................
+  Encodage........................................................
   Discussion......................................................
-    Envoie de message globaux.....................................
+    Publication de message globaux................................
     Echange de message entre client...............................
-  TÈlÈchargement d'un fichier.....................................
-    Recherche de fichiers.........................................
-    Mode de TÈlÈchargement........................................
+  Annonce.........................................................
+  Recherche de fichiers...........................................
+  T√©l√©chargement d'un fichier.....................................
+    Mode de T√©l√©chargement........................................
       Mode ouvert.................................................
-      Mode fermÈ..................................................
+      Mode ferm√©..................................................
 
 
 
@@ -54,28 +56,39 @@ SOMMAIRE
 
                                                                   [page 1]
 
-
 Conventions
 
   Il existe des noeuds:
-    - serveur, reprÈsentÈ par une lettre majuscule entre crochet, ex: [A]
-    - client, reprÈsentÈ par une lettre majuscule, ex: B
+    - serveur, repr√©sent√© par une lettre majuscule entre crochet, ex: [A]
+    - client, repr√©sent√© par une lettre majuscule, ex: B
+
+                        B ------ [A] ----- C
+                                  |
+                                  |
+                                  D
+
+  une trame est d√©crite par une suite de 
+  
+
+Encodage
 
 
-  B ------ [A] ----- C
-            |
-            |
-            D
 
 
+
+
+
+
+
+
+Discussion
+
+  Le client poss√®de l'adresse du serveur. 
+  Pour envoyer  
 
   +--------------------------------------------------------------------+
   | login_sender (STRING) | login_receiver (STRING) | message (STRING) |
   +--------------------------------------------------------------------+
-
-  Le servuer
-
-
 
 
 
