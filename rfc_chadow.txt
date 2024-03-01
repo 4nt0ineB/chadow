@@ -1,17 +1,110 @@
-RFC                 Chadow                     version 1.0.0
+RFC                         Chadow                    version 1.0.0
 
 
 DESCRIPTION
 
-Le protocole Chadow est un protocole d'Ã©change de message et de fichiers.
-Le protocole Chadow permet la mise en place d'un reseau de partage de fichier en pair Ã  pair, qui n'est pas
-complÃ¨tement dÃ©centralisÃ©.
-Le protocole Chadow se veut par essence, en ce qui concerne le partage de fichier, Ãªtre expÃ©rimentatif et Ã©quivalent Ã  une implÃ©mentation 
-limitÃ©e du protocole BitTorrent. 
+  Le protocole Chadow est un protocole d'échange de message et 
+  de fichiers. Il permet la mise en place d'un 
+  reseau de partage de fichier en pair à pair, qui n'est pas complètement 
+  décentralisé. Il se veut par essence, en ce qui concerne le 
+  partage de fichier, être implémentation expérimentative et didactique 
+  d'un protocole p2p type BitTorrent. 
+  La particularité de chadow réside dans le fait que chaque client 
+  peut-être un proxy pour d'autres clients
+
+SOMMAIRE
+
+  Conventions.....................................................
+  Connection......................................................
+  Discussion......................................................
+    Envoie de message globaux.....................................
+    Echange de message entre client...............................
+  Téléchargement d'un fichier.....................................
+    Recherche de fichiers.........................................
+    Mode de Téléchargement........................................
+      Mode ouvert.................................................
+      Mode fermé..................................................
 
 
-Il existe des noeuds:
-    - serveur
-    - client
- 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                  [page 1]
+
+
+Conventions
+
+  Il existe des noeuds:
+    - serveur, représenté par une lettre majuscule entre crochet, ex: [A]
+    - client, représenté par une lettre majuscule, ex: B
+
+
+  B ------ [A] ----- C
+            |
+            |
+            D
+
+
+
+  +--------------------------------------------------------------------+
+  | login_sender (STRING) | login_receiver (STRING) | message (STRING) |
+  +--------------------------------------------------------------------+
+
+  Le servuer
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                  [page 2]
