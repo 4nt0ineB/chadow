@@ -8,16 +8,18 @@ DESCRIPTION
   de fichiers. Il permet la mise en place d'un reseau de partage 
   de fichier en pair é pair, qui n'est pas complétement 
   décentralisé. Il se veut par essence, en ce qui concerne le 
-  partage de fichier, étre implémentation expérimentative et 
-  didactique d'un protocole p2p type BitTorrent. La particularité 
-  de chadow réside dans le fait que chaque client peut servir de 
-  proxy pour d'autres clients.
+  partage de fichier, étre une implémentation expérimentative à
+  caractère didactique du protocole p2p BitTorrent. 
+  La particularité de chadow réside dans le fait que chaque client 
+  peut servir de proxy pour d'autres clients.
 
 SOMMAIRE
 
   Conventions.....................................................
   Encodage........................................................
+  Identification..................................................
   Discussion......................................................
+    Découverte des clients........................................
     Publication de message globaux................................
     Echange de message entre client...............................
   Annonce.........................................................
@@ -26,10 +28,6 @@ SOMMAIRE
     Mode de Téléchargement........................................
       Mode ouvert.................................................
       Mode fermé..................................................
-
-
-
-
 
 
 
@@ -66,58 +64,102 @@ Conventions
                                   |
                                   |
                                   D
-
-  une trame est décrite par une suite de 
-  
+ 
 
 Encodage
 
+  - un int représente 4 octets
+  - un long représente 8 octets
+  - une string est toujours précédée par sa taille en int (4 octets) 
+                  +--------------------------------+
+                  | size (int) | mystring (string) | 
+                  +--------------------------------+
+
+  - 'creation_date' est une date au format UNIX, nombre de secondes depuis 
+    le 1er janvier 1970 à 00:00:00 UTC
 
 
+  'username' se réfère à une chaine de charactère (string):
+    - D'une taille comprise entre 2 et 32 charactères
+    - Encodée en UTF-16 (Unicode)
+    - Ne contenant pas d'espaces ou de charactères invisibles
+    - Ne contenant pas les sous-chaînes suivantes : @, #, :, /, ```, chadow
 
+Identification
 
-
-
-
+  Le client possède connaît l'adresse du serveur avec lequel il dialogue.
 
 
 Discussion
 
-  Le client possède l'adresse du serveur. 
-  Pour envoyer  
-
-  +--------------------------------------------------------------------+
-  | login_sender (STRING) | login_receiver (STRING) | message (STRING) |
-  +--------------------------------------------------------------------+
 
 
+ Découverte des clients
 
+                    +--------------+
+                    | 1 | username |
+                    +--------------+
+  renvoie la liste des pseudo 
 
+  Publication de messages globaux
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    +---------------------------------------------------+
+    | 2 | username | creation_date | message (string)   |
+    +---------------------------------------------------+
 
                                                                   [page 2]
+
+
+  Echange de messages entre client
+
+    +--------------------------------------------------------------+
+    | 3 | username | username_receiver | creation_date | message   |
+    +--------------------------------------------------------------+
+
+
+Annonce
+  
+  Le client annonce au serveur qu'il propose un fichier.
+
+                              _____ __ __ __ _ _ _ _ 
+                             | info         
+  +------------------------------------------------------------------------+
+  | 5 | username | info_hash | creation_date | name | size | fragment_size |
+  +------------------------------------------------------------------------+
+  fragments |
+  +---------+
+
+  info_hash: SHA1 de la partie 'info' de la trame
+
+  creation_date: date de création du partage (long)
+  name: nom du fichier (string)
+  size: taille du fichier en long
+  fragment_size: taille fixe en int, d'une puissance 2, avec laquelle le 
+                 fichier est découpé en fragments.
+  fragments: concaténation des SHA1 (20 octets) des fragments 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                  [page 3]
