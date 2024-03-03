@@ -23,6 +23,8 @@ SOMMAIRE
     Publication de message globaux................................
     Echange de message entre client...............................
   Annonce.........................................................
+    Annonce initiale..............................................
+    Annonce de mise à jour........................................
   Recherche de fichiers...........................................
   Téléchargement d'un fichier.....................................
     Mode de Téléchargement........................................
@@ -67,6 +69,22 @@ Conventions
  
 
 Encodage
+  le serveur doit garantir qu'il n'existe deux client avec le même pseudo.
+
+                        +---------------+
+                        | 0 | error     |
+                        +---------------+
+                        | 1 | register  |
+                        +---------------+
+                        | 2 | discovery |
+                        +---------------+
+                        | 3 | event     |
+                        +---------------+
+                        | 4 | yell      |
+                        +---------------+
+                        | 5 | whisper   |
+                        +---------------+
+
 
   - un int représente 4 octets
   - un long représente 8 octets
@@ -75,7 +93,7 @@ Encodage
                   | size (int) | mystring (string) | 
                   +--------------------------------+
 
-  - 'creation_date' est une date au format UNIX, nombre de secondes depuis 
+  - 'creation_date' est une date au format UNIX (long), nombre de secondes depuis 
     le 1er janvier 1970 à 00:00:00 UTC
 
 
@@ -87,51 +105,117 @@ Encodage
 
 Identification
 
-  Le client possède connaît l'adresse du serveur avec lequel il dialogue.
+  Le client doit connaître l'adresse du serveur avec lequel il souhaite communiquer.
+  Lorsqu'un client souhaite se connecter au serveur IRC, il envoie une demande de connexion en spécifiant le nom d'utilisateur qu'il souhaite utiliser.
+  Voici le format de la trame pour cette demande : 
 
-
+                    +-----------------------+
+                    | (register) | username | 
+                    +-----------------------+
+                    
+  Le serveur répond au client pour indiquer si le nom d'utilisateur est disponible ou non :
+    - Si le nom d'utilisateur est disponible, le serveur envoie une validation au client :
+      
+                    +-----------------------+
+                    | (register) | username | 
+                    +-----------------------+
+      
+    - Si le nom d'utilisateur est déjà utilisé, le serveur envoie un message d'erreur au client :
+      
+                    +-----------------------------------+
+                    | (error) | username already in use | 
+                    +-----------------------------------+
+      
+      Dans ce cas ci le client peut envoyer à nouveau une demande de connexion au serveur.
+      
+  La partie chat Discord:
+    GPG
+    
 Discussion
 
+  Découverte des clients 
+    Le client envoie au serveur la trame suivante:
 
+    +-------------+
+    | (discovery) |
+    +-------------+
+                
+  Le serveur répond avec la liste des pseudo présents:
 
- Découverte des clients
+    +-------------------------+
+    | (discovery) | usernames |
+    +-------------------------+
 
-                    +--------------+
-                    | 1 | username |
-                    +--------------+
-  renvoie la liste des pseudo 
+    usernames: liste des usernames des clients connectés. 
+                Concaténation des paires (taille de l'username en int)(username).
+                La liste se termine par 0.
+                Ex: 
+                8morpheus7trinity0
+                
+
+  Mise à jour des présence
+
+    Le serveur notifie les évènements ('code') d'arrivé (1) et de départ (0) à tous les clients.
+    Permet d'éviter de demander la liste entière des utilisateurs intervalle régulier.
+    Les arrivés et départs sont traité comme des messages.
+
+    +------------------------------+
+    | (event) | code |  username   |
+    +------------------------------+
+
+    username: le username associé avec l'évènement
+
 
   Publication de messages globaux
 
-    +---------------------------------------------------+
-    | 2 | username | creation_date | message (string)   |
-    +---------------------------------------------------+
+    Le client envoie une trame de publication de message global.
+    Le serveur retransmet la même trame à tous les clients même le client d'origine.
+
+    +--------------------------------------------------------+
+    | (yell) | creation_date | message (string)   |
+    +--------------------------------------------------------+
+
+    
+
 
                                                                   [page 2]
 
 
   Echange de messages entre client
 
-    +--------------------------------------------------------------+
-    | 3 | username | username_receiver | creation_date | message   |
-    +--------------------------------------------------------------+
+    Le client envoie au serveur une trame pour un message privé destiné à un
+    username spécifique. Le serveur la retransmet au client associé.
 
+    +--------------------------------------------------------------------+
+    | (whisper) | username_receiver | creation_date | message |
+    +--------------------------------------------------------------------+
+
+    Si le serveur ne connaît pas l'username (n'est plus connecté ou n'existe pas)
+    le serveur réponds une trame d'erreur.
+
+    +----------------+
+    | (error) |  0   |
+    +----------------+
+
+    0 : unknown user
+ 
 
 Annonce
-  
+  Annonce initiale
+
   Le client annonce au serveur qu'il propose un fichier.
 
                               _____ __ __ __ _ _ _ _ 
                              | info         
   +------------------------------------------------------------------------+
-  | 5 | username | info_hash | creation_date | name | size | fragment_size |
+  | 5 | info_hash | creation_date | name | size | fragment_size |
   +------------------------------------------------------------------------+
   fragments |
   +---------+
 
   info_hash: SHA1 de la partie 'info' de la trame
 
-  creation_date: date de création du partage (long)
+  creation_date: date de création du partage
   name: nom du fichier (string)
   size: taille du fichier en long
   fragment_size: taille fixe en int, d'une puissance 2, avec laquelle le 
@@ -140,10 +224,36 @@ Annonce
 
 
 
+  Recherche de fichiers
 
+    genre: 
+      +-----------------------------------------------------------------------+
+      | (search) | search_input  | options | expected_results | creation_date |
+      +-----------------------------------------------------------------------+
+        
+      search_input: (string) la chaine de charactère pour rechercher le nom d'un fichier
+      options: champs de bits (int)
+        Numéro du bit en partant du poids faible.
+        1: sensible à la case
+        
+        2: à la date (date incluse)
+        3: avant la date (date exclue)
+        4: après la date (date exclue)
+      expected_results: (int) nombre de résultats attendus, 0 pour "tous"
 
+    Le serveur réponds avec 
 
+      +----------------------------------------+
+      | (search) | number_of_results | results |
+      +----------------------------------------+
 
+      number_of_results: (int)
+      results: liste 
+        filename (string)
+        info_hash (20 byte)
+        creation_date (long) 
+        seeders (int)
+        leechers (int)
 
 
 
