@@ -397,7 +397,7 @@ Téléchargement d'un fichier
 
       - filename: Nom du fichier demandé (string).
       - num_parts: Nombre total de parties (fragments) du fichier disponibles pour le téléchargement (int).
-      - parts: Liste des parties du fichier disponibles, représentées par leur SHA1.
+      - parts: Liste des parties du fichier disponibles, représentées par leur SHA1. -> au final pas interessant vu que le client peut dl les meta_infos
       - sharers: Liste des utilisateurs partageant le fichier, avec leurs informations d'identification et les SHA1 des fragments qu'ils possèdent.
 
 
