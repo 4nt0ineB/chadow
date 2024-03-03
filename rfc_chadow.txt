@@ -240,7 +240,7 @@ Publication du torrent
 
   +----------------------------+
   | (propose) | metainfo_file  |
-   ----------------------------+
+  +----------------------------+
 
   Dictionnaire Bencoded
 
@@ -252,6 +252,13 @@ Publication du torrent
   files: liste qui concatène tous les fichiers du torrent
       filename: nom du fichier (string)
       path: chemin du fichier dans le partage (string)
+
+  Le client peut télécharger le metainfo_file avec la trame: 
+
+  +------------------------+
+  | (request) | info_hash  |
+  +------------------------+
+
 
 Annonce
 
