@@ -1,0 +1,504 @@
+    Trame de recherche envoyé par le client:
+
+      +-----------------------------------------------------------------------+
+      | (search) | search_input  | options | expected_results | creation_date |
+      +-----------------------------------------------------------------------+
+        
+      search_input: (string) la chaine de charactère pour rechercher le nom d'un fichier
+      options: champs de bits (int)
+        Numéro du bit en partant du poids faible.
+        1: sensible à la case
+        2: à la date (date incluse)
+        3: avant la date (date exclue)
+        4: après la date (date exclue)
+      expected_results: (int) nombre de résultats attendus, 0 pour "tous"
+
+    Le serveur réponds avec 
+
+      +----------------------------------------+
+      | (search) | number_of_results | results |
+      +----------------------------------------+
+
+      number_of_results: (int)
+      results: liste 
+        filename (string)
+        info_hash (20 byte)
+        creation_date (long) 
+        seeders (int)
+        leechers (int)
+
+
+
+/////////////////////////////////////////////
+ Le client annonce au serveur qu'il propose un fichier.
+
+                              _____ __ __ __ _ _ _ _ 
+                             | info         
+  +------------------------------------------------------------------------+
+  | (announce) | info_hash | creation_date | name | size | fragment_size |
+  +------------------------------------------------------------------------+
+  fragments |
+  +---------+
+
+  info_hash: SHA1 de la partie 'info' de la trame
+
+  creation_date: date de création du partage
+  name: nom du fichier (string)
+  size: taille du fichier en long
+  fragment_size: taille fixe en int, d'une puissance 2, avec laquelle le 
+                 fichier est découpé en fragments.
+  fragments: concaténation des SHA1 (20 octets) des fragments 
+////////////////////////////////////////////////////////////:
+
+  Le client annonce au serveur qu'il propose un fichier.
+
+                            
+  +----------------------------------------------------------+
+  | (announce) | info_hash | creation_date | filename | size |
+  +----------------------------------------------------------+
+
+  info_hash: SHA1 de la partie des données associé au partage 
+  [
+    creation_date: date de création du partage
+    filename: nom du fichier (string)
+    size: taille du fichier en long
+    fragment_size: taille fixe en int, d'une puissance 2, avec laquelle le 
+                  fichier est découpé en fragments.
+    fragments: concaténation des SHA1 (20 octets) des fragments 
+  ]
+  ///////////////////////////////////////////////////////////
+
+
+  Le serveur répond un dictionnaire encodé au format Bencoding modifié
+  contenant les informations sur l'essaim de partage.
+
+  L'encodage Bencoding est adapté: 
+    i est forcément suivi d'un int
+
+  error: message d'erreur. Si ce champ est présent, aucun autres n'est présent
+  complete:    nombre de seeders
+  imcomplete:  nombre de leechers 
+  wait: intervale minimum que le client doit attendre avant de re faire une annonce
+  peers: liste de clients qui sont actifs dans l'essaim de partage.
+  proxies: présent lorsque le client télécharge en mode fermé. Liste des clients disponibles au 
+
+
+  Voici un exemple de ce à quoi peut ressembler la réponse
+
+  d
+      10:completei123      
+      10:incompletei456   
+      12:waiti900
+      5:peersl
+          d
+              2:ip13:192.168.1.100
+              4:porti6881
+          e
+          d
+              2:ip13:192.168.1.101
+              4:porti6882
+          e
+      e
+      5:proxiesl
+          d
+              2:ip13:192.168.1.100
+              4:porti6881
+          e
+          d
+              2:ip13:192.168.1.101
+              4:porti6882
+          e
+      e
+
+      5:peers6:abcdef        ; binary model for peers
+  e
+  
+///////// 3 mars
+RFC                         Chadow                         version 1.0.0
+                                                         Valentin Sebbah
+                                                          Antoine Bastos
+
+DESCRIPTION
+
+  Le protocole Chadow est un protocole d'échange de message et de 
+  fichiers. Il permet la mise en place d'un reseau de partage de 
+  fichier en pair à pair, qui n'est pas complétement décentralisé. 
+  Il se veut par essence, en ce qui concerne le partage de fichier, 
+  être une implémentation expérimentative à caractère didactique du 
+  protocole p2p BitTorrent. La particularité de chadow réside dans 
+  le fait que chaque client peut servir de proxy pour d'autres 
+  clients.
+
+SOMMAIRE
+
+  1. Conventions.....................................................1
+  2. Encodage........................................................
+  3. Identification..................................................
+  4. Discussion......................................................
+    4.1 Découverte des clients.......................................
+    4.2 Publication de message globaux...............................
+    4.3 Echange de message entre client..............................
+  5. Annonce.........................................................
+  6. Téléchargement d'un fichier.....................................
+    6.1 Mode de Téléchargement.......................................
+      6.1.1 Mode ouvert..............................................
+      6.1.2 Mode fermé...............................................
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                [page 1]
+
+Conventions
+
+  Il existe des noeuds:
+    - serveur, représenté par une lettre majuscule entre crochet, ex:[A]
+    - client, représenté par une lettre majuscule, ex: B
+
+                        B ------ [A] ----- C
+                                  |
+                                  |
+                                  D
+  
+  Chadow utilise le protocole TCP (Transmission Control Protocol) comme 
+  fondation pour assurer la fiabilité et l'intégrité des communications 
+  entre les clients et le serveur. 
+
+ p2p: peer to peer
+ torrent: définit un fichier ou une liste de fichiers en partages par 
+        un ou plusieurs peers identifé par un unique identifiant 
+        (info_hash).
+ swarm: ensemble de peers qui participent au partage simultané d'un 
+        torrent en p2p 
+ tracker: serveur qui centralise une liste de torrent et permet à tout 
+        client de récupérer les informations nécessaire à leur 
+        téléchargement et de contribuer à leur partage.
+ client: application qui permet de télécharger et partager un torrent
+ peer: par rapport à un client les peers sont les autres clients présent
+       dans le swarm
+
+Encodage
+
+  Opcode des trames
+
+                        +---------------+
+                        | 0 | error     |
+                        +---------------+
+                        | 1 | register  |
+                        +---------------+
+                        | 2 | discovery |
+                        +---------------+
+                        | 3 | event     |
+                        +---------------+
+                        | 4 | yell      |
+                        +---------------+
+                        | 5 | whisper   |
+                        +---------------+
+                        | 6 | propose   |
+                        +---------------+
+                        | 7 | request   |
+                        +---------------+
+                        | 8 | announce  |
+                        +---------------+
+                        | 9 | update    |
+                        +---------------+
+
+
+
+  - un int représente 4 octets
+  - un long représente 8 octets
+  - une string est toujours précédée par sa taille en int (4 octets) 
+
+                  +--------------------------------+
+                  | size (int) | mystring (string) | 
+                  +--------------------------------+
+
+  - 'creation_date' est une date au format UNIX (long), 
+  nombre de secondes depuis le 1er janvier 1970 à 00:00:00 UTC
+
+  - 'username' et 'username_receiver' se réfèrent à une chaine de 
+    charactères (string):
+    - D'une taille comprise entre 2 et 32 charactères
+    - Encodée en UTF-16 (Unicode)
+    - Ne contenant pas d'espaces ou de charactères invisibles
+    - Ne contenant pas les sous-chaînes suivantes : @, #, :, /, 
+    ```, chadow
+    Le serveur doit garantir qu'il n'existe pas deux clients avec le 
+    même username.
+
+
+Identification
+
+  Le client doit connaître l'adresse du serveur avec lequel il 
+  souhaite communiquer.
+  Lorsqu'un client souhaite se connecter au serveur IRC, il envoie une 
+  demande de connexion en spécifiant le nom d'utilisateur qu'il souhaite 
+  utiliser. Voici le format de la trame pour cette demande : 
+
+                    +-----------------------+
+                    | (register) | username | 
+                    +-----------------------+
+                    
+  Le serveur répond au client pour indiquer si le nom d'utilisateur est 
+  disponible ou non :
+    - Si le nom d'utilisateur est disponible, le serveur envoie une 
+    validation au client :
+      
+                    +-----------------------+
+                    | (register) | username | 
+                    +-----------------------+
+      
+    - Si le nom d'utilisateur est déjà utilisé, le serveur envoie un 
+    message d'erreur au client :
+      
+                    +--------------------------------------------+
+                    | (error) | username already in use (string) | 
+                    +--------------------------------------------+
+      
+      Dans ce cas ci le client peut envoyer à nouveau une demande de 
+      connexion au serveur.
+      
+  La partie chat Discord:
+    GPG
+    
+Discussion
+
+  Découverte des clients 
+    Le client envoie au serveur la trame suivante:
+
+    +-------------+
+    | (discovery) |
+    +-------------+
+                
+    Le serveur répond avec la liste des pseudo présents:
+
+    +-------------------------+
+    | (discovery) | usernames |
+    +-------------------------+
+
+    usernames: liste des usernames des clients connectés. 
+                Concaténation des pairs 
+                (taille de l'username en int)(username).
+                La liste se termine par 0.
+                Ex: 
+                8morpheus7trinity0
+                
+  Mise à jour des présences
+
+    Le serveur notifie les évènements ('code') d'arrivé (1) et de départ 
+    (0) à tous les clients. Permet d'éviter de demander la liste entière 
+    des utilisateurs systématiquement.
+    Finalement les arrivés et départs sont traités comme des messages.
+
+    +------------------------------+
+    | (event) | code |  username   |
+    +------------------------------+
+
+    username: le username associé avec l'évènement
+
+
+  Publication de messages globaux
+
+    Le client envoie une trame de publication de message global.
+    Le serveur retransmet la même trame à tous les clients même le 
+    client d'origine.
+
+    +---------------------------------------------+
+    | (yell) | creation_date | message (string)   |
+    +---------------------------------------------+
+
+    
+
+
+                                                                [page 2]
+
+
+  Echange de messages entre client
+
+    Le client envoie au serveur une trame pour un message privé destiné 
+    à un username spécifique. Le serveur la retransmet au client associé.
+
+    +---------------------------------------------------------+
+    | (whisper) | username_receiver | creation_date | message |
+    +---------------------------------------------------------+
+
+    Si le serveur ne connaît pas l'username (n'est plus connecté ou 
+    n'existe pas), le serveur réponds une trame d'erreur.
+
+    +----------------+
+    | (error) |  0   |
+    +----------------+
+
+    0 : unknown user
+ 
+Publication du torrent
+  Le client peut proposer un torrent contenant un ou des fichiers au 
+  tracker et doit donc fournir une description appelé metainfo .
+
+  +----------------------------+
+  | (propose) | metainfo_file  |
+  +----------------------------+
+
+  Dictionnaire Bencoded
+
+  share_name: nom du partage
+  piece_length: taille fixe en int, d'une puissance 2, avec laquelle le 
+                    fichier est découpé en fragments.
+  pieces: concaténation des SHA1 (20 octets) des fragments 
+  files_count: nombre de fichiers (int)
+  files: liste qui concatène tous les fichiers du torrent
+      filename: nom du fichier (string)
+      path: chemin du fichier dans le partage (string)
+
+  Le client peut télécharger le metainfo_file avec la trame: 
+
+  +------------------------+
+  | (request) | info_hash  |
+  +------------------------+
+
+
+Annonce
+
+  Le client annonce à intervalle régulier (définit par le serveur) 
+  l'état dans lequel il se trouve pour chaque fichier qu'il partage et 
+  ou télécharge.
+
+  +-------------------------------------+
+  | (announce) | info_hash | parameters |
+  +-------------------------------------+
+
+  info_hash: (SHA1) hash du dictionnaire de données associé au partage: 
+
+  parametres: liste de parametres
+    uploaded (long)
+    downloaded (long)
+    left (long)
+    event: (byte)
+      - 0 = démarré
+      - 1 = arrêté
+      - 2 = complété
+    privacy: (byte) fermé (0) ouvert (1) 
+    peers: (int) le nombre de pairs (au mieux) en partage que le serveur 
+            doit renvoyer
+    proxy: (int) nombre de pairs pour qui le client accepte de faire proxy
+
+  Le serveur répond une trame pour répondre à ça requête.
+
+  +--------------------------------------------------------------------------+
+  | (announce) | info_hash | complete  | imcomplete | wait | peers | proxies |
+  +--------------------------------------------------------------------------+
+
+  complete:    nombre de seeders (int)
+  imcomplete:  nombre de leechers (int)
+  wait: intervale minimum que le client doit attendre avant de re faire une annonce (int)
+  peers: liste de pairs qui sont actifs dans l'essaim de partage encodé sur 6 bytes.
+
+    +-------------------------------------------+
+    | peers_count | ip | port | ip | port | ... |
+    +--------------------- ---------------------+
+
+    proxy_number est 1 byte
+    ip est 4 bytes
+    port est 2 bytes
+
+  proxies: présent lorsque le client télécharge en mode fermé. Liste des clients 
+  disponibles pour faire proxy.
+
+    +---------------------------------------------+
+    | proxies_count | ip | port | ip | port | ... |
+    +---------------------------------------------+
+
+    proxies_count est 1 byte
+    ip est 4 bytes
+    port est 2 bytes
+
+  Voici un exemple de ce à quoi peut ressembler la réponse
+
+
+  S'il y une erreur le serveur répond par 
+
+  +-----------------------+
+  | (error) | message     |
+  +-----------------------+
+
+
+
+
+
+
+  proxy?yo | 192.168.1.100 | 6881 | 
+
+
+
+
+
+
+  Trame de recherche envoyé par le client:
+
+    +-----------------------------------------------------------------------+
+    | (search) | filename  | options | expected_results | creation_date |
+    +-----------------------------------------------------------------------+
+      
+
+
+    filename: (string) le nom du fichier à chercher
+    options: champs de bits (int)
+      Numéro du bit en partant du poids faible.
+      1: à la date (date incluse)
+      2: avant la date (date exclue)
+      3: après la date (date exclue)
+    expected_results: (int) nombre de résultats attendus, 0 pour "tous"
+
+  Le serveur réponds avec 
+
+    +----------------------------------------+
+    | (search) | number_of_results | results |
+    +----------------------------------------+
+
+    number_of_results: (int)
+    results: liste 
+      filename (string)
+      info_hash (20 byte)
+      creation_date (long) 
+      seeders (int)
+      leechers (int)
+      
+  
+
+
+Deconnexion
+  Lorsqu'un client se déconnecte du serveur, que ce soit de manière inattendue ou volontaire, 
+  le protocole TCP permet au serveur de détecter automatiquement cette déconnexion.
+  Le serveur réagit à cette déconnexion en libérant les ressources associées à cet utilisateur
+  et en informant tous les autres utilisateurs de sa déconnexion, 
+  conformément aux spécifications de la partie "Discussion - Mise à jour des présences".
+
+
+
+
+
+
+
+
+
+                                                                  [page 3]
+//////

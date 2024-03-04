@@ -1,4 +1,5 @@
 RFC                         Chadow                         version 1.0.0
+                                                               Mars 2024
                                                          Valentin Sebbah
                                                           Antoine Bastos
 
@@ -8,28 +9,31 @@ DESCRIPTION
   fichiers. Il permet la mise en place d'un reseau de partage de 
   fichier en pair à pair, qui n'est pas complétement décentralisé. 
   Il se veut par essence, en ce qui concerne le partage de fichier, 
-  être une implémentation expérimentative à caractère didactique du 
-  protocole p2p BitTorrent. La particularité de chadow réside dans 
-  le fait que chaque client peut servir de proxy pour d'autres 
-  clients.
+  être une implémentation réduite, expérimentative et à caractère 
+  didactique du protocole p2p BitTorrent. La particularité de chadow 
+  réside dans le fait que chaque client peut servir de proxy pour 
+  d'autres clients.
 
 SOMMAIRE
 
-  1. Conventions.....................................................1
-  2. Encodage........................................................
-  3. Identification..................................................
-  4. Discussion......................................................
-    4.1 Découverte des clients.......................................
-    4.2 Publication de message globaux...............................
-    4.3 Echange de message entre client..............................
-  5. Annonce.........................................................
-  6. Téléchargement d'un fichier.....................................
-    6.1 Mode de Téléchargement.......................................
-      6.1.1 Mode ouvert..............................................
-      6.1.2 Mode fermé...............................................
-
-
-
+  1. Conventions. . . . . . . . . . . . . . . . . . . . . . . . . . 1
+  2. Encodage. . . . . . . . . . . . . . . . . . . . . . . . . .  . .
+  3. Identification. . . . . . . . . . . . . . . . . . . . . . . . .  
+  4. Discussion. . . . . . . . . . . . . . . . . . . . . . . . . . .
+    4.1 Découverte des utilisateurs. . . . . . . . . . . . . . . . .
+    4.2 Mise à jour des présences. . . . . . . . . . . . . . . . . .
+    4.3 Publication de message globaux. . . . . . . . . . . . . . . .
+    4.4 Echange de message entre utilisateurs. . . . . . . . . . . .
+  5. Fichier torrent. . . . . . . . . . . . . . . . . . . . . . . . .  
+    5.1 Publication du fichier torrent. . . . . . . . . . . . . . . .
+    5.2 Téléchargement du fichier torrent. . . . . . . . . . . . . . 
+  6. Recherche de torrents. . . . . . . . . . . . . . . . . . . . . .
+  7. Annonce. . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+  8. Téléchargement des fichiers du torrent. . . . . . . . . . . . .
+    8.1 Mode de Téléchargement. . . . . . . . . . . . . . . . . . . .
+      8.1.1 Mode ouvert. . . . . . . . . . . . . . . . . . . . . . .
+      8.1.2 Mode fermé. . . . . . . . . . . . . . . . . . . . . . . .
+  9. Déconnexion. . . . . . . . . . . . . . . . . . . . . . . . . . .
 
 
 
@@ -52,7 +56,7 @@ SOMMAIRE
 
                                                                 [page 1]
 
-Conventions
+1. Conventions
 
   Il existe des noeuds:
     - serveur, représenté par une lettre majuscule entre crochet, ex:[A]
@@ -80,36 +84,35 @@ Conventions
  peer: par rapport à un client les peers sont les autres clients présent
        dans le swarm
 
-Encodage
+2. Encodage
 
   Opcode des trames
+  +-----------------------+-----------------------+
+  | 0  | error            | 1  | register         |
+  +-----------------------+-----------------------+
+  | 2  | discovery        | 3  | event            |
+  +-----------------------+-----------------------+
+  | 4  | yell             | 5  | whisper          |
+  +-----------------------+-----------------------+
+  | 6  | propose          | 7  | request          |
+  +-----------------------+-----------------------+
+  | 8  | announce         | 9  | update           |
+  +-----------------------+-----------------------+
+  | 10 | request          | 11 | handshake        |
+  +-----------------------+-----------------------+
+  | 12 | keepalive        | 13 | choke            |
+  +-----------------------+-----------------------+
+  | 14 | unchoke          | 15 | interested       |
+  +-----------------------+-----------------------+
+  | 16 | notinterested    | 17 | have             |
+  +-----------------------+-----------------------+
+  | 18 | needblock        | 19 | cancel           |
+  +-----------------------+-----------------------+
+  | 20 | hereblock        | 21 | proxy_open       |
+  +-----------------------+-----------------------+
 
-                        +-----------------------+
-                        | 0  | error            |
-                        +-----------------------+
-                        | 1  | register         |
-                        +-----------------------+
-                        | 2  | discovery        |
-                        +-----------------------+
-                        | 3  | event            |
-                        +-----------------------+
-                        | 4  | yell             |
-                        +-----------------------+
-                        | 5  | whisper          |
-                        +-----------------------+
-                        | 6  | propose          |
-                        +-----------------------+
-                        | 7  | request          |
-                        +-----------------------+
-                        | 8  | announce         |
-                        +-----------------------+
-                        | 9  | update           |
-                        +-----------------------+
-                        | 10 | download_request |
-                        +-----------------------+
-
-
-
+  [page 2]
+                                                                
   - un int représente 4 octets
   - un long représente 8 octets
   - une string est toujours précédée par sa taille en int (4 octets) 
@@ -132,7 +135,7 @@ Encodage
     même username.
 
 
-Identification
+3. Identification
 
   Le client doit connaître l'adresse du serveur avec lequel il 
   souhaite communiquer.
@@ -152,91 +155,89 @@ Identification
                     +-----------------------+
                     | (register) | username | 
                     +-----------------------+
-      
+  
+                                                                [page 2]
+
     - Si le nom d'utilisateur est déjà utilisé, le serveur envoie un 
     message d'erreur au client :
       
-                    +--------------------------------------------+
-                    | (error) | username already in use (string) | 
-                    +--------------------------------------------+
+          +--------------------------------------------+
+          | (error) | username already in use (string) | 
+          +--------------------------------------------+
       
       Dans ce cas ci le client peut envoyer à nouveau une demande de 
       connexion au serveur.
       
+
   La partie chat Discord:
     GPG
     
-Discussion
+4. Discussion
 
-  Découverte des clients 
-    Le client envoie au serveur la trame suivante:
+4.1 Découverte des utilisateurs 
+  Le client envoie au serveur la trame suivante:
 
-    +-------------+
-    | (discovery) |
-    +-------------+
-                
-    Le serveur répond avec la liste des pseudo présents:
+  +-------------+
+  | (discovery) |
+  +-------------+
+              
+  Le serveur répond avec la liste des pseudo présents:
 
-    +-------------------------+
-    | (discovery) | usernames |
-    +-------------------------+
+  +-------------------------+
+  | (discovery) | usernames |
+  +-------------------------+
 
-    usernames: liste des usernames des clients connectés. 
-                Concaténation des pairs 
-                (taille de l'username en int)(username).
-                La liste se termine par 0.
-                Ex: 
-                8morpheus7trinity0
-                
-  Mise à jour des présences
+  usernames: 
+    liste des usernames des clients connectés. Concaténation des pairs 
+    <taille de l'username en int><username>.
+    La liste se termine par 0.
+    Ex: 8morpheus7trinity0
+              
+4.2 Mise à jour des présences
 
-    Le serveur notifie les évènements ('code') d'arrivé (1) et de départ 
-    (0) à tous les clients. Permet d'éviter de demander la liste entière 
-    des utilisateurs systématiquement.
-    Finalement les arrivés et départs sont traités comme des messages.
+  Le serveur notifie les évènements ('code') d'arrivé (1) et de départ 
+  (0) à tous les clients. Permet d'éviter de demander la liste entière 
+  des utilisateurs systématiquement.
+  Finalement les arrivés et départs sont traités comme des messages.
 
-    +------------------------------+
-    | (event) | code |  username   |
-    +------------------------------+
+  +------------------------------+
+  | (event) | code |  username   |
+  +------------------------------+
 
-    username: le username associé avec l'évènement
-
-
-  Publication de messages globaux
-
-    Le client envoie une trame de publication de message global.
-    Le serveur retransmet la même trame à tous les clients même le 
-    client d'origine.
-
-    +---------------------------------------------+
-    | (yell) | creation_date | message (string)   |
-    +---------------------------------------------+
-
-    
+  username: le username associé avec l'évènement
 
 
-                                                                [page 2]
+4.3 Publication de messages globaux
 
+  Le client envoie une trame de publication de message global.
+  Le serveur retransmet la même trame à tous les clients même le 
+  client d'origine.                                             [page 3]
 
-  Echange de messages entre client
+  +---------------------------------------------+
+  | (yell) | creation_date | message (string)   |
+  +---------------------------------------------+
 
-    Le client envoie au serveur une trame pour un message privé destiné 
-    à un username spécifique. Le serveur la retransmet au client associé.
+4.4 Echange de messages entre utilisateurs
 
-    +---------------------------------------------------------+
-    | (whisper) | username_receiver | creation_date | message |
-    +---------------------------------------------------------+
+  Le client envoie au serveur une trame pour un message privé destiné 
+  à un username spécifique. Le serveur la retransmet au client 
+  associé.
 
-    Si le serveur ne connaît pas l'username (n'est plus connecté ou 
-    n'existe pas), le serveur réponds une trame d'erreur.
+  +---------------------------------------------------------+
+  | (whisper) | username_receiver | creation_date | message |
+  +---------------------------------------------------------+
 
-    +----------------+
-    | (error) |  0   |
-    +----------------+
+  Si le serveur ne connaît pas l'username (n'est plus connecté ou 
+  n'existe pas), le serveur réponds une trame d'erreur.
 
-    0 : unknown user
+  +----------------+
+  | (error) |  0   |
+  +----------------+
+
+  0 : unknown user
  
-Publication du torrent
+5. Fichier torrent
+5.1 Publication du fichier torrent
   Le client peut proposer un torrent contenant un ou des fichiers au 
   tracker et doit donc fournir une description appelé metainfo .
 
@@ -244,25 +245,59 @@ Publication du torrent
   | (propose) | metainfo_file  |
   +----------------------------+
 
-  Dictionnaire Bencoded
-
-  share_name: nom du partage
-  piece_length: taille fixe en int, d'une puissance 2, avec laquelle le 
-                    fichier est découpé en fragments.
-  pieces: concaténation des SHA1 (20 octets) des fragments 
+  [metainfo_file]
+  share_name:   nom du partage (string)
+  piece_length: 
+    taille fixe en int, d'une puissance 2, avec laquelle le fichier 
+    est découpé en fragments. Cette taille est choisi par le client 
+    et peut varier entre 32ko et 16Mo. Une taille optimale est de 
+    256ko ou 512ko. Si le torrent comporte moins que 32ko de données 
+    la taille de la pièce est de la taille de la donnée.
+  pieces:      concaténation des SHA1 (20 octets) des fragments
   files_count: nombre de fichiers (int)
-  files: liste qui concatène tous les fichiers du torrent
-      filename: nom du fichier (string)
-      path: chemin du fichier dans le partage (string)
+  files: 
+      liste qui concatène tous les <nomfichier><path> des fichiers du 
+      torrent. nomfichier et path sont des string
+
+5.2 Téléchargement du fichier torrent
 
   Le client peut télécharger le metainfo_file avec la trame: 
-
   +------------------------+
   | (request) | info_hash  |
   +------------------------+
+                                                                [page 4]
 
 
-Annonce
+6. Recherche de torrents
+
+  Trame de recherche envoyé par le client:
+  +----------------------------------------------------------------------+
+  | (search) | torrent_name | options | expected_results | creation_date |
+  +----------------------------------------------------------------------+
+    
+  torrent_name:    (string) le nom du torrent à chercher
+  options:         
+    champs de bits (int). Numéroté du bit en partant du poids fort.
+    1: à la date (date incluse)
+    2: avant la date (date exclue)
+    3: après la date (date exclue)
+  expected_results: (int) nombre de résultats attendus, 0 pour "tous"
+
+  Le serveur réponds avec 
+
+  +----------------------------------------+
+  | (search) | number_of_results | results |
+  +----------------------------------------+
+
+  number_of_results: (int)
+  results: liste 
+    filename (string)
+    info_hash (20 byte)
+    creation_date (long) 
+    seeders (int)
+    leechers (int)
+
+7. Annonce
 
   Le client annonce à intervalle régulier (définit par le serveur) 
   l'état dans lequel il se trouve pour chaque fichier qu'il partage et 
@@ -275,102 +310,60 @@ Annonce
   info_hash: (SHA1) hash du dictionnaire de données associé au partage: 
 
   parametres: liste de parametres
-    uploaded (long)
-    downloaded (long)
-    left (long)
+    uploaded: (long)
+    downloaded: (long)
+    left: (long)
     event: (byte)
       - 0 = démarré
       - 1 = arrêté
       - 2 = complété
     privacy: (byte) fermé (0) ouvert (1) 
-    peers: (int) le nombre de pairs (au mieux) en partage que le serveur 
-            doit renvoyer
-    proxy: (int) nombre de pairs pour qui le client accepte de faire proxy
+    peers: 
+      (int) le nombre de pairs (au mieux) en partage que le serveur doit 
+      renvoyer
+    proxy: 
+      (int) nombre de pairs pour qui le client accepte de faire proxy
 
   Le serveur répond une trame pour répondre à ça requête.
+  +-------------------------------------------------------------------------+
+  | (announce) | info_hash | complete | imcomplete | wait | peers | proxies |
+  +-------------------------------------------------------------------------+
+                                                                [page 5]
 
-  +--------------------------------------------------------------------------+
-  | (announce) | info_hash | complete  | imcomplete | wait | peers | proxies |
-  +--------------------------------------------------------------------------+
-
-  complete:    nombre de seeders (int)
-  imcomplete:  nombre de leechers (int)
-  wait: intervale minimum que le client doit attendre avant de re faire une annonce (int)
-  peers: liste de pairs qui sont actifs dans l'essaim de partage encodé sur 6 bytes.
-
+  complete:   nombre de seeders (int)
+  imcomplete: nombre de leechers (int)
+  wait:      
+     intervale minimum que le client doit attendre avant de refaire une 
+     annonce (int)
+  peers:      
+    liste de pairs qui sont actifs dans l'essaim de partage encodé sur 
+    6 bytes.
     +-------------------------------------------+
     | peers_count | ip | port | ip | port | ... |
     +--------------------- ---------------------+
-
     proxy_number est 1 byte
     ip est 4 bytes
     port est 2 bytes
 
-  proxies: présent lorsque le client télécharge en mode fermé. Liste des clients 
-  disponibles pour faire proxy.
-
+  proxies: 
+    présent lorsque le client télécharge en mode fermé. Liste des 
+    clients disponibles pour faire proxy.
     +---------------------------------------------+
     | proxies_count | ip | port | ip | port | ... |
     +---------------------------------------------+
-
+                                                                [page 5]
     proxies_count est 1 byte
     ip est 4 bytes
     port est 2 bytes
 
-  Voici un exemple de ce à quoi peut ressembler la réponse
+  Le serveur répond par la trame, s'il y a une erreur. 
 
+  +----------------------------------+
+  | (error) | error_message (string) |
+  +----------------------------------+
 
-  S'il y une erreur le serveur répond par 
-
-  +-----------------------+
-  | (error) | message     |
-  +-----------------------+
-
-
-
-
-
-
-  proxy?yo | 192.168.1.100 | 6881 | 
-
-
-
-
-
-
-  Trame de recherche envoyé par le client:
-
-    +-----------------------------------------------------------------------+
-    | (search) | filename  | options | expected_results | creation_date |
-    +-----------------------------------------------------------------------+
-      
-
-
-    filename: (string) le nom du fichier à chercher
-    options: champs de bits (int)
-      Numéro du bit en partant du poids faible.
-      1: à la date (date incluse)
-      2: avant la date (date exclue)
-      3: après la date (date exclue)
-    expected_results: (int) nombre de résultats attendus, 0 pour "tous"
-
-  Le serveur réponds avec 
-
-    +----------------------------------------+
-    | (search) | number_of_results | results |
-    +----------------------------------------+
-
-    number_of_results: (int)
-    results: liste 
-      filename (string)
-      info_hash (20 byte)
-      creation_date (long) 
-      seeders (int)
-      leechers (int)
-      
-
-Téléchargement d'un fichier
-
+8. Téléchargement des fichiers du torrent  
+8.1 Mode ouvert
 
       +--------------------------------------------+
       | (download_request) | filename | mode       |
@@ -381,14 +374,15 @@ Téléchargement d'un fichier
     - mode: Mode de téléchargement, représenté par un entier, où :
         - 0 : Mode de téléchargement ouvert.
         - 1 : Mode de téléchargement caché.
-
     
-    Dans cette trame, le champ mode est un entier qui indique au serveur le mode de téléchargement souhaité 
-    par le client. Si le mode est 0, cela signifie que le client souhaite un téléchargement en mode ouvert. 
-    Si le mode est 1, cela indique un téléchargement en mode caché.
+    Dans cette trame, le champ mode est un entier qui indique au serveur 
+    le mode de téléchargement souhaité par le client. Si le mode est 0, 
+    cela signifie que le client souhaite un téléchargement en mode 
+    ouvert. Si le mode est 1, cela indique un téléchargement en mode 
+    caché.
+                                                                [page 6]
 
 
-  Mode ouvert
 
     Réponse du serveur
     +-------------------------------------------------------------+
@@ -400,25 +394,171 @@ Téléchargement d'un fichier
       - parts: Liste des parties du fichier disponibles, représentées par leur SHA1. -> au final pas interessant vu que le client peut dl les meta_infos
       - sharers: Liste des utilisateurs partageant le fichier, avec leurs informations d'identification et les SHA1 des fragments qu'ils possèdent.
 
-
       Dans le champ sharers, chaque entrée peut être structurée comme suit :
       +---------------------------+
       | username | IP | fragments |
       +---------------------------+
       username: Nom d'utilisateur du partageur.
       IP: Adresse IP du partageur.
-      fragments: Liste des SHA1 des fragments du fichier que le partageur possède.
+      fragments: Liste des SHA1 des fragments du fichier que le 
+                 partageur possède.
+
+8.1 Mode ouvert - version BitTorrent
+  Implémentation du Peer wire protocol sur TCP
+
+  A ce stade le client possède un fichier torrent/metainfo et donc 
+  connaît la liste des pièces du torrent et les fichiers qu'il contient.
+  Il connaît également les pairs qu'il doit contacter pour récupérer les 
+  pièces.
+
+  Le client initie l'échange avec un pair avec le handshake:
+
+  +-------------------------+
+  | (handshake) | info_hash | 
+  +-------------------------+
+
+  Si le client reçoit un handshake avec un info_hash qu'il ne possède 
+  pas où qu'il ne souhaite pas partager il peut terminer la connexion.
+
+  Le reste des trames échangées est préfixées par leur taille, afin de
+  facilter la lecture sur le socket par le client.
+
+  Champs de bits
+
+  juste après le handshake le client et le pair s'envoient 
+  respectivement le champs de bits des pièces qu'ils possède du 
+  torrent.
+  Le bit de poids fort est est la pièce d'indice 0.
+  Le client termine la connexion si le champs de bits n'est pas de la 
+  bonne taille.
+
+  +-------------------------------------+
+  | (have) | bitfield_length | bitfield |
+  +-------------------------------------+ 
+                                                                [page 7]
+  
+  Keep-alive
+
+  Le client doit aussi maintenir la connexion avec des message 
+  keep-alive, dans le cas contraire le pair peut y mettre fin s'il 
+  n'a rien reçu du client pendant une certaine durée.
+
+  +-------------+
+  | (keepalive) | 
+  +-------------+
+  
+  Choke/Unchoke
+
+  Le client tient à jour des informations sur les connexion qu'il 
+  a avec les pairs. L'intérêt est de pouvoir équilibrer le partage
+  en limitant le nombre de connexion actives et de limiter la 
+  saturation du réseau, tout en s'assurant que chaque pairs 
+  obtiennent les pièces manquantes le plus rapidement possible.
+
+                                                      Valeur initiale
+  am_choking:      le client refuse de servir le pair,         1
+  am_interested:   le client est intéressé par le pair,        0
+  peer_choking:    le pair refuse de servir le client,         1
+  peer_interested: le pair est intéressé par le client,        0
+
+  Un block de données est téléchargé quand le client et interested 
+  et que le pair n'est pas choke.
+
+  La trame choke/unchoke contient selement le opcode:
+  (choke), (unchoke), (interested), (notinterested)
+
+  Demande de block
+  Le client souhaite télécharger une pièce au pair.
+  le client ne télécharge pas les pièces une à une mais par portions 
+  de pièces appelé 'blocks' de taille comprise entre 16ko et la 
+  taille de la pièce.
+
+  +------------------------------------------------+
+  | (needblock) | piece_index | offset | length   |
+  +------------------------------------------------+
+
+  piece_index: l'indice de la piece demandée
+  offset:      position en byte du block dans la pièce.
+  length:      la taille du block 
+  
+  Annulation
+  Le client peut envoyer une trame pour annuler la requête 
+  (need_block) d'un block. La trame est identique à celle envoyée 
+  pour la requête mais l'opcode est remplacé par (cancel).
+
+  Envoie du block
+  
+  Le client répond à une requête de block:
+
+
+                                                                [page 8]
+  +----------------------------------------------+
+  | (hereblock) | piece_index | offset | payload |
+  +----------------------------------------------+ 
+
+  piece_index: l'indice de la piece demandée
+  offset:      position en byte du block dans la pièce.
+  payload:     la donnée
+
+8.2 Mode fermé
+
+  A ce stade le client possède un fichier torrent/metainfo et donc 
+  connaît la liste des pièces du torrent et les fichiers qu'il contient.
+  Il connaît également les pairs qui doit contacter pour récupérer les 
+  pièces. Il connaît aussi l'adresse des clients qui peuvent 
+  potentiellement accepter de faire proxy pour lui.
+
+  Le client demande l'ouverture d'une connexion. 
+  Si le pair proxy accepte alors la connection reste ouverte 
+  et ouvre une connection avec le pair et le flux est transmis
+  dans les deux sens entre le client et le pair. 
+  Le reste du fonctionnement du partage est identique au mode ouvert 
+  mais passe désormait par le proxy.
+                              ___
+                  A ---------|   |--------- B
+                             | D |          |
+                  C ---------|___|--------- +
+
+  Si une des connexion est fermée, côté client ou côté pair alors le 
+  la connection restante est fermée.
+  Le proxy peut à tout décider moment de terminer son rôle de proxy, 
+  et terminer les deux connexions.  
+
+  TODO: rajouter des infos dans les trames A --> | D |
+  pour que le client puisse télécharger chez plusieurs pairs
+  avec le même proxy sans avoir à ouvrir plusieurs connexions 
+  avec le proxy.
+
+
+  +------------------------------------+
+  | (proxy_open) | peer_ip | peer_port |     
+  +------------------------------------+
+
+  Dans cette implémentation, chaque demande d'ouverture de connexion
+  à un proxy par un client ouvre une nouvelle connexion. Le proxy doit 
+  gérer sa charge et sa bande passante.
+
+  Il est suggéré au développeur du client de ne pas mettre en place, 
+  ou du moins cacher l'option, permettant de choisir ou non d'être 
+  proxy. L'utilisateur serait tenté de ne pas l'activer dans le but
+  de faciliter le téléchargement de ses propres fichiers, mettant en 
+  péril cette fonctionnalité anonymisante du protocole. 
+
+  
+
+9. Deconnexion
+  Lorsqu'un client se déconnecte du serveur, que ce soit de manière 
+  inattendue ou volontaire, le protocole TCP permet au serveur de 
+  détecter automatiquement cette déconnexion. Le serveur réagit à cette 
+  déconnexion en libérant les ressources associées à cet utilisateur et 
+  en informant tous les autres utilisateurs de sa déconnexion, 
+  conformément aux spécifications de la partie "Discussion - Mise à jour 
+  des présences".
 
 
 
 
 
-Deconnexion
-  Lorsqu'un client se déconnecte du serveur, que ce soit de manière inattendue ou volontaire, 
-  le protocole TCP permet au serveur de détecter automatiquement cette déconnexion.
-  Le serveur réagit à cette déconnexion en libérant les ressources associées à cet utilisateur
-  et en informant tous les autres utilisateurs de sa déconnexion, 
-  conformément aux spécifications de la partie "Discussion - Mise à jour des présences".
 
 
 
@@ -428,4 +568,20 @@ Deconnexion
 
 
 
-                                                                  [page 3]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                [page 9]
