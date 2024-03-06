@@ -300,34 +300,42 @@ SOMMAIRE
 
   où codex contient les mêmes informations que décrites dans la partie 5.1.
 
-6. Recherche de torrents
 
-  Trame de recherche envoyé par le client:
-  +----------------------------------------------------------------------+
-  | (search) | torrent_name | options | expected_results | creation_date |
-  +----------------------------------------------------------------------+
+6. Recherche de codex
+
+  Le client envoie une trame de recherche au serveur avec les informations suivantes :
+
+  +--------------------------------------------------------------------+
+  | (search) | codex_name | options | expected_results | creation_date |
+  +--------------------------------------------------------------------+
     
-  torrent_name:    (string) le nom du torrent à chercher
-  options:         
-    champs de bits (int). Numéroté du bit en partant du poids fort.
-    1: à la date (date incluse)
-    2: avant la date (date exclue)
-    3: après la date (date exclue)
-  expected_results: (int) nombre de résultats attendus, 0 pour "tous"
+  codex_name : (string) le nom du codex à rechercher.
+  options : un champ de bits (int) où chaque bit est numéroté à partir du poids fort.
+    - Le bit 1 indique une recherche à une date spécifique (incluse).
+    - Le bit 2 indique une recherche avant une certaine date (exclue).
+    - Le bit 3 indique une recherche après une certaine date (exclue).
+  expected_results : (int) le nombre de résultats attendus, avec 0 pour "tous".
+  
+  exemple de trame pour le client qui recherche le codex "MonCodex": 
+  +--------------------------------------------------------------------+
+  | (search) | MonCodex | 2       | 5                 | 1646232387     |
+  +--------------------------------------------------------------------+
 
-  Le serveur réponds avec 
+  
+  Le serveur répond avec les informations suivantes :
 
   +----------------------------------------+
   | (search) | number_of_results | results |
   +----------------------------------------+
 
-  number_of_results: (int)
-  results: liste 
-    filename (string)
-    info_hash (20 byte)
-    creation_date (long) 
-    seeders (int)
-    leechers (int)
+  number_of_results : (int) le nombre total de résultats.
+  results : une liste comprenant :
+    - filename : (string) le nom du fichier.
+    - info_hash : (20 bytes) le hash d'information.
+    - creation_date : (long) la date de création.
+    - seeders : (int) le nombre de seeders (sharers partageant le fichier).
+    - leechers : (int) le nombre de leechers (clients téléchargeant le fichier).
+
 
 7. Annonce
 
