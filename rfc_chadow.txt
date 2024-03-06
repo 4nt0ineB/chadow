@@ -347,28 +347,28 @@ SOMMAIRE
   | (announce) | info_hash | parameters |
   +-------------------------------------+
 
-  info_hash: (SHA1) hash du dictionnaire de données associé au partage: 
-
-  parametres: liste de parametres
-    uploaded: (long)
-    downloaded: (long)
-    left: (long)
+  info_hash: (SHA1) hash du dictionnaire de données associé au partage
+  paramètres: une liste comprenant :
     event: (byte)
-      - 0 = démarré
-      - 1 = arrêté
-      - 2 = complété
-    privacy: (byte) fermé (0) ouvert (1) 
+      - 0 : indique que le client est en train de télécharger le fichier.
+      - 1 : signifie que le client a cessé de partager le fichier.
+      - 2 : indique que le client a complètement téléchargé le fichier.
+      Ce paramètre spécifie l'état actuel du fichier.
+    privacy: (byte)
+      - 0 : signifie que le partage est en mode caché.
+      - 1 : indique que le partage est en mode ouvert.
+      Ce paramètre détermine la visibilité du partage.
     sharers: 
-      (int) le nombre de pairs (au mieux) en partage que le serveur doit 
-      renvoyer
+      (int) le nombre de sharers que le client souhaite recevoir 
+      du serveur pour garantir le téléchargement du fichier.
     proxy: 
-      (int) nombre de pairs pour qui le client accepte de faire proxy
+      (int) le nombre de clients que le client accepte de servir 
+      en tant que relais pour leurs téléchargements.
 
   Le serveur répond une trame pour répondre à ça requête.
   +-------------------------------------------------------------------------+
   | (announce) | info_hash | complete | imcomplete | wait | sharers | proxies |
   +-------------------------------------------------------------------------+
-                                                                [page 5]
 
   complete:   nombre de seeders (int)
   imcomplete: nombre de leechers (int)
@@ -378,9 +378,9 @@ SOMMAIRE
   sharers:      
     liste de pairs qui sont actifs dans l'essaim de partage encodé sur 
     6 bytes.
-    +-------------------------------------------+
+    +---------------------------------------------+
     | sharers_count | ip | port | ip | port | ... |
-    +--------------------- ---------------------+
+    +---------------------------------------------+
     proxy_number est 1 byte
     ip est 4 bytes
     port est 2 bytes
@@ -443,8 +443,6 @@ SOMMAIRE
   | (newchunk) | chunk_index | 
   +--------------------------+
 
-
-                                                                [page 7]
   
   Keep-alive
 
@@ -505,8 +503,6 @@ SOMMAIRE
   
   Le client répond à une requête de block:
 
-
-                                                                [page 8]
   +----------------------------------------------+
   | (hereblock) | piece_index | offset | payload |
   +----------------------------------------------+ 
