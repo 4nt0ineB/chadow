@@ -502,3 +502,42 @@ Deconnexion
 
                                                                   [page 3]
 //////
+8.1 Mode ouvert
+
+      +--------------------------------------------+
+      | (download_request) | filename | mode       |
+      +--------------------------------------------+
+
+    - (download_request): Opcode indiquant une demande de téléchargement.
+    - filename: Nom du fichier que le client souhaite télécharger.
+    - mode: Mode de téléchargement, représenté par un entier, où :
+        - 0 : Mode de téléchargement ouvert.
+        - 1 : Mode de téléchargement caché.
+    
+    Dans cette trame, le champ mode est un entier qui indique au serveur 
+    le mode de téléchargement souhaité par le client. Si le mode est 0, 
+    cela signifie que le client souhaite un téléchargement en mode 
+    ouvert. Si le mode est 1, cela indique un téléchargement en mode 
+    caché.
+                                                                [page 6]
+
+
+
+    Réponse du serveur
+    +-------------------------------------------------------------+
+    | (download_request) | filename | num_parts | parts | sharers |
+    +-------------------------------------------------------------+
+
+      - filename: Nom du fichier demandé (string).
+      - num_parts: Nombre total de parties (fragments) du fichier disponibles pour le téléchargement (int).
+      - parts: Liste des parties du fichier disponibles, représentées par leur SHA1. -> au final pas interessant vu que le client peut dl les meta_infos
+      - sharers: Liste des utilisateurs partageant le fichier, avec leurs informations d'identification et les SHA1 des fragments qu'ils possèdent.
+
+      Dans le champ sharers, chaque entrée peut être structurée comme suit :
+      +---------------------------+
+      | username | IP | fragments |
+      +---------------------------+
+      username: Nom d'utilisateur du partageur.
+      IP: Adresse IP du partageur.
+      fragments: Liste des SHA1 des fragments du fichier que le 
+                 partageur possède.

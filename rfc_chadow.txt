@@ -6,13 +6,10 @@ RFC                         Chadow                         version 1.0.0
 DESCRIPTION
 
   Le protocole Chadow est un protocole d'échange de message et de 
-  fichiers. Il permet la mise en place d'un reseau de partage de 
-  fichier en pair à pair, qui n'est pas complétement décentralisé. 
-  Il se veut par essence, en ce qui concerne le partage de fichier, 
-  être une implémentation réduite, expérimentative et à caractère 
-  didactique du protocole p2p BitTorrent. La particularité de chadow 
-  réside dans le fait que chaque client peut servir de proxy pour 
-  d'autres clients.
+  fichiers. Il permet la mise en place d'un reseau de partage 
+  décentralisé de fichiers entre clients. Il embarque un moyen 
+  d'éventuellement anonymiser le téléchargement en passant par d'autres
+  clients qui servent de proxy.
 
 SOMMAIRE
 
@@ -24,12 +21,12 @@ SOMMAIRE
     4.2 Mise à jour des présences. . . . . . . . . . . . . . . . . .
     4.3 Publication de message globaux. . . . . . . . . . . . . . . .
     4.4 Echange de message entre utilisateurs. . . . . . . . . . . .
-  5. Fichier torrent. . . . . . . . . . . . . . . . . . . . . . . . .  
-    5.1 Publication du fichier torrent. . . . . . . . . . . . . . . .
-    5.2 Téléchargement du fichier torrent. . . . . . . . . . . . . . 
-  6. Recherche de torrents. . . . . . . . . . . . . . . . . . . . . .
+  5. Codex. . . . . . . . . . . . . . . . . . . . . . . . . . . . . .  
+    5.1 Publication du codex. . . . . . . . . . . . . . . . . . . . .
+    5.2 Téléchargement du codex. . . . . . . . . . . . . . . . . . . 
+  6. Recherche de partage. . . . . . . . . . . . . . . . . . . . . .
   7. Annonce. . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
-  8. Téléchargement des fichiers du torrent. . . . . . . . . . . . .
+  8. Téléchargement des fichiers du codex. . . . . . . . . . . . . . .
     8.1 Mode de Téléchargement. . . . . . . . . . . . . . . . . . . .
       8.1.1 Mode ouvert. . . . . . . . . . . . . . . . . . . . . . .
       8.1.2 Mode fermé. . . . . . . . . . . . . . . . . . . . . . . .
@@ -71,18 +68,28 @@ SOMMAIRE
   fondation pour assurer la fiabilité et l'intégrité des communications 
   entre les clients et le serveur. 
 
- p2p: peer to peer
- torrent: définit un fichier ou une liste de fichiers en partages par 
-        un ou plusieurs peers identifé par un unique identifiant 
-        (info_hash).
- swarm: ensemble de peers qui participent au partage simultané d'un 
-        torrent en p2p 
- tracker: serveur qui centralise une liste de torrent et permet à tout 
-        client de récupérer les informations nécessaire à leur 
-        téléchargement et de contribuer à leur partage.
- client: application qui permet de télécharger et partager un torrent
- peer: par rapport à un client les peers sont les autres clients présent
-       dans le swarm
+  Codex : Une suite de données décrivant les fichiers partagés par un ou plusieurs 
+    utilisateurs dans un réseau pair à pair. Chaque codex est identifié par un identifiant
+    unique (ID) et comprend des informations telles que la liste des fichiers partagés, 
+    les parties de ces fichiers disponibles chez chaque utilisateur (sharer), 
+    et d'autres métadonnées pertinentes.
+
+  Annuaire : Un serveur centralisé qui stocke une liste de codex disponibles dans le réseau. 
+    L'annuaire permet à tout client de récupérer les informations nécessaires sur les codex 
+    afin de participer au partage de fichiers. En consultant l'annuaire, un client peut découvrir 
+    quels fichiers sont disponibles pour le téléchargement, ainsi que les utilisateurs (sharers) 
+    qui possèdent des parties de ces fichiers.
+
+  Client : Une application logicielle utilisée pour télécharger et partager des fichiers dans un 
+    réseau pair à pair. Les clients interagissent avec l'annuaire pour obtenir des informations sur 
+    les fichiers disponibles et établissent des connexions avec d'autres utilisateurs (sharers) pour 
+    échanger des parties de fichiers.
+
+  Sharer : Dans le contexte d'un réseau de partage de fichiers pair à pair, les sharers sont les 
+    utilisateurs qui possèdent et partagent des parties de fichiers avec d'autres utilisateurs. 
+    Chaque sharer contribue au réseau en mettant à disposition des parties de fichiers qu'il possède, 
+    permettant ainsi aux autres utilisateurs de télécharger ces fichiers à partir de plusieurs sources.
+
 
 2. Encodage
 
@@ -108,7 +115,7 @@ SOMMAIRE
   +-----------------------+-----------------------+
   | 18 | needblock        | 19 | cancel           |
   +-----------------------+-----------------------+
-  | 20 | hereblock        | 21 | proxy_open       |
+  | 20 | hereblock        | 21 | proxyopen        |
   +-----------------------+-----------------------+
 
   [page 2]
@@ -156,8 +163,6 @@ SOMMAIRE
                     | (register) | username | 
                     +-----------------------+
   
-                                                                [page 2]
-
     - Si le nom d'utilisateur est déjà utilisé, le serveur envoie un 
     message d'erreur au client :
       
@@ -168,10 +173,7 @@ SOMMAIRE
       Dans ce cas ci le client peut envoyer à nouveau une demande de 
       connexion au serveur.
       
-
-  La partie chat Discord:
-    GPG
-    
+   
 4. Discussion
 
 4.1 Découverte des utilisateurs 
@@ -181,14 +183,14 @@ SOMMAIRE
   | (discovery) |
   +-------------+
               
-  Le serveur répond avec la liste des pseudo présents:
+  Le serveur répond avec la liste des noms d'utilisateurs présents:
 
   +-------------------------+
   | (discovery) | usernames |
   +-------------------------+
 
   usernames: 
-    liste des usernames des clients connectés. Concaténation des pairs 
+    liste des usernames des clients connectés. Concaténation des sharers 
     <taille de l'username en int><username>.
     La liste se termine par 0.
     Ex: 8morpheus7trinity0
@@ -198,7 +200,7 @@ SOMMAIRE
   Le serveur notifie les évènements ('code') d'arrivé (1) et de départ 
   (0) à tous les clients. Permet d'éviter de demander la liste entière 
   des utilisateurs systématiquement.
-  Finalement les arrivés et départs sont traités comme des messages.
+  Finalement les arrivés et départs sont traités comme des messages globaux.
 
   +------------------------------+
   | (event) | code |  username   |
@@ -206,67 +208,97 @@ SOMMAIRE
 
   username: le username associé avec l'évènement
 
-
 4.3 Publication de messages globaux
 
   Le client envoie une trame de publication de message global.
-  Le serveur retransmet la même trame à tous les clients même le 
-  client d'origine.                                             [page 3]
 
-  +---------------------------------------------+
-  | (yell) | creation_date | message (string)   |
-  +---------------------------------------------+
+  +-------------------------------------------+
+  | (yell) | creation_date | message (string) |
+  +-------------------------------------------+
+
+  Le serveur retransmet la même trame à tous les clients même le 
+  client d'origine.
 
 4.4 Echange de messages entre utilisateurs
 
   Le client envoie au serveur une trame pour un message privé destiné 
-  à un username spécifique. Le serveur la retransmet au client 
-  associé.
+  à un username spécifique. 
 
-  +---------------------------------------------------------+
-  | (whisper) | username_receiver | creation_date | message |
-  +---------------------------------------------------------+
+  +------------------------------------------------------------------+
+  | (whisper) | username_receiver | creation_date | message (string) |
+  +------------------------------------------------------------------+
+
+  Le serveur la retransmet au client associé.
 
   Si le serveur ne connaît pas l'username (n'est plus connecté ou 
   n'existe pas), le serveur réponds une trame d'erreur.
 
-  +----------------+
-  | (error) |  0   |
-  +----------------+
+  +---------------------------------+
+  | (error) | unknown user (string) |
+  +---------------------------------+
 
-  0 : unknown user
- 
-5. Fichier torrent
-5.1 Publication du fichier torrent
-  Le client peut proposer un torrent contenant un ou des fichiers au 
-  tracker et doit donc fournir une description appelé metainfo .
 
-  +----------------------------+
-  | (propose) | metainfo_file  |
-  +----------------------------+
+5. Codex
+  L'annuaire possède des descriptions de chaque partage qu'on appelle codex.
+  L'annuaire sait quels clients partage un codex. 
+  Les clients peuvent chercher des codex dans l'annuaire.
+  Les clients peuvent demander à l'annuaire de rejoindre le réseau de partage 
+  des fichiers du codex.
 
-  [metainfo_file]
-  share_name:   nom du partage (string)
-  piece_length: 
-    taille fixe en int, d'une puissance 2, avec laquelle le fichier 
-    est découpé en fragments. Cette taille est choisi par le client 
-    et peut varier entre 32ko et 16Mo. Une taille optimale est de 
-    256ko ou 512ko. Si le torrent comporte moins que 32ko de données 
-    la taille de la pièce est de la taille de la donnée.
-  pieces:      concaténation des SHA1 (20 octets) des fragments
-  files_count: nombre de fichiers (int)
+5.1 Publication du codex
+  
+  L'intérêt est que le l'annuaire ne possède pas de copie des fichiers en partage, 
+  ce qui reviendrait à du téléchargement centralisé et nécessite un serveur très puissant.
+  L'annuaire possède seulement un description des fichiers que les sharers partagent.
+
+  Le client peut proposer un ou des fichiers au partage qui sont rassemblés dans 
+  un même ensemble décrit pas le codex. 
+  
+  +------------------------------+
+  | (propose) | codex_id | codex |
+  +------------------------------+
+
+  codex_id : le hachage (SHA1) du codex.
+  codex : une structure comprenant les informations suivantes :
+    - name : le nom du codex (string).
+    - chunk_length : la taille fixe des chunks du codex.
+    - files_count : le nombre de fichiers (int).
+    - chunks : la concaténation des identifiants SHA1 (20 octets) de chaque chunk.
+  
+    Chaque fichier du codex est découpé en chunk d'une taille fixe en int, 
+    d'une puissance 2. De cette façon plusieurs sharers peuvent partager
+    des bouts du fichiers en simultané, ce qui augmente sa disponibilité 
+    et la probabilité qu'un client aboutisse à compléter le téléchargement.
+    Dans un optique de pouvoir télécharger des fichiers d'une taille jusqu'à 2Go
+    on propose une taille de 256ko qui donne un total de 7 813 chunks.
+    Chaque chunk est ensuite hashé pour obtenir un identifiant SHA1.
+    Pour un fichier de 2Go cette liste de sha1 (20 bytes) réprésente un poids de 156ko, ce qui est raisonnable.
+    Le hashage permet aux clients de s'assurer de l'intégrité des données qu'il télécharge, 
+    en testant le hash du chunk reçu avec celui décrit dans le codex. 
+
   files: 
-      liste qui concatène tous les <nomfichier><path> des fichiers du 
-      torrent. nomfichier et path sont des string
+    une liste qui concatène tous les <nomfichier><path> des fichiers du 
+    codex. nomfichier et path sont des strings. 
+    path représente le chemin absolu où nomfichier se situe dans le codex.
+  
 
-5.2 Téléchargement du fichier torrent
+5.2 Téléchargement du codex
 
-  Le client peut télécharger le metainfo_file avec la trame: 
-  +------------------------+
-  | (request) | info_hash  |
-  +------------------------+
-                                                                [page 4]
+  Le client peut télécharger le codex avec la trame: 
 
+  +----------------------+
+  | (request) | codex_id |
+  +----------------------+
+
+  codex_id: hash (SHA1) du codex
+
+  Le serveur répond avec la trame suivante :
+
+  +-------------------+
+  | (request) | codex |
+  +-------------------+
+
+  où codex contient les mêmes informations que décrites dans la partie 5.1.
 
 6. Recherche de torrents
 
@@ -318,7 +350,7 @@ SOMMAIRE
       - 1 = arrêté
       - 2 = complété
     privacy: (byte) fermé (0) ouvert (1) 
-    peers: 
+    sharers: 
       (int) le nombre de pairs (au mieux) en partage que le serveur doit 
       renvoyer
     proxy: 
@@ -326,7 +358,7 @@ SOMMAIRE
 
   Le serveur répond une trame pour répondre à ça requête.
   +-------------------------------------------------------------------------+
-  | (announce) | info_hash | complete | imcomplete | wait | peers | proxies |
+  | (announce) | info_hash | complete | imcomplete | wait | sharers | proxies |
   +-------------------------------------------------------------------------+
                                                                 [page 5]
 
@@ -335,11 +367,11 @@ SOMMAIRE
   wait:      
      intervale minimum que le client doit attendre avant de refaire une 
      annonce (int)
-  peers:      
+  sharers:      
     liste de pairs qui sont actifs dans l'essaim de partage encodé sur 
     6 bytes.
     +-------------------------------------------+
-    | peers_count | ip | port | ip | port | ... |
+    | sharers_count | ip | port | ip | port | ... |
     +--------------------- ---------------------+
     proxy_number est 1 byte
     ip est 4 bytes
@@ -351,60 +383,20 @@ SOMMAIRE
     +---------------------------------------------+
     | proxies_count | ip | port | ip | port | ... |
     +---------------------------------------------+
-                                                                [page 5]
+
     proxies_count est 1 byte
     ip est 4 bytes
     port est 2 bytes
 
-  Le serveur répond par la trame, s'il y a une erreur. 
+  S'il y a une erreur, le serveur répond par la trame 
 
   +----------------------------------+
   | (error) | error_message (string) |
   +----------------------------------+
 
 8. Téléchargement des fichiers du torrent  
-8.1 Mode ouvert
-
-      +--------------------------------------------+
-      | (download_request) | filename | mode       |
-      +--------------------------------------------+
-
-    - (download_request): Opcode indiquant une demande de téléchargement.
-    - filename: Nom du fichier que le client souhaite télécharger.
-    - mode: Mode de téléchargement, représenté par un entier, où :
-        - 0 : Mode de téléchargement ouvert.
-        - 1 : Mode de téléchargement caché.
-    
-    Dans cette trame, le champ mode est un entier qui indique au serveur 
-    le mode de téléchargement souhaité par le client. Si le mode est 0, 
-    cela signifie que le client souhaite un téléchargement en mode 
-    ouvert. Si le mode est 1, cela indique un téléchargement en mode 
-    caché.
-                                                                [page 6]
-
-
-
-    Réponse du serveur
-    +-------------------------------------------------------------+
-    | (download_request) | filename | num_parts | parts | sharers |
-    +-------------------------------------------------------------+
-
-      - filename: Nom du fichier demandé (string).
-      - num_parts: Nombre total de parties (fragments) du fichier disponibles pour le téléchargement (int).
-      - parts: Liste des parties du fichier disponibles, représentées par leur SHA1. -> au final pas interessant vu que le client peut dl les meta_infos
-      - sharers: Liste des utilisateurs partageant le fichier, avec leurs informations d'identification et les SHA1 des fragments qu'ils possèdent.
-
-      Dans le champ sharers, chaque entrée peut être structurée comme suit :
-      +---------------------------+
-      | username | IP | fragments |
-      +---------------------------+
-      username: Nom d'utilisateur du partageur.
-      IP: Adresse IP du partageur.
-      fragments: Liste des SHA1 des fragments du fichier que le 
-                 partageur possède.
-
 8.1 Mode ouvert - version BitTorrent
-  Implémentation du Peer wire protocol sur TCP
+  Implémentation du sharer wire protocol sur TCP
 
   A ce stade le client possède un fichier torrent/metainfo et donc 
   connaît la liste des pièces du torrent et les fichiers qu'il contient.
@@ -414,10 +406,10 @@ SOMMAIRE
   Le client initie l'échange avec un pair avec le handshake:
 
   +-------------------------+
-  | (handshake) | info_hash | 
+  | (handshake) | codex_id  | 
   +-------------------------+
 
-  Si le client reçoit un handshake avec un info_hash qu'il ne possède 
+  Si le client reçoit un handshake avec un codex_id qu'il ne possède 
   pas où qu'il ne souhaite pas partager il peut terminer la connexion.
 
   Le reste des trames échangées est préfixées par leur taille, afin de
@@ -426,15 +418,24 @@ SOMMAIRE
   Champs de bits
 
   juste après le handshake le client et le pair s'envoient 
-  respectivement le champs de bits des pièces qu'ils possède du 
+  respectivement le champs de bits des chunk qu'ils possèdent du 
   torrent.
-  Le bit de poids fort est est la pièce d'indice 0.
+  Le bit de poids fort est la pièce d'indice 0.
   Le client termine la connexion si le champs de bits n'est pas de la 
   bonne taille.
 
   +-------------------------------------+
   | (have) | bitfield_length | bitfield |
   +-------------------------------------+ 
+
+
+  Le client peut indiquer au pair qu'il vient de compléter un chunk.
+   
+  +--------------------------+
+  | (newchunk) | chunk_index | 
+  +--------------------------+
+
+
                                                                 [page 7]
   
   Keep-alive
@@ -458,14 +459,20 @@ SOMMAIRE
                                                       Valeur initiale
   am_choking:      le client refuse de servir le pair,         1
   am_interested:   le client est intéressé par le pair,        0
-  peer_choking:    le pair refuse de servir le client,         1
-  peer_interested: le pair est intéressé par le client,        0
+  sharer_choking:    le pair refuse de servir le client,         1
+  sharer_interested: le pair est intéressé par le client,        0
 
   Un block de données est téléchargé quand le client et interested 
   et que le pair n'est pas choke.
 
   La trame choke/unchoke contient selement le opcode:
   (choke), (unchoke), (interested), (notinterested)
+
+  +---------+
+  | (choke) | 
+  +---------+
+
+
 
   Demande de block
   Le client souhaite télécharger une pièce au pair.
@@ -531,7 +538,7 @@ SOMMAIRE
 
 
   +------------------------------------+
-  | (proxy_open) | peer_ip | peer_port |     
+  | (proxy_open) | sharer_ip | sharer_port |     
   +------------------------------------+
 
   Dans cette implémentation, chaque demande d'ouverture de connexion
