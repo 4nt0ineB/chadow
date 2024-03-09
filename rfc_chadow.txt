@@ -365,38 +365,39 @@ SOMMAIRE
       (int) le nombre de clients que le client accepte de servir 
       en tant que relais pour leurs téléchargements.
 
-  Le serveur répond une trame pour répondre à ça requête.
-  +-------------------------------------------------------------------------+
-  | (announce) | info_hash | complete | imcomplete | wait | sharers | proxies |
-  +-------------------------------------------------------------------------+
 
-  complete:   nombre de seeders (int)
-  imcomplete: nombre de leechers (int)
-  wait:      
-     intervale minimum que le client doit attendre avant de refaire une 
-     annonce (int)
-  sharers:      
-    liste de pairs qui sont actifs dans l'essaim de partage encodé sur 
-    6 bytes.
+  Le serveur répond avec une trame pour répondre à la requête :
+
+  +---------------------------------------------------------------------------+
+  | (announce) | info_hash | complete | imcomplete | wait | sharers | proxies |
+  +---------------------------------------------------------------------------+
+
+  complete: le nombre de sharers ayant le fichier complet (int)
+  incomplete: le nombre de clients téléchargeant le fichier (int)
+  wait: l'intervalle minimum que le client doit attendre avant de refaire une annonce (int)
+  sharers: une liste de sharers actifs au partage du codex, chaque sharer étant 
+           représenté par une série de 6 octets d'informations:
+
     +---------------------------------------------+
     | sharers_count | ip | port | ip | port | ... |
     +---------------------------------------------+
-    proxy_number est 1 byte
-    ip est 4 bytes
-    port est 2 bytes
 
-  proxies: 
-    présent lorsque le client télécharge en mode fermé. Liste des 
-    clients disponibles pour faire proxy.
+    - sharers_count: le nombre de sharers actifs (int)
+    - ip: l'adresse IP du sharer (4 octets)
+    - port: le port du sharer (2 octets)
+
+  proxies: présent lorsque le client télécharge en mode fermé. 
+    Liste des clients disponibles pour agir en tant que proxy :
+
     +---------------------------------------------+
     | proxies_count | ip | port | ip | port | ... |
     +---------------------------------------------+
 
-    proxies_count est 1 byte
-    ip est 4 bytes
-    port est 2 bytes
+    - proxies_count: le nombre de pairs disponibles pour agir en tant que proxy (int)
+    - ip: l'adresse IP du client (4 octets)
+    - port: le port du client (2 octets)
 
-  S'il y a une erreur, le serveur répond par la trame 
+  En cas d'erreur, le serveur répond avec la trame suivante : 
 
   +----------------------------------+
   | (error) | error_message (string) |
