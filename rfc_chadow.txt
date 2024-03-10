@@ -121,6 +121,7 @@ SOMMAIRE
   - un int représente 4 octets
   - un long représente 8 octets
   - une string est toujours précédée par sa taille en int (4 octets) 
+    et encodé en UTF-8
 
                   +--------------------------------+
                   | size (int) | mystring (string) | 
