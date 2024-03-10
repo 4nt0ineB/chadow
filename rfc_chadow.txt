@@ -117,8 +117,6 @@ SOMMAIRE
   +-----------------------+-----------------------+
   | 20 | hereblock        | 21 | proxyopen        |
   +-----------------------+-----------------------+
-
-  [page 2]
                                                                 
   - un int représente 4 octets
   - un long représente 8 octets
@@ -190,8 +188,8 @@ SOMMAIRE
   +-------------------------+
 
   usernames: 
-    liste des usernames des clients connectés. Concaténation des sharers 
-    <taille de l'username en int><username>.
+    liste des usernames des clients connectés. Concaténation des 
+    utilisateurs <taille de l'username en int><username>.
     La liste se termine par 0.
     Ex: 8morpheus7trinity0
               
@@ -200,11 +198,12 @@ SOMMAIRE
   Le serveur notifie les évènements ('code') d'arrivé (1) et de départ 
   (0) à tous les clients. Permet d'éviter de demander la liste entière 
   des utilisateurs systématiquement.
-  Finalement les arrivés et départs sont traités comme des messages globaux.
+  Finalement les arrivés et départs sont traités comme des messages 
+  globaux.
 
-  +------------------------------+
-  | (event) | code |  username   |
-  +------------------------------+
+  +-------------------------------------+
+  | (event) | code (byte) |  username   |
+  +-------------------------------------+
 
   username: le username associé avec l'évènement
 
@@ -233,9 +232,11 @@ SOMMAIRE
   Si le serveur ne connaît pas l'username (n'est plus connecté ou 
   n'existe pas), le serveur réponds une trame d'erreur.
 
-  +---------------------------------+
-  | (error) | unknown user (string) |
-  +---------------------------------+
+  +-----------------------------------+
+  | (error) | error_message (string)  |
+  +-----------------------------------+
+
+  message: description de l'erreur human-readable
 
 
 5. Codex
@@ -263,7 +264,7 @@ SOMMAIRE
     - name : le nom du codex (string).
     - chunk_length : la taille fixe des chunks du codex.
     - files_count : le nombre de fichiers (int).
-    - chunks : la concaténation des identifiants SHA1 (20 octets) de chaque chunk.
+    - chunks : la concaténation des identifiants (SHA1) de chaque chunk.
   
     Chaque fichier du codex est découpé en chunk d'une taille fixe en int, 
     d'une puissance 2. De cette façon plusieurs sharers peuvent partager
@@ -276,21 +277,19 @@ SOMMAIRE
     Le hashage permet aux clients de s'assurer de l'intégrité des données qu'il télécharge, 
     en testant le hash du chunk reçu avec celui décrit dans le codex. 
 
-  files: 
-    une liste qui concatène tous les <nomfichier><path> des fichiers du 
-    codex. nomfichier et path sont des strings. 
-    path représente le chemin absolu où nomfichier se situe dans le codex.
+    files: 
+      une liste qui concatène tous les <nomfichier><path> des fichiers du 
+      codex. nomfichier et path sont des strings. 
+      path représente le chemin absolu où nomfichier se situe dans le codex.
   
 
 5.2 Téléchargement du codex
 
   Le client peut télécharger le codex avec la trame: 
 
-  +----------------------+
-  | (request) | codex_id |
-  +----------------------+
-
-  codex_id: hash (SHA1) du codex
+  +-----------------------------+
+  | (request) | codex_id (SHA1) |
+  +-----------------------------+
 
   Le serveur répond avec la trame suivante :
 
@@ -320,7 +319,6 @@ SOMMAIRE
   +--------------------------------------------------------------------+
   | (search) | MonCodex | 2       | 5                 | 1646232387     |
   +--------------------------------------------------------------------+
-
   
   Le serveur répond avec les informations suivantes :
 
@@ -333,8 +331,10 @@ SOMMAIRE
     - filename : (string) le nom du fichier.
     - info_hash : (20 bytes) le hash d'information.
     - creation_date : (long) la date de création.
-    - seeders : (int) le nombre de seeders (sharers partageant le fichier).
-    - leechers : (int) le nombre de leechers (clients téléchargeant le fichier).
+    - seeders : (int) le nombre de seeders
+        (sharers qui partagent et possèdent les fichiers du codex à 100%).
+    - leechers : (int) le nombre de leechers 
+        (clients qui partagent les fichiers du codex mais qui ne les ont qu'en partie).
 
 
 7. Annonce
@@ -369,11 +369,11 @@ SOMMAIRE
   Le serveur répond avec une trame pour répondre à la requête :
 
   +---------------------------------------------------------------------------+
-  | (announce) | info_hash | complete | imcomplete | wait | sharers | proxies |
+  | (announce) | info_hash | seeders | leechers | wait | sharers | proxies |
   +---------------------------------------------------------------------------+
 
-  complete: le nombre de sharers ayant le fichier complet (int)
-  incomplete: le nombre de clients téléchargeant le fichier (int)
+  seeders: le nombre de sharers ayant les fichiers complet (int)
+  leechers: le nombre de clients ayant en partie les fichiers (int)
   wait: l'intervalle minimum que le client doit attendre avant de refaire une annonce (int)
   sharers: une liste de sharers actifs au partage du codex, chaque sharer étant 
            représenté par une série de 6 octets d'informations:
@@ -403,14 +403,16 @@ SOMMAIRE
   | (error) | error_message (string) |
   +----------------------------------+
 
-8. Téléchargement des fichiers du torrent  
-8.1 Mode ouvert - version BitTorrent
-  Implémentation du sharer wire protocol sur TCP
+  error_message: message human-readable
 
-  A ce stade le client possède un fichier torrent/metainfo et donc 
-  connaît la liste des pièces du torrent et les fichiers qu'il contient.
+
+8. Téléchargement des fichiers du codex
+8.1 Mode ouverte
+
+  A ce stade le client possède un codex et donc 
+  connaît la liste des chunks du codex et les fichiers qu'il contient.
   Il connaît également les pairs qu'il doit contacter pour récupérer les 
-  pièces.
+  chunks.
 
   Le client initie l'échange avec un pair avec le handshake:
 
@@ -420,16 +422,16 @@ SOMMAIRE
 
   Si le client reçoit un handshake avec un codex_id qu'il ne possède 
   pas où qu'il ne souhaite pas partager il peut terminer la connexion.
-
+  Dans ce cas on 
+  
   Le reste des trames échangées est préfixées par leur taille, afin de
   facilter la lecture sur le socket par le client.
 
-  Champs de bits
+  8.1.1 Champs de bits
 
   juste après le handshake le client et le pair s'envoient 
-  respectivement le champs de bits des chunk qu'ils possèdent du 
-  torrent.
-  Le bit de poids fort est la pièce d'indice 0.
+  respectivement le champs de bits des chunk qu'ils possèdent du codex.
+  Le bit de poids fort est le chunk d'indice 0.
   Le client termine la connexion si le champs de bits n'est pas de la 
   bonne taille.
 
@@ -437,15 +439,16 @@ SOMMAIRE
   | (have) | bitfield_length | bitfield |
   +-------------------------------------+ 
 
-
-  Le client peut indiquer au pair qu'il vient de compléter un chunk.
+  Le client met au courant une portion des sharers avec 
+  qui il est connecté des nouveaux chunks qu'il complète afin de mettre 
+  à jour les bitfield que chacun possède.
    
   +--------------------------+
   | (newchunk) | chunk_index | 
   +--------------------------+
-
   
-  Keep-alive
+
+  8.1.2 Keep-alive
 
   Le client doit aussi maintenir la connexion avec des message 
   keep-alive, dans le cas contraire le pair peut y mettre fin s'il 
@@ -454,97 +457,67 @@ SOMMAIRE
   +-------------+
   | (keepalive) | 
   +-------------+
+
+
+  8.1.3 Demande de block
   
-  Choke/Unchoke
-
-  Le client tient à jour des informations sur les connexion qu'il 
-  a avec les pairs. L'intérêt est de pouvoir équilibrer le partage
-  en limitant le nombre de connexion actives et de limiter la 
-  saturation du réseau, tout en s'assurant que chaque pairs 
-  obtiennent les pièces manquantes le plus rapidement possible.
-
-                                                      Valeur initiale
-  am_choking:      le client refuse de servir le pair,         1
-  am_interested:   le client est intéressé par le pair,        0
-  sharer_choking:    le pair refuse de servir le client,         1
-  sharer_interested: le pair est intéressé par le client,        0
-
-  Un block de données est téléchargé quand le client et interested 
-  et que le pair n'est pas choke.
-
-  La trame choke/unchoke contient selement le opcode:
-  (choke), (unchoke), (interested), (notinterested)
-
-  +---------+
-  | (choke) | 
-  +---------+
-
-
-
-  Demande de block
-  Le client souhaite télécharger une pièce au pair.
-  le client ne télécharge pas les pièces une à une mais par portions 
-  de pièces appelé 'blocks' de taille comprise entre 16ko et la 
-  taille de la pièce.
+  Le client souhaite télécharger un chunk au sharer.
+  le client ne télécharge pas les chunks mais par portions 
+  de chunks appelé 'blocks' de taille comprise entre 16ko et la 
+  taille du chunk.
 
   +------------------------------------------------+
-  | (needblock) | piece_index | offset | length   |
+  | (needblock) | chunk_index | offset | length   |
   +------------------------------------------------+
 
-  piece_index: l'indice de la piece demandée
-  offset:      position en byte du block dans la pièce.
+  chunk_index: l'indice de la piece demandée
+  offset:      position en byte du block dans le chunk.
   length:      la taille du block 
   
-  Annulation
+  8.1.4 Annulation
   Le client peut envoyer une trame pour annuler la requête 
   (need_block) d'un block. La trame est identique à celle envoyée 
   pour la requête mais l'opcode est remplacé par (cancel).
 
-  Envoie du block
+  8.1.5 Envoie du block
   
-  Le client répond à une requête de block:
+  Le sharer répond à une requête de block:
 
   +----------------------------------------------+
-  | (hereblock) | piece_index | offset | payload |
+  | (hereblock) | chunk_index | offset | payload |
   +----------------------------------------------+ 
 
-  piece_index: l'indice de la piece demandée
-  offset:      position en byte du block dans la pièce.
+  chunk_index: l'indice de la piece demandée
+  offset:      position en byte du block dans le chunk.
   payload:     la donnée
 
 8.2 Mode fermé
 
-  A ce stade le client possède un fichier torrent/metainfo et donc 
-  connaît la liste des pièces du torrent et les fichiers qu'il contient.
-  Il connaît également les pairs qui doit contacter pour récupérer les 
-  pièces. Il connaît aussi l'adresse des clients qui peuvent 
+  A ce stade le client possède un codex et donc 
+  connaît la liste des chunks du codex et les fichiers qu'il contient.
+  Il connaît également les pairs qu'il doit contacter pour récupérer les 
+  chunks. Il connaît aussi l'adresse des clients qui peuvent 
   potentiellement accepter de faire proxy pour lui.
 
-  Le client demande l'ouverture d'une connexion. 
-  Si le pair proxy accepte alors la connection reste ouverte 
-  et ouvre une connection avec le pair et le flux est transmis
-  dans les deux sens entre le client et le pair. 
-  Le reste du fonctionnement du partage est identique au mode ouvert 
-  mais passe désormait par le proxy.
+  Le client envoie une trame d'ouverture de connexion. 
+
+  +----------------------------------------+
+  | (proxy_open) | sharer_ip | sharer_port |     
+  +----------------------------------------+
+
+  Si le proxy accepte alors la connection reste ouverte 
+  et ouvre une connection avec le sharer et communique avec lui comme spécifié en 
+  8.. Le flux est transmis dans les deux sens entre le client et le sharer 
+  par le proxy.
                               ___
                   A ---------|   |--------- B
                              | D |          |
                   C ---------|___|--------- +
 
-  Si une des connexion est fermée, côté client ou côté pair alors le 
+  Si une des connexion est fermée, côté client ou côté sharer alors le 
   la connection restante est fermée.
-  Le proxy peut à tout décider moment de terminer son rôle de proxy, 
-  et terminer les deux connexions.  
-
-  TODO: rajouter des infos dans les trames A --> | D |
-  pour que le client puisse télécharger chez plusieurs pairs
-  avec le même proxy sans avoir à ouvrir plusieurs connexions 
-  avec le proxy.
-
-
-  +------------------------------------+
-  | (proxy_open) | sharer_ip | sharer_port |     
-  +------------------------------------+
+  Le proxy peut décider à tout moment de terminer son rôle de proxy, 
+  et ferme alors les deux connexions.  
 
   Dans cette implémentation, chaque demande d'ouverture de connexion
   à un proxy par un client ouvre une nouvelle connexion. Le proxy doit 
@@ -556,7 +529,6 @@ SOMMAIRE
   de faciliter le téléchargement de ses propres fichiers, mettant en 
   péril cette fonctionnalité anonymisante du protocole. 
 
-  
 
 9. Deconnexion
   Lorsqu'un client se déconnecte du serveur, que ce soit de manière 
@@ -567,33 +539,3 @@ SOMMAIRE
   conformément aux spécifications de la partie "Discussion - Mise à jour 
   des présences".
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                                                                [page 9]
