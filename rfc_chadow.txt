@@ -270,7 +270,7 @@ SOMMAIRE
   L'intérêt est que le l'annuaire ne possède pas de copie des fichiers 
   en partage, ce qui reviendrait à du téléchargement centralisé et 
   nécessite un serveur très puissant.
-  L'annuaire possède seulement un description des fichiers que les 
+  L'annuaire possède seulement une description des fichiers que les 
 
                                                                 [page 5]
   
