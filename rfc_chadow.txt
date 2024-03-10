@@ -13,27 +13,28 @@ DESCRIPTION
 
 SOMMAIRE
 
-  1. Conventions. . . . . . . . . . . . . . . . . . . . . . . . . . 1
-  2. Encodage. . . . . . . . . . . . . . . . . . . . . . . . . .  . .
-  3. Identification. . . . . . . . . . . . . . . . . . . . . . . . .  
-  4. Discussion. . . . . . . . . . . . . . . . . . . . . . . . . . .
-    4.1 Découverte des utilisateurs. . . . . . . . . . . . . . . . .
-    4.2 Mise à jour des présences. . . . . . . . . . . . . . . . . .
-    4.3 Publication de message globaux. . . . . . . . . . . . . . . .
-    4.4 Echange de message entre utilisateurs. . . . . . . . . . . .
-  5. Codex. . . . . . . . . . . . . . . . . . . . . . . . . . . . . .  
-    5.1 Publication du codex. . . . . . . . . . . . . . . . . . . . .
-    5.2 Téléchargement du codex. . . . . . . . . . . . . . . . . . . 
-  6. Recherche de partage. . . . . . . . . . . . . . . . . . . . . .
-  7. Annonce. . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
-  8. Téléchargement des fichiers du codex. . . . . . . . . . . . . . .
-    8.1 Mode de Téléchargement. . . . . . . . . . . . . . . . . . . .
-      8.1.1 Mode ouvert. . . . . . . . . . . . . . . . . . . . . . .
-      8.1.2 Mode fermé. . . . . . . . . . . . . . . . . . . . . . . .
-  9. Déconnexion. . . . . . . . . . . . . . . . . . . . . . . . . . .
-
-
-
+  1. Conventions. . . . . . . . . . . . . . . . . . . . . . . . . . 2
+  2. Encodage. . . . . . . . . . . . . . . . . . . . . . . . . . .  2
+  3. Identification. . . . . . . . . . . . . . . . . . . . . . . .  3  
+  4. Discussion. . . . . . . . . . . . . . . . . . . . . . . . . .  4
+    4.1 Découverte des utilisateurs. . . . . . . . . . . . . . . .  4
+    4.2 Mise à jour des présences. . . . . . . . . . . . . . . . .  4
+    4.3 Publication de messages globaux. . . . . . . . . . . . . .  5
+    4.4 Echange de message entre utilisateurs. . . . . . . . . . .  5
+  5. Codex. . . . . . . . . . . . . . . . . . . . . . . . . . . . . 5  
+    5.1 Publication du codex. . . . . . . . . . . . . . . . . . . . 5
+    5.2 Téléchargement du codex. . . . . . . . . . . . . . . . . .  6
+  6. Recherche de partage. . . . . . . . . . . . . . . . . . . . .  7
+  7. Annonce. . . . . . . . . . . . . . . . . . . . . . . . . . . . 7 
+  8. Téléchargement des fichiers du codex. . . . . . . . . . . . .  9
+    8.1 Mode de Téléchargement. . . . . . . . . . . . . . . . . . . 9
+      8.1.1 Mode ouvert. . . . . . . . . . . . . . . . . . . . . .  9
+      8.1.2 Mode fermé. . . . . . . . . . . . . . . . . . . . . . . 10
+      8.1.3 Demande de block. . . . . . . . . . . . . . . . . . . . 10
+      8.1.4 Annulation. . . . . . . . . . . . . . . . . . . . . . . 11
+      8.1.5 Envoie du block. . . . . . . . . . . . . . . . . . . .  11
+    8.2 Mode fermé. . . . . . . . . . . . . . . . . . . . . . . . . 11
+  9. Déconnexion. . . . . . . . . . . . . . . . . . . . . . . . . . 12
 
 
 
@@ -68,27 +69,33 @@ SOMMAIRE
   fondation pour assurer la fiabilité et l'intégrité des communications 
   entre les clients et le serveur. 
 
-  Codex : Une suite de données décrivant les fichiers partagés par un ou plusieurs 
-    utilisateurs dans un réseau pair à pair. Chaque codex est identifié par un identifiant
-    unique (ID) et comprend des informations telles que la liste des fichiers partagés, 
-    les parties de ces fichiers disponibles chez chaque utilisateur (sharer), 
-    et d'autres métadonnées pertinentes.
+  Codex : Une suite de données décrivant les fichiers partagés par un ou 
+    plusieurs utilisateurs dans un réseau pair à pair. Chaque codex est 
+    identifié par un identifiant unique (ID) et comprend des 
+    informations telles que la liste des fichiers partagés, les parties 
+    de ces fichiers disponibles chez chaque utilisateur (sharer), et 
+    d'autres métadonnées pertinentes.
 
-  Annuaire : Un serveur centralisé qui stocke une liste de codex disponibles dans le réseau. 
-    L'annuaire permet à tout client de récupérer les informations nécessaires sur les codex 
-    afin de participer au partage de fichiers. En consultant l'annuaire, un client peut découvrir 
-    quels fichiers sont disponibles pour le téléchargement, ainsi que les utilisateurs (sharers) 
-    qui possèdent des parties de ces fichiers.
+  Annuaire : Un serveur centralisé qui stocke une liste de codex 
+    disponibles dans le réseau. L'annuaire permet à tout client de 
+    récupérer les informations nécessaires sur les codex afin de 
+    participer au partage de fichiers. En consultant l'annuaire, un 
+    client peut découvrir quels fichiers sont disponibles pour le 
+    téléchargement, ainsi que les utilisateurs (sharers) qui possèdent 
+    des parties de ces fichiers.
 
-  Client : Une application logicielle utilisée pour télécharger et partager des fichiers dans un 
-    réseau pair à pair. Les clients interagissent avec l'annuaire pour obtenir des informations sur 
-    les fichiers disponibles et établissent des connexions avec d'autres utilisateurs (sharers) pour 
-    échanger des parties de fichiers.
+  Client : Une application utilisée pour télécharger et partager des 
+    fichiers dans un réseau pair à pair. Les clients interagissent avec 
+    l'annuaire pour obtenir des informations sur les fichiers 
+    disponibles et établissent des connexions avec d'autres utilisateurs 
+    (sharers) pour échanger des parties de fichiers.
 
-  Sharer : Dans le contexte d'un réseau de partage de fichiers pair à pair, les sharers sont les 
-    utilisateurs qui possèdent et partagent des parties de fichiers avec d'autres utilisateurs. 
-    Chaque sharer contribue au réseau en mettant à disposition des parties de fichiers qu'il possède, 
-    permettant ainsi aux autres utilisateurs de télécharger ces fichiers à partir de plusieurs sources.
+  Sharer : Dans le contexte d'un réseau de partage de fichiers pair à
+   pair, les sharers sont les utilisateurs qui possèdent et partagent 
+   des parties de fichiers avec d'autres utilisateurs. Chaque sharer 
+   contribue au réseau en mettant à disposition des parties de fichiers
+   qu'il possède, permettant ainsi aux autres utilisateurs de 
+   télécharger ces fichiers à partir de plusieurs sources.
 
 
 2. Encodage
@@ -98,6 +105,10 @@ SOMMAIRE
   | 0  | error            | 1  | register         |
   +-----------------------+-----------------------+
   | 2  | discovery        | 3  | event            |
+  +-----------------------+-----------------------+
+
+                                                                [page 2]
+
   +-----------------------+-----------------------+
   | 4  | yell             | 5  | whisper          |
   +-----------------------+-----------------------+
@@ -115,8 +126,10 @@ SOMMAIRE
   +-----------------------+-----------------------+
   | 18 | needblock        | 19 | cancel           |
   +-----------------------+-----------------------+
-  | 20 | hereblock        | 21 | proxyopen        |
+  | 20 | hereblock        | 21 | newchunk         |
   +-----------------------+-----------------------+
+  | 22 | proxyopen        | 
+  +-----------------------+
                                                                 
   - un int représente 4 octets
   - un long représente 8 octets
@@ -148,6 +161,8 @@ SOMMAIRE
   Lorsqu'un client souhaite se connecter au serveur IRC, il envoie une 
   demande de connexion en spécifiant le nom d'utilisateur qu'il souhaite 
   utiliser. Voici le format de la trame pour cette demande : 
+
+                                                                [page 3]
 
                     +-----------------------+
                     | (register) | username | 
@@ -202,6 +217,8 @@ SOMMAIRE
   Finalement les arrivés et départs sont traités comme des messages 
   globaux.
 
+                                                                [page 4]
+
   +-------------------------------------+
   | (event) | code (byte) |  username   |
   +-------------------------------------+
@@ -241,20 +258,26 @@ SOMMAIRE
 
 
 5. Codex
-  L'annuaire possède des descriptions de chaque partage qu'on appelle codex.
+  L'annuaire possède des descriptions de chaque partage qu'on appelle 
+  codex.
   L'annuaire sait quels clients partage un codex. 
   Les clients peuvent chercher des codex dans l'annuaire.
-  Les clients peuvent demander à l'annuaire de rejoindre le réseau de partage 
-  des fichiers du codex.
+  Les clients peuvent demander à l'annuaire de rejoindre le réseau de 
+  partage des fichiers du codex.
 
 5.1 Publication du codex
   
-  L'intérêt est que le l'annuaire ne possède pas de copie des fichiers en partage, 
-  ce qui reviendrait à du téléchargement centralisé et nécessite un serveur très puissant.
-  L'annuaire possède seulement un description des fichiers que les sharers partagent.
+  L'intérêt est que le l'annuaire ne possède pas de copie des fichiers 
+  en partage, ce qui reviendrait à du téléchargement centralisé et 
+  nécessite un serveur très puissant.
+  L'annuaire possède seulement un description des fichiers que les 
 
-  Le client peut proposer un ou des fichiers au partage qui sont rassemblés dans 
-  un même ensemble décrit pas le codex. 
+                                                                [page 5]
+  
+  sharers partagent.
+
+  Le client peut proposer un ou des fichiers au partage qui sont 
+  rassemblés dans un même ensemble décrit pas le codex. 
   
   +------------------------------+
   | (propose) | codex_id | codex |
@@ -267,21 +290,24 @@ SOMMAIRE
     - files_count : le nombre de fichiers (int).
     - chunks : la concaténation des identifiants (SHA1) de chaque chunk.
   
-    Chaque fichier du codex est découpé en chunk d'une taille fixe en int, 
-    d'une puissance 2. De cette façon plusieurs sharers peuvent partager
-    des bouts du fichiers en simultané, ce qui augmente sa disponibilité 
-    et la probabilité qu'un client aboutisse à compléter le téléchargement.
-    Dans un optique de pouvoir télécharger des fichiers d'une taille jusqu'à 2Go
-    on propose une taille de 256ko qui donne un total de 7 813 chunks.
-    Chaque chunk est ensuite hashé pour obtenir un identifiant SHA1.
-    Pour un fichier de 2Go cette liste de sha1 (20 bytes) réprésente un poids de 156ko, ce qui est raisonnable.
-    Le hashage permet aux clients de s'assurer de l'intégrité des données qu'il télécharge, 
-    en testant le hash du chunk reçu avec celui décrit dans le codex. 
+    Chaque fichier du codex est découpé en chunk d'une taille fixe en 
+    int, d'une puissance 2. De cette façon plusieurs sharers peuvent 
+    partager des bouts du fichiers en simultané, ce qui augmente sa 
+    disponibilité et la probabilité qu'un client aboutisse à compléter 
+    le téléchargement. Dans un optique de pouvoir télécharger des 
+    fichiers d'une taille jusqu'à 2Go on propose une taille de 256ko qui
+    donne un total de 7 813 chunks. 
+    Chaque chunk est ensuite hashé pour obtenir un identifiant SHA1. 
+    Pour un fichier de 2Go cette liste de sha1 (20 bytes) réprésente un 
+    poids de 156ko, ce qui est raisonnable. Le hashage permet aux 
+    clients de s'assurer de l'intégrité des données qu'il télécharge, en 
+    testant le hash du chunk reçu avec celui décrit dans le codex. 
 
     files: 
-      une liste qui concatène tous les <nomfichier><path> des fichiers du 
-      codex. nomfichier et path sont des strings. 
-      path représente le chemin absolu où nomfichier se situe dans le codex.
+      une liste qui concatène tous les <nomfichier><path> des fichiers 
+      du codex. nomfichier et path sont des strings. 
+      path représente le chemin absolu où nomfichier se situe dans le 
+      codex.
   
 
 5.2 Téléchargement du codex
@@ -298,23 +324,28 @@ SOMMAIRE
   | (request) | codex |
   +-------------------+
 
-  où codex contient les mêmes informations que décrites dans la partie 5.1.
+  où codex contient les mêmes informations que décrites dans la partie 
+  5.1.
 
+                                                                [page 6]
 
 6. Recherche de codex
 
-  Le client envoie une trame de recherche au serveur avec les informations suivantes :
+  Le client envoie une trame de recherche au serveur avec les 
+  informations suivantes :
 
   +--------------------------------------------------------------------+
   | (search) | codex_name | options | expected_results | creation_date |
   +--------------------------------------------------------------------+
     
   codex_name : (string) le nom du codex à rechercher.
-  options : un champ de bits (int) où chaque bit est numéroté à partir du poids fort.
+  options : un champ de bits (int) où chaque bit est numéroté à partir 
+            du poids fort.
     - Le bit 1 indique une recherche à une date spécifique (incluse).
     - Le bit 2 indique une recherche avant une certaine date (exclue).
     - Le bit 3 indique une recherche après une certaine date (exclue).
-  expected_results : (int) le nombre de résultats attendus, avec 0 pour "tous".
+  expected_results : (int) le nombre de résultats attendus, avec 0 pour 
+  "tous".
   
   exemple de trame pour le client qui recherche le codex "MonCodex": 
   +--------------------------------------------------------------------+
@@ -333,9 +364,11 @@ SOMMAIRE
     - info_hash : (20 bytes) le hash d'information.
     - creation_date : (long) la date de création.
     - seeders : (int) le nombre de seeders
-        (sharers qui partagent et possèdent les fichiers du codex à 100%).
+        (sharers qui partagent et possèdent les fichiers du codex à 
+        100%).
     - leechers : (int) le nombre de leechers 
-        (clients qui partagent les fichiers du codex mais qui ne les ont qu'en partie).
+        (clients qui partagent les fichiers du codex mais qui ne les ont
+         qu'en partie).
 
 
 7. Annonce
@@ -348,10 +381,14 @@ SOMMAIRE
   | (announce) | info_hash | parameters |
   +-------------------------------------+
 
+
+                                                                [page 7]
+
   info_hash: (SHA1) hash du dictionnaire de données associé au partage
   paramètres: une liste comprenant :
     event: (byte)
-      - 0 : indique que le client est en train de télécharger le fichier.
+      - 0 : indique que le client est en train de télécharger le 
+            fichier.
       - 1 : signifie que le client a cessé de partager le fichier.
       - 2 : indique que le client a complètement téléchargé le fichier.
       Ce paramètre spécifie l'état actuel du fichier.
@@ -369,15 +406,17 @@ SOMMAIRE
 
   Le serveur répond avec une trame pour répondre à la requête :
 
-  +---------------------------------------------------------------------------+
+  +------------------------------------------------------------------------+
   | (announce) | info_hash | seeders | leechers | wait | sharers | proxies |
-  +---------------------------------------------------------------------------+
+  +------------------------------------------------------------------------+
 
   seeders: le nombre de sharers ayant les fichiers complet (int)
   leechers: le nombre de clients ayant en partie les fichiers (int)
-  wait: l'intervalle minimum que le client doit attendre avant de refaire une annonce (int)
-  sharers: une liste de sharers actifs au partage du codex, chaque sharer étant 
-           représenté par une série de 6 octets d'informations:
+  wait: l'intervalle minimum que le client doit attendre avant de
+        refaire une annonce (int)
+  sharers: une liste de sharers actifs au partage du codex, chaque
+           sharer étant représenté par une série de 6 octets 
+           d'informations:
 
     +---------------------------------------------+
     | sharers_count | ip | port | ip | port | ... |
@@ -394,7 +433,12 @@ SOMMAIRE
     | proxies_count | ip | port | ip | port | ... |
     +---------------------------------------------+
 
-    - proxies_count: le nombre de pairs disponibles pour agir en tant que proxy (int)
+    - proxies_count: le nombre de clients disponibles pour agir en tant 
+                     que proxy (int)
+
+
+                                                                [page 8]
+
     - ip: l'adresse IP du client (4 octets)
     - port: le port du client (2 octets)
 
@@ -405,6 +449,7 @@ SOMMAIRE
   +----------------------------------+
 
   error_message: message human-readable
+  Le client pourra alors renvoyer une annonce
 
 
 8. Téléchargement des fichiers du codex
@@ -412,10 +457,10 @@ SOMMAIRE
 
   A ce stade le client possède un codex et donc 
   connaît la liste des chunks du codex et les fichiers qu'il contient.
-  Il connaît également les pairs qu'il doit contacter pour récupérer les 
-  chunks.
+  Il connaît également les sharers qu'il doit contacter pour récupérer 
+  les chunks.
 
-  Le client initie l'échange avec un pair avec le handshake:
+  Le client initie l'échange avec un sharer avec le handshake:
 
   +-------------------------+
   | (handshake) | codex_id  | 
@@ -430,8 +475,8 @@ SOMMAIRE
 
   8.1.1 Champs de bits
 
-  juste après le handshake le client et le pair s'envoient 
-  respectivement le champs de bits des chunk qu'ils possèdent du codex.
+  Juste après le handshake le client et le sharers s'envoient 
+  respectivement le champs de bits des chunks qu'ils possèdent du codex.
   Le bit de poids fort est le chunk d'indice 0.
   Le client termine la connexion si le champs de bits n'est pas de la 
   bonne taille.
@@ -439,21 +484,51 @@ SOMMAIRE
   +-------------------------------------+
   | (have) | bitfield_length | bitfield |
   +-------------------------------------+ 
+  
+  bitfield_length: Longueur du champ de bits (int).
+  bitfield: Champ de bits représentant les chunks possédés par le client
+            ou le pair. 
+            Chaque bit correspond à un chunk du codex, où le bit de 
+            poids fort représente le 
+            chunk d'indice 0. Un bit à 1 indique que le chunk 
 
-  Le client met au courant une portion des sharers avec 
-  qui il est connecté des nouveaux chunks qu'il complète afin de mettre 
-  à jour les bitfield que chacun possède.
+                                                                [page 9]
+
+            correspondant est possédé, tandis qu'un bit à 0 indique 
+            qu'il ne l'est pas.
+
+ 
+  Le client connaît les chunks que possèdent les sharers avec lesquels 
+  il est connecté grâce aux bitfields échangés. 
+  Lorsqu'il reçoit un nouveau chunk, le client sait quels sharers ne le 
+  possèdent pas. 
+  Il envoie alors une trame newchunk à ces sharers. Ces derniers
+  pourrons alors demander ce chunk au client.
    
   +--------------------------+
-  | (newchunk) | chunk_index | 
+  | (newchunk) | chunk_index |
   +--------------------------+
   
+  Cas de figure 
+                      A ---- C ---- B
+
+  Dans cette configuration à l'ouverture des deux connexions:
+    - A connaît les chunks de C
+    - C connaît les chunks de A et B
+    - B connaît les chunks C
+  
+  Au bout d'un moment C complète un chunk qu'il a téléchargé chez B.
+  C envoie (newchunk)<chunk_index> à A.
+  A qui n'avait pas le chunk et ne pouvait pas le télécharger chez C, 
+  peut désormais le faire.
+
 
   8.1.2 Keep-alive
 
   Le client doit aussi maintenir la connexion avec des message 
   keep-alive, dans le cas contraire le pair peut y mettre fin s'il 
   n'a rien reçu du client pendant une certaine durée.
+  La durée définie est de une minute et 30 secondes.
 
   +-------------+
   | (keepalive) | 
@@ -463,17 +538,21 @@ SOMMAIRE
   8.1.3 Demande de block
   
   Le client souhaite télécharger un chunk au sharer.
-  le client ne télécharge pas les chunks mais par portions 
-  de chunks appelé 'blocks' de taille comprise entre 16ko et la 
+  Le client ne télécharge pas les chunks mais par portions 
+  de chunks appelés 'blocks' de taille comprise entre 16ko et la 
   taille du chunk.
 
-  +------------------------------------------------+
-  | (needblock) | chunk_index | offset | length   |
-  +------------------------------------------------+
+  +---------------------------------------------+
+  | (needblock) | chunk_index | offset | length |
+  +---------------------------------------------+
 
-  chunk_index: l'indice de la piece demandée
-  offset:      position en byte du block dans le chunk.
-  length:      la taille du block 
+
+                                                               [page 10] 
+                                                               
+  chunk_index: l'indice du chunk demandé (int).
+  offset:      l'indice du byte dans le chunk (int).
+  length:      la taille du block (int).
+
   
   8.1.4 Annulation
   Le client peut envoyer une trame pour annuler la requête 
@@ -488,28 +567,30 @@ SOMMAIRE
   | (hereblock) | chunk_index | offset | payload |
   +----------------------------------------------+ 
 
-  chunk_index: l'indice de la piece demandée
-  offset:      position en byte du block dans le chunk.
+  chunk_index: l'indice du chunk demandé (int).
+  offset:      l'indice du byte dans le chunk (int).
   payload:     la donnée
 
 8.2 Mode fermé
 
   A ce stade le client possède un codex et donc 
   connaît la liste des chunks du codex et les fichiers qu'il contient.
-  Il connaît également les pairs qu'il doit contacter pour récupérer les 
-  chunks. Il connaît aussi l'adresse des clients qui peuvent 
+  Il connaît également les sharers qu'il doit contacter pour récupérer 
+  les chunks. Il connaît aussi l'adresse des clients qui peuvent 
   potentiellement accepter de faire proxy pour lui.
 
-  Le client envoie une trame d'ouverture de connexion. 
+  Le client envoie une trame d'ouverture de connexion à un potentiel 
+  client proxy.
 
   +----------------------------------------+
   | (proxy_open) | sharer_ip | sharer_port |     
   +----------------------------------------+
 
   Si le proxy accepte alors la connection reste ouverte 
-  et ouvre une connection avec le sharer et communique avec lui comme spécifié en 
-  8.. Le flux est transmis dans les deux sens entre le client et le sharer 
-  par le proxy.
+  et ouvre une connection avec le sharer et communique avec lui comme 
+  spécifié en 8.. Le flux est transmis dans les deux sens entre le 
+  client et le sharer par le proxy.
+  
                               ___
                   A ---------|   |--------- B
                              | D |          |
@@ -520,8 +601,11 @@ SOMMAIRE
   Le proxy peut décider à tout moment de terminer son rôle de proxy, 
   et ferme alors les deux connexions.  
 
+
+                                                               [page 11]
+
   Dans cette implémentation, chaque demande d'ouverture de connexion
-  à un proxy par un client ouvre une nouvelle connexion. Le proxy doit 
+  à un proxy par un client ouvre une nouvelle connexion. Le proxy doit  
   gérer sa charge et sa bande passante.
 
   Il est suggéré au développeur du client de ne pas mettre en place, 
@@ -540,3 +624,37 @@ SOMMAIRE
   conformément aux spécifications de la partie "Discussion - Mise à jour 
   des présences".
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                               [page 12]
