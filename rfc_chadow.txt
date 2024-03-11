@@ -554,6 +554,8 @@ SOMMAIRE
   comme un proxy pour le client, échangeant ainsi les trames de demande
   de bloc avec le client et les trames de réponse avec le sharer.
 
+  8.2.1 Gestion erreur
+  
   Si le serveur ne peut pas garantir le téléchargement du fichier faute
   de suffisamment de clients pour servir de proxy, il envoie une trame
   d'erreur au client :
@@ -563,6 +565,8 @@ SOMMAIRE
   +----------------------------------+
 
   error_message: message human-readable
+
+  8.2.2 Connexion en chaîne
 
   Si le serveur peut garantir le téléchargement du fichier,
   il envoie une trame de réponse au client :
@@ -609,6 +613,8 @@ SOMMAIRE
   pour télécharger les chunks, les proxy servant de relais pour les 
   trames de demande de bloc et de réponse.
 
+  8.2.3 Déconnexion en chaîne
+
   Dès qu'un proxy, le client ou le sharer se déconnecte, une déconnexion 
   en chaîne est initiée. Le client doit alors informer le serveur de la 
   déconnexion du proxy pour que ce dernier puisse mettre à jour ses 
@@ -626,38 +632,3 @@ SOMMAIRE
   en informant tous les autres utilisateurs de sa déconnexion, 
   conformément aux spécifications de la partie "Discussion - Mise à jour 
   des présences".
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                                                               [page 12]
