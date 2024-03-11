@@ -18,28 +18,28 @@ SOMMAIRE
   3. Identification. . . . . . . . . . . . . . . . . . . . . . . .  3  
   4. Discussion. . . . . . . . . . . . . . . . . . . . . . . . . .  4
     4.1 Découverte des utilisateurs. . . . . . . . . . . . . . . .  4
-    4.2 Mise à jour des présences. . . . . . . . . . . . . . . . .  4
+    4.2 Mise à jour des présences. . . . . . . . . . . . . . . . .  5
     4.3 Publication de messages globaux. . . . . . . . . . . . . .  5
     4.4 Echange de message entre utilisateurs. . . . . . . . . . .  5
   5. Codex. . . . . . . . . . . . . . . . . . . . . . . . . . . . . 5  
-    5.1 Publication du codex. . . . . . . . . . . . . . . . . . . . 5
+    5.1 Publication du codex. . . . . . . . . . . . . . . . . . . . 6
     5.2 Téléchargement du codex. . . . . . . . . . . . . . . . . .  6
   6. Recherche de partage. . . . . . . . . . . . . . . . . . . . .  7
-  7. Annonce. . . . . . . . . . . . . . . . . . . . . . . . . . . . 7 
+  7. Annonce. . . . . . . . . . . . . . . . . . . . . . . . . . . . 8
+    7.1 Annonce de proxy. . . . . . . . . . . . . . . . . . . . . . 8              
+    7.2 Annonce de partage ou de téléchargement. . . . . . . . . . .8
   8. Téléchargement des fichiers du codex. . . . . . . . . . . . .  9
     8.1 Mode de Téléchargement. . . . . . . . . . . . . . . . . . . 9
-      8.1.1 Mode ouvert. . . . . . . . . . . . . . . . . . . . . .  9
-      8.1.2 Mode fermé. . . . . . . . . . . . . . . . . . . . . . . 10
-      8.1.3 Demande de block. . . . . . . . . . . . . . . . . . . . 10
+      8.1.1 Mode ouvert. . . . . . . . . . . . . . . . . . . . . . .10
+      8.1.2 Mode fermé. . . . . . . . . . . . . . . . . . . . . . . 11
+      8.1.3 Demande de block. . . . . . . . . . . . . . . . . . . . 11
       8.1.4 Annulation. . . . . . . . . . . . . . . . . . . . . . . 11
-      8.1.5 Envoie du block. . . . . . . . . . . . . . . . . . . .  11
+      8.1.5 Envoie du block. . . . . . . . . . . . . . . . . . . . .11
     8.2 Mode fermé. . . . . . . . . . . . . . . . . . . . . . . . . 11
-      8.1.1 Connexion en chaîne. . . . . . . . . . . . . . . . . . . 
-      8.2.2 Réparation de la chaîne. . . . . . . . . . . . . . . . . 
-  9. Déconnexion. . . . . . . . . . . . . . . . . . . . . . . . . . 12
-
-
-
+      8.1.1 Connexion en chaîne. . . . . . . . . . . . . . . . . . .12 
+      8.2.2 Réparation de la chaîne. . . . . . . . . . . . . . . . .13
+      8.2.3 Déconnexion en chaîne. . . . . . . . . . . . . . . . . .13
+  9. Déconnexion. . . . . . . . . . . . . . . . . . . . . . . . . . 13
 
 
 
