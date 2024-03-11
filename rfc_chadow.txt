@@ -164,34 +164,30 @@ SOMMAIRE
 
                                                                 [page 3]
 
-                    +-----------------------+
-                    | (register) | username | 
-                    +-----------------------+
-                    
+        +-----------------------+
+        | (register) | username | 
+        +-----------------------+
+
   Le serveur répond au client pour indiquer si le nom d'utilisateur est 
   disponible ou non :
     - Si le nom d'utilisateur est disponible, le serveur envoie une 
     validation au client :
-      
-                    +-----------------------+
-                    | (register) | username | 
-                    +-----------------------+
-  
+
+        +-----------------------+
+        | (register) | username | 
+        +-----------------------+
+
     - Si le nom d'utilisateur est déjà utilisé ou que le nom 
     d'utilisateur ne respecte pas les règles de formatage définies
     dans la section "Encodage", le serveur envoie un message d'erreur
     au client :
-      
-          +--------------------------------------------+
-          | (error) | username already in use (string) | 
-          +--------------------------------------------+
 
-          ou
+        +----------------------------------+
+        | (error) | error_message (string) |
+        +----------------------------------+
 
-          +--------------------------------------------+
-          | (error) | invalid username (string)        |
-          +--------------------------------------------+
-      
+        error_message: message human-readable
+
       Dans ce cas ci le client peut envoyer à nouveau une demande de 
       connexion au serveur.
       
@@ -405,9 +401,9 @@ SOMMAIRE
 
   Le serveur répond avec une trame pour répondre à la requête :
 
-  +------------------------------------------------------------------------+
-  | (announce) | info_hash | seeders | leechers | wait | sharers | proxies |
-  +------------------------------------------------------------------------+
+  +--------------------------------------------------------------+
+  | (announce) | info_hash | seeders | leechers | wait | sharers |
+  +--------------------------------------------------------------+
 
   seeders: le nombre de sharers ayant les fichiers complet (int)
   leechers: le nombre de clients ayant en partie les fichiers (int)
@@ -424,18 +420,6 @@ SOMMAIRE
     - sharers_count: le nombre de sharers actifs (int)
     - ip: l'adresse IP du sharer (4 octets)
     - port: le port du sharer (2 octets)
-
-  proxies: présent lorsque le client télécharge en mode fermé. 
-    Liste des clients disponibles pour agir en tant que proxy :
-
-    +---------------------------------------------+
-    | proxies_count | ip | port | ip | port | ... |
-    +---------------------------------------------+
-
-    - proxies_count: le nombre de clients disponibles pour agir en tant 
-                     que proxy (int)
-    - ip: l'adresse IP du client (4 octets)
-    - port: le port du client (2 octets)
 
   En cas d'erreur, le serveur répond avec la trame suivante : 
 
@@ -562,44 +546,77 @@ SOMMAIRE
 
 8.2 Mode fermé
 
-  A ce stade le client possède un codex et donc 
-  connaît la liste des chunks du codex et les fichiers qu'il contient.
-  Il connaît également les sharers qu'il doit contacter pour récupérer 
-  les chunks. Il connaît aussi l'adresse des clients qui peuvent 
-  potentiellement accepter de faire proxy pour lui.
+  À ce stade, le client a envoyé une demande au serveur pour télécharger
+  un codex en mode fermé, en précisant le nombre de sharers souhaités et
+  le nombre de proxy à utiliser pour le chaînage. Si le nombre de 
+  clients est insuffisant pour garantir le téléchargement du fichier 
+  (seulement 2 client sont présent sur le serveur), le serveur agira
+  comme un proxy pour le client, échangeant ainsi les trames de demande
+  de bloc avec le client et les trames de réponse avec le sharer.
 
-  Le client envoie une trame d'ouverture de connexion à un potentiel 
-  client proxy.
+  Si le serveur ne peut pas garantir le téléchargement du fichier faute
+  de suffisamment de clients pour servir de proxy, il envoie une trame
+  d'erreur au client :
 
-  +----------------------------------------+
-  | (proxy_open) | sharer_ip | sharer_port |     
-  +----------------------------------------+
+  +----------------------------------+
+  | (error) | error_message (string) |
+  +----------------------------------+
 
-  Si le proxy accepte alors la connection reste ouverte 
-  et ouvre une connection avec le sharer et communique avec lui comme 
-  spécifié en 8.. Le flux est transmis dans les deux sens entre le 
-  client et le sharer par le proxy.
-  
-                              ___
-                  A ---------|   |--------- B
-                             | D |          |
-                  C ---------|___|--------- +
+  error_message: message human-readable
 
-  Si une des connexion est fermée, côté client ou côté sharer alors le 
-  la connection restante est fermée.
-  Le proxy peut décider à tout moment de terminer son rôle de proxy, 
-  et ferme alors les deux connexions.  
+  Si le serveur peut garantir le téléchargement du fichier,
+  il envoie une trame de réponse au client :
 
-  Dans cette implémentation, chaque demande d'ouverture de connexion
-  à un proxy par un client ouvre une nouvelle connexion. Le proxy doit  
-  gérer sa charge et sa bande passante.
+  +-------------------------------------------------+
+  | (anonymize) | codex_id | download_id | chain_id | 
+  +-------------------------------------------------+
+  | proxy_ip | proxy_port                           | 
+  +-------------------------------------------------+
 
-  Il est suggéré au développeur du client de ne pas mettre en place, 
-  ou du moins cacher l'option, permettant de choisir ou non d'être 
-  proxy. L'utilisateur serait tenté de ne pas l'activer dans le but
-  de faciliter le téléchargement de ses propres fichiers, mettant en 
-  péril cette fonctionnalité anonymisante du protocole. 
+  codex_id : hachage (SHA1) du codex.
+  download_id : identifiant unique du téléchargement (long) 
+                généré par le serveur.
+  chain_id : identifiant unique de la chaîne de proxy (long) 
+             généré par le serveur.
+  proxy_ip : adresse IP du client servant de proxy (4 octets).
+  proxy_port : port du client servant de proxy (2 octets).
 
+  Le client initie alors une connexion avec le premier proxy :
+
+  +-------------------------------------------------+
+  | (proxyopen) | codex_id | download_id | chain_id |
+  +-------------------------------------------------+
+  | remaining_proxy_count                           |
+  +-------------------------------------------------+
+
+  remaining_proxy_count : nombre de proxy restants dans la chaîne (int).
+
+  Après avoir reçu la trame et établi la connexion, le proxy envoie une
+  trame au serveur pour demander une connexion au prochain pair de la chaîne :
+
+  +-------------------------------------------------+
+  | (anonymize) | codex_id | download_id | chain_id |
+  +-------------------------------------------------+
+  | remaining_proxy_count                           |
+  +-------------------------------------------------+
+
+  Le serveur répond avec une trame identique à celle envoyée au client. 
+  Lorsque remaining_proxy_count est à 0, le serveur envoie une trame de
+  réponse au dernier proxy de la chaîne, contenant les informations du 
+  sharer dans proxy_ip et proxy_port.
+
+  Le client peut alors utiliser les mêmes trames que dans le mode ouvert
+  pour télécharger les chunks, les proxy servant de relais pour les 
+  trames de demande de bloc et de réponse.
+
+  Dès qu'un proxy, le client ou le sharer se déconnecte, une déconnexion 
+  en chaîne est initiée. Le client doit alors informer le serveur de la 
+  déconnexion du proxy pour que ce dernier puisse mettre à jour ses 
+  informations. Il envoie alors une trame de déconnexion au serveur :
+
+  +--------------------------------------------------+
+  | (disconnect) | codex_id | download_id | chain_id |
+  +--------------------------------------------------+  
 
 9. Deconnexion
   Lorsqu'un client se déconnecte du serveur, que ce soit de manière 
