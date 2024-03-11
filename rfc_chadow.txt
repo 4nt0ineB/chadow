@@ -34,11 +34,9 @@ SOMMAIRE
       8.1.4 Annulation. . . . . . . . . . . . . . . . . . . . . . . 11
       8.1.5 Envoie du block. . . . . . . . . . . . . . . . . . . .  11
     8.2 Mode fermé. . . . . . . . . . . . . . . . . . . . . . . . . 11
+      8.1.1 Connexion en chaîne. . . . . . . . . . . . . . . . . . . 
+      8.2.2 Réparation de la chaîne. . . . . . . . . . . . . . . . . 
   9. Déconnexion. . . . . . . . . . . . . . . . . . . . . . . . . . 12
-
-
-
-
 
 
 
@@ -97,7 +95,6 @@ SOMMAIRE
    qu'il possède, permettant ainsi aux autres utilisateurs de 
    télécharger ces fichiers à partir de plusieurs sources.
 
-
 2. Encodage
 
   Opcode des trames
@@ -106,7 +103,6 @@ SOMMAIRE
   +-----------------------+-----------------------+
   | 2  | discovery        | 3  | event            |
   +-----------------------+-----------------------+
-
                                                                 [page 2]
 
   +-----------------------+-----------------------+
@@ -128,7 +124,9 @@ SOMMAIRE
   +-----------------------+-----------------------+
   | 20 | hereblock        | 21 | newchunk         |
   +-----------------------+-----------------------+
-  | 22 | proxyopen        | 
+  | 22 | proxyopen        | 23 | anonymize        | 
+  +-----------------------+-----------------------+
+  | 24 | disconnect       |
   +-----------------------+
                                                                 
   - un int représente 4 octets
@@ -153,16 +151,16 @@ SOMMAIRE
     Le serveur doit garantir qu'il n'existe pas deux clients avec le 
     même username.
 
-
 3. Identification
 
   Le client doit connaître l'adresse du serveur avec lequel il 
   souhaite communiquer.
+
+                                                                [page 3]
+  
   Lorsqu'un client souhaite se connecter au serveur IRC, il envoie une 
   demande de connexion en spécifiant le nom d'utilisateur qu'il souhaite 
   utiliser. Voici le format de la trame pour cette demande : 
-
-                                                                [page 3]
 
         +-----------------------+
         | (register) | username | 
@@ -191,7 +189,6 @@ SOMMAIRE
       Dans ce cas ci le client peut envoyer à nouveau une demande de 
       connexion au serveur.
       
-   
 4. Discussion
 
 4.1 Découverte des utilisateurs 
@@ -212,7 +209,8 @@ SOMMAIRE
     utilisateurs <taille de l'username en int><username>.
     La liste se termine par 0.
     Ex: 8morpheus7trinity0
-              
+                                                                [page 4]
+
 4.2 Mise à jour des présences
 
   Le serveur notifie les évènements ('code') d'arrivé (1) et de départ 
@@ -264,6 +262,7 @@ SOMMAIRE
   codex.
   L'annuaire sait quels clients partage un codex. 
   Les clients peuvent chercher des codex dans l'annuaire.
+                                                                [page 5]
   Les clients peuvent demander à l'annuaire de rejoindre le réseau de 
   partage des fichiers du codex.
 
@@ -316,6 +315,7 @@ SOMMAIRE
   +-----------------------------+
   | (request) | codex_id (SHA1) |
   +-----------------------------+
+                                                                [page 6]
 
   Le serveur répond avec la trame suivante :
 
@@ -368,6 +368,7 @@ SOMMAIRE
         (clients qui partagent les fichiers du codex mais qui ne les ont
          qu'en partie).
 
+                                                                [page 7]
 
 7. Annonce
 
@@ -417,9 +418,10 @@ SOMMAIRE
 
   Le serveur répond avec une trame pour répondre à la requête :
 
-  +------------------------------------------------------------------------+
+  +-----------------------------------------------------------------------+
   | (announce) | codex_id | seeders | leechers | wait | sharers | proxies |
-  +------------------------------------------------------------------------+
+  +-----------------------------------------------------------------------+
+                                                                [page 8]
 
   seeders: le nombre de sharers ayant les codex complet (int)
   leechers: le nombre de clients ayant en partie les codex (int)
@@ -459,7 +461,6 @@ SOMMAIRE
   error_message: message human-readable
   Le client pourra alors renvoyer une annonce
 
-
 8. Téléchargement des fichiers du codex
 8.1 Mode ouverte
 
@@ -473,6 +474,7 @@ SOMMAIRE
   +-------------------------+
   | (handshake) | codex_id  | 
   +-------------------------+
+                                                                [page 9]
 
   Si le client reçoit un handshake avec un codex_id qu'il ne possède 
   pas où qu'il ne souhaite pas partager il peut terminer la connexion.
@@ -481,7 +483,7 @@ SOMMAIRE
   Le reste des trames échangées est préfixées par leur taille, afin de
   facilter la lecture sur le socket par le client.
 
-  8.1.1 Champs de bits
+8.1.1 Champs de bits
 
   Juste après le handshake le client et le sharers s'envoient 
   respectivement le champs de bits des chunks qu'ils possèdent du codex.
@@ -501,7 +503,6 @@ SOMMAIRE
             chunk d'indice 0. Un bit à 1 indique que le chunk 
             correspondant est possédé, tandis qu'un bit à 0 indique 
             qu'il ne l'est pas.
-
  
   Le client connaît les chunks que possèdent les sharers avec lesquels 
   il est connecté grâce aux bitfields échangés. 
@@ -526,7 +527,7 @@ SOMMAIRE
   C envoie (newchunk)<chunk_index> à A.
   A qui n'avait pas le chunk et ne pouvait pas le télécharger chez C, 
   peut désormais le faire.
-
+                                                               [page 10]
 
   8.1.2 Keep-alive
 
@@ -579,10 +580,12 @@ SOMMAIRE
   un codex en mode fermé. Si le nombre de clients est insuffisant pour 
   garantir le téléchargement du codex (seulement 2 client sont présent
   sur le serveur), le serveur agira comme un proxy pour le client, 
+                                                               [page 11]
+
   échangeant ainsi les trames de demande de bloc avec le client et les 
   trames de réponse avec le sharer.
 
-  8.2.2 Connexion en chaîne
+  8.2.1 Connexion en chaîne
 
   Après avoir reçu une liste de proxy par le serveur après 
   son l'annonce, le client se connecte à un des proxys.
@@ -630,15 +633,18 @@ SOMMAIRE
   Il associe le codex_id, l'id de téléchargement, l'id de chaînage le 
   client qu'il lui à transmis pour ne pas le lui transmettre à nouveau 
   pour une nouvelle chaîne.
-  
+                                                               [page 12]
+
   Le client peut alors utiliser les mêmes trames que dans le mode ouvert
   pour télécharger les chunks, les proxy servant de relais pour les 
   trames de demande de bloc et de réponse.
 
+  8.2.2 Réparation de la chaîne
+
   A chaque étape de la création du chaînage, le maillon (client ou 
   proxy) peut abandonner le chaînage s'il n'a pu établir de connexion 
   avec le prochain maillon après écoulement d'un timeout qu'il aura 
-  choisi (L'annuaire ne peut pas fournir de nouveau proxy ou de sharer, 
+  choisi (l'annuaire ne peut pas fournir de nouveau proxy ou de sharer, 
   problème de latence,...).
   Les proxys en amont peuvent décider de suivre ou de retenter la 
   construction de la chaîne.
@@ -648,9 +654,9 @@ SOMMAIRE
   (Left)                                (Right)
   Client ---> Proxy A ---> Proxy B ---> Sharer 
 
-  Toute fermeture de connexion prevenant du côté gauche d'un maillon de
-  la chaîne (client) entraîne la fermeture successive des connections
-  de la chaîne à droite (côté sharer).
+  Toute fermeture de connexion prevenant du côté gauche (côté client) 
+  d'un maillon de la chaîne entraîne la fermeture successive des 
+  connections de la chaîne à droite (côté sharer).
   Toute fermeture à droite d'un maillon de la chaîne entraîne le même 
   comportement que l'établissement de la chaîne décrit plus haut.
   Ce fonctionnement optimiste permet la reconstruction d'un chaîne 
@@ -660,9 +666,10 @@ SOMMAIRE
   8.2.3 Déconnexion en chaîne
 
   Dès qu'un proxy, le client ou le sharer se déconnecte, une déconnexion 
-  en chaîne est initiée. Le client doit informer le serveur qu'une chaîne
-  a été fermée, lorsque que la connection avec le premier proxy de la chaîne 
-  a été fermée. Le client envoie alors une trame de déconnexion au serveur :
+  en chaîne est initiée. Le client doit informer le serveur qu'une 
+  chaîne a été fermée, lorsque que la connection avec le premier proxy
+  de la chaîne a été fermée. 
+  Le client envoie alors une trame de déconnexion au serveur :
 
   +--------------------------------------------------+
   | (disconnect) | codex_id | download_id | chain_id |
@@ -676,3 +683,7 @@ SOMMAIRE
   en informant tous les autres utilisateurs de sa déconnexion, 
   conformément aux spécifications de la partie "Discussion - Mise à jour 
   des présences".
+
+
+
+                                                               [page 13]
