@@ -359,7 +359,7 @@ SOMMAIRE
   number_of_results : (int) le nombre total de résultats.
   results : une liste comprenant :
     - filename : (string) le nom du fichier.
-    - info_hash : (20 bytes) le hash d'information.
+    - codex_id : (20 bytes) le hash d'information.
     - creation_date : (long) la date de création.
     - seeders : (int) le nombre de seeders
         (sharers qui partagent et possèdent les fichiers du codex à 
@@ -372,7 +372,7 @@ SOMMAIRE
 7. Annonce
 
   Le client annonce à intervalle régulier, défini par le serveur, son 
-  état pour chaque fichier partagé ou téléchargé, ainsi que sa 
+  état pour chaque codex partagés ou téléchargés, ainsi que sa 
   disponibilité à servir de proxy.
 
   7.1 Annonce de proxy
@@ -389,39 +389,40 @@ SOMMAIRE
           proxy.
     - 1 : indique que le client est disponible pour servir de proxy.
 
-  7.2 Annonce de partage ou téléchargement
+  Le client effectue cette annonce à chaque changement d'état et doit
+  renvoyer une annonce une minute après la dernière annonce pour 
+  maintenir sa disponibilité actuelle à jour.
+
+  7.2 Annonce de partage ou de téléchargement
+
   +-------------------------------------+
-  | (announce) | info_hash | parameters |
+  | (announce) | codex_id | parameters |
   +-------------------------------------+
 
-  info_hash: (SHA1) hash du dictionnaire de données associé au partage
+  codex_id: (SHA1) hash du dictionnaire de données associé au partage
   paramètres: une liste comprenant :
     event: (byte)
       - 0 : indique que le client est en train de télécharger le 
-            fichier.
-      - 1 : signifie que le client a cessé de partager le fichier.
-      - 2 : indique que le client a complètement téléchargé le fichier.
-      Ce paramètre spécifie l'état actuel du fichier.
+            codex.
+      - 1 : signifie que le client a cessé de partager le codex.
+      - 2 : indique que le client a complètement téléchargé le codex.
+      Ce paramètre spécifie l'état actuel du codex.
     privacy: (byte)
       - 0 : signifie que le partage est en mode caché.
       - 1 : indique que le partage est en mode ouvert.
       Ce paramètre détermine la visibilité du partage.
     sharers: 
       (int) le nombre de sharers que le client souhaite recevoir 
-      du serveur pour garantir le téléchargement du fichier.
-    proxy: 
-      (int) le nombre de clients que le client accepte de servir 
-      en tant que relais pour leurs téléchargements.
-
+      du serveur pour garantir le téléchargement du codex.
 
   Le serveur répond avec une trame pour répondre à la requête :
 
   +------------------------------------------------------------------------+
-  | (announce) | info_hash | seeders | leechers | wait | sharers | proxies |
+  | (announce) | codex_id | seeders | leechers | wait | sharers | proxies |
   +------------------------------------------------------------------------+
 
-  seeders: le nombre de sharers ayant les fichiers complet (int)
-  leechers: le nombre de clients ayant en partie les fichiers (int)
+  seeders: le nombre de sharers ayant les codex complet (int)
+  leechers: le nombre de clients ayant en partie les codex (int)
   wait: l'intervalle minimum que le client doit attendre avant de
         refaire une annonce (int)
   sharers: une liste de sharers actifs au partage du codex, chaque
@@ -576,7 +577,7 @@ SOMMAIRE
 
   À ce stade, le client a envoyé une demande au serveur pour télécharger
   un codex en mode fermé. Si le nombre de clients est insuffisant pour 
-  garantir le téléchargement du fichier (seulement 2 client sont présent
+  garantir le téléchargement du codex (seulement 2 client sont présent
   sur le serveur), le serveur agira comme un proxy pour le client, 
   échangeant ainsi les trames de demande de bloc avec le client et les 
   trames de réponse avec le sharer.
@@ -594,10 +595,9 @@ SOMMAIRE
 
   codex_id : hachage (SHA1) du codex.
   download_id : identifiant unique du téléchargement (long) 
-                généré par le serveur.
+                généré aléatoirement par le client.
   chain_id : identifiant unique de la chaîne de proxy (long) 
-             généré par le serveur.
-
+             généré aléatoirement par le client.
   remaining_proxy_count : nombre de proxy restants dans la chaîne (int).
 
   Après avoir reçu la trame et établi la connexion, le proxy envoie une
@@ -610,7 +610,7 @@ SOMMAIRE
   | remaining_proxy_count                           |
   +-------------------------------------------------+
 
-  Le serveur répond avec une trame identique à celle envoyée au client. 
+  Le serveur répond:
 
   +-------------------------------------------------+
   | (anonymize) | codex_id | download_id | chain_id |
@@ -618,9 +618,9 @@ SOMMAIRE
   | exists (byte) | ip | port                       |
   +-------------------------------------------------+
 
-  ?? il faut un moyen pour que le proxy sache si y'a bien un ip/port 
-  ptet pas la meilleur façon le "exists" ...
-
+  exists: 
+    - 0 : le serveur n'a pas pu fournir de nouveau proxy.
+    - 1 : le serveur a fourni une adresse pour le prochain proxy.
   ip : adresse IP du client servant de proxy (4 octets).
   port : port du client servant de proxy (2 octets).
 
@@ -635,22 +635,34 @@ SOMMAIRE
   pour télécharger les chunks, les proxy servant de relais pour les 
   trames de demande de bloc et de réponse.
 
-  A chaque étape de demande de chaînage par un proxy au serveur,
-  si le serveur ne peut pas fournir de nouveau proxy ou de sharer,
-  le client peut abandonner le chaînage s'il 
-  ne peut pas établir la prochaine connexion au bout après l'écoulement 
-  d'un timeout que le client à choisi.
-  Les proxys en amont peuvent décider de suivre ou de retenter le 
-  chaînage selon leur propre timeout.
+  A chaque étape de la création du chaînage, le maillon (client ou 
+  proxy) peut abandonner le chaînage s'il n'a pu établir de connexion 
+  avec le prochain maillon après écoulement d'un timeout qu'il aura 
+  choisi (L'annuaire ne peut pas fournir de nouveau proxy ou de sharer, 
+  problème de latence,...).
+  Les proxys en amont peuvent décider de suivre ou de retenter la 
+  construction de la chaîne.
   En cas de timeout non écoulé, le proxy demande en boucle à intervalle
-  de 5 secondes le nouveau maillon (proxy ou sharer).
+  de 4 secondes le nouveau maillon (proxy ou sharer).
+
+  (Left)                                (Right)
+  Client ---> Proxy A ---> Proxy B ---> Sharer 
+
+  Toute fermeture de connexion prevenant du côté gauche d'un maillon de
+  la chaîne (client) entraîne la fermeture successive des connections
+  de la chaîne à droite (côté sharer).
+  Toute fermeture à droite d'un maillon de la chaîne entraîne le même 
+  comportement que l'établissement de la chaîne décrit plus haut.
+  Ce fonctionnement optimiste permet la reconstruction d'un chaîne 
+  rompue en considérant que les proxy et l'état de partage du codex 
+  seront favorables.
 
   8.2.3 Déconnexion en chaîne
 
   Dès qu'un proxy, le client ou le sharer se déconnecte, une déconnexion 
-  en chaîne est initiée. Le client doit alors informer le serveur de la 
-  déconnexion du proxy pour que ce dernier puisse mettre à jour ses 
-  informations. Il envoie alors une trame de déconnexion au serveur :
+  en chaîne est initiée. Le client doit informer le serveur qu'une chaîne
+  a été fermée, lorsque que la connection avec le premier proxy de la chaîne 
+  a été fermée. Le client envoie alors une trame de déconnexion au serveur :
 
   +--------------------------------------------------+
   | (disconnect) | codex_id | download_id | chain_id |
