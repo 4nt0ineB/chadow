@@ -371,10 +371,25 @@ SOMMAIRE
 
 7. Annonce
 
-  Le client annonce à intervalle régulier (définit par le serveur) 
-  l'état dans lequel il se trouve pour chaque fichier qu'il partage et 
-  ou télécharge.
+  Le client annonce à intervalle régulier, défini par le serveur, son 
+  état pour chaque fichier partagé ou téléchargé, ainsi que sa 
+  disponibilité à servir de proxy.
 
+  7.1 Annonce de proxy
+
+  Le client envoie une trame pour annoncer s'il est disponible ou non
+  pour servir de proxy :
+
+  +---------------------------------+
+  | (announce_proxy) | availability |
+  +---------------------------------+
+
+  availability: (byte)
+    - 0 : indique que le client n'est pas disponible pour servir de 
+          proxy.
+    - 1 : indique que le client est disponible pour servir de proxy.
+
+  7.2 Annonce de partage ou téléchargement
   +-------------------------------------+
   | (announce) | info_hash | parameters |
   +-------------------------------------+
@@ -401,9 +416,9 @@ SOMMAIRE
 
   Le serveur répond avec une trame pour répondre à la requête :
 
-  +--------------------------------------------------------------+
-  | (announce) | info_hash | seeders | leechers | wait | sharers |
-  +--------------------------------------------------------------+
+  +------------------------------------------------------------------------+
+  | (announce) | info_hash | seeders | leechers | wait | sharers | proxies |
+  +------------------------------------------------------------------------+
 
   seeders: le nombre de sharers ayant les fichiers complet (int)
   leechers: le nombre de clients ayant en partie les fichiers (int)
@@ -420,6 +435,19 @@ SOMMAIRE
     - sharers_count: le nombre de sharers actifs (int)
     - ip: l'adresse IP du sharer (4 octets)
     - port: le port du sharer (2 octets)
+
+  proxies: présent lorsque le client télécharge en mode fermé. 
+    Liste des clients disponibles pour agir en tant que proxy :
+
+    +---------------------------------------------+
+    | proxies_count | ip | port | ip | port | ... |
+    +---------------------------------------------+
+
+    - proxies_count: le nombre de clients disponibles pour agir en tant 
+                     que proxy (int)
+    - ip: l'adresse IP du client (4 octets)
+    - port: le port du client (2 octets)
+
 
   En cas d'erreur, le serveur répond avec la trame suivante : 
 
@@ -547,45 +575,16 @@ SOMMAIRE
 8.2 Mode fermé
 
   À ce stade, le client a envoyé une demande au serveur pour télécharger
-  un codex en mode fermé, en précisant le nombre de sharers souhaités et
-  le nombre de proxy à utiliser pour le chaînage. Si le nombre de 
-  clients est insuffisant pour garantir le téléchargement du fichier 
-  (seulement 2 client sont présent sur le serveur), le serveur agira
-  comme un proxy pour le client, échangeant ainsi les trames de demande
-  de bloc avec le client et les trames de réponse avec le sharer.
-
-  8.2.1 Gestion erreur
-  
-  Si le serveur ne peut pas garantir le téléchargement du fichier faute
-  de suffisamment de clients pour servir de proxy, il envoie une trame
-  d'erreur au client :
-
-  +----------------------------------+
-  | (error) | error_message (string) |
-  +----------------------------------+
-
-  error_message: message human-readable
+  un codex en mode fermé. Si le nombre de clients est insuffisant pour 
+  garantir le téléchargement du fichier (seulement 2 client sont présent
+  sur le serveur), le serveur agira comme un proxy pour le client, 
+  échangeant ainsi les trames de demande de bloc avec le client et les 
+  trames de réponse avec le sharer.
 
   8.2.2 Connexion en chaîne
 
-  Si le serveur peut garantir le téléchargement du fichier,
-  il envoie une trame de réponse au client :
-
-  +-------------------------------------------------+
-  | (anonymize) | codex_id | download_id | chain_id | 
-  +-------------------------------------------------+
-  | proxy_ip | proxy_port                           | 
-  +-------------------------------------------------+
-
-  codex_id : hachage (SHA1) du codex.
-  download_id : identifiant unique du téléchargement (long) 
-                généré par le serveur.
-  chain_id : identifiant unique de la chaîne de proxy (long) 
-             généré par le serveur.
-  proxy_ip : adresse IP du client servant de proxy (4 octets).
-  proxy_port : port du client servant de proxy (2 octets).
-
-  Le client initie alors une connexion avec le premier proxy :
+  Après avoir reçu une liste de proxy par le serveur après 
+  son l'annonce, le client se connecte à un des proxys.
 
   +-------------------------------------------------+
   | (proxyopen) | codex_id | download_id | chain_id |
@@ -593,10 +592,17 @@ SOMMAIRE
   | remaining_proxy_count                           |
   +-------------------------------------------------+
 
+  codex_id : hachage (SHA1) du codex.
+  download_id : identifiant unique du téléchargement (long) 
+                généré par le serveur.
+  chain_id : identifiant unique de la chaîne de proxy (long) 
+             généré par le serveur.
+
   remaining_proxy_count : nombre de proxy restants dans la chaîne (int).
 
   Après avoir reçu la trame et établi la connexion, le proxy envoie une
-  trame au serveur pour demander une connexion au prochain pair de la chaîne :
+  trame au serveur pour demander une adresse pour 
+  le prochain proxy de la chaîne :
 
   +-------------------------------------------------+
   | (anonymize) | codex_id | download_id | chain_id |
@@ -605,13 +611,39 @@ SOMMAIRE
   +-------------------------------------------------+
 
   Le serveur répond avec une trame identique à celle envoyée au client. 
+
+  +-------------------------------------------------+
+  | (anonymize) | codex_id | download_id | chain_id |
+  +-------------------------------------------------+
+  | exists (byte) | ip | port                       |
+  +-------------------------------------------------+
+
+  ?? il faut un moyen pour que le proxy sache si y'a bien un ip/port 
+  ptet pas la meilleur façon le "exists" ...
+
+  ip : adresse IP du client servant de proxy (4 octets).
+  port : port du client servant de proxy (2 octets).
+
   Lorsque remaining_proxy_count est à 0, le serveur envoie une trame de
   réponse au dernier proxy de la chaîne, contenant les informations du 
-  sharer dans proxy_ip et proxy_port.
-
+  sharer dans ip et port. 
+  Il associe le codex_id, l'id de téléchargement, l'id de chaînage le 
+  client qu'il lui à transmis pour ne pas le lui transmettre à nouveau 
+  pour une nouvelle chaîne.
+  
   Le client peut alors utiliser les mêmes trames que dans le mode ouvert
   pour télécharger les chunks, les proxy servant de relais pour les 
   trames de demande de bloc et de réponse.
+
+  A chaque étape de demande de chaînage par un proxy au serveur,
+  si le serveur ne peut pas fournir de nouveau proxy ou de sharer,
+  le client peut abandonner le chaînage s'il 
+  ne peut pas établir la prochaine connexion au bout après l'écoulement 
+  d'un timeout que le client à choisi.
+  Les proxys en amont peuvent décider de suivre ou de retenter le 
+  chaînage selon leur propre timeout.
+  En cas de timeout non écoulé, le proxy demande en boucle à intervalle
+  de 5 secondes le nouveau maillon (proxy ou sharer).
 
   8.2.3 Déconnexion en chaîne
 
