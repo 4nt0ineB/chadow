@@ -177,11 +177,19 @@ SOMMAIRE
                     | (register) | username | 
                     +-----------------------+
   
-    - Si le nom d'utilisateur est déjà utilisé, le serveur envoie un 
-    message d'erreur au client :
+    - Si le nom d'utilisateur est déjà utilisé ou que le nom 
+    d'utilisateur ne respecte pas les règles de formatage définies
+    dans la section "Encodage", le serveur envoie un message d'erreur
+    au client :
       
           +--------------------------------------------+
           | (error) | username already in use (string) | 
+          +--------------------------------------------+
+
+          ou
+
+          +--------------------------------------------+
+          | (error) | invalid username (string)        |
           +--------------------------------------------+
       
       Dans ce cas ci le client peut envoyer à nouveau une demande de 
@@ -216,8 +224,6 @@ SOMMAIRE
   des utilisateurs systématiquement.
   Finalement les arrivés et départs sont traités comme des messages 
   globaux.
-
-                                                                [page 4]
 
   +-------------------------------------+
   | (event) | code (byte) |  username   |
@@ -270,10 +276,7 @@ SOMMAIRE
   L'intérêt est que le l'annuaire ne possède pas de copie des fichiers 
   en partage, ce qui reviendrait à du téléchargement centralisé et 
   nécessite un serveur très puissant.
-  L'annuaire possède seulement une description des fichiers que les 
-
-                                                                [page 5]
-  
+  L'annuaire possède seulement une description des fichiers que les
   sharers partagent.
 
   Le client peut proposer un ou des fichiers au partage qui sont 
@@ -327,7 +330,6 @@ SOMMAIRE
   où codex contient les mêmes informations que décrites dans la partie 
   5.1.
 
-                                                                [page 6]
 
 6. Recherche de codex
 
@@ -381,9 +383,6 @@ SOMMAIRE
   | (announce) | info_hash | parameters |
   +-------------------------------------+
 
-
-                                                                [page 7]
-
   info_hash: (SHA1) hash du dictionnaire de données associé au partage
   paramètres: une liste comprenant :
     event: (byte)
@@ -435,10 +434,6 @@ SOMMAIRE
 
     - proxies_count: le nombre de clients disponibles pour agir en tant 
                      que proxy (int)
-
-
-                                                                [page 8]
-
     - ip: l'adresse IP du client (4 octets)
     - port: le port du client (2 octets)
 
@@ -491,9 +486,6 @@ SOMMAIRE
             Chaque bit correspond à un chunk du codex, où le bit de 
             poids fort représente le 
             chunk d'indice 0. Un bit à 1 indique que le chunk 
-
-                                                                [page 9]
-
             correspondant est possédé, tandis qu'un bit à 0 indique 
             qu'il ne l'est pas.
 
@@ -545,9 +537,6 @@ SOMMAIRE
   +---------------------------------------------+
   | (needblock) | chunk_index | offset | length |
   +---------------------------------------------+
-
-
-                                                               [page 10] 
                                                                
   chunk_index: l'indice du chunk demandé (int).
   offset:      l'indice du byte dans le chunk (int).
@@ -600,9 +589,6 @@ SOMMAIRE
   la connection restante est fermée.
   Le proxy peut décider à tout moment de terminer son rôle de proxy, 
   et ferme alors les deux connexions.  
-
-
-                                                               [page 11]
 
   Dans cette implémentation, chaque demande d'ouverture de connexion
   à un proxy par un client ouvre une nouvelle connexion. Le proxy doit  
