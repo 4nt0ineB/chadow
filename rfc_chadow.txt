@@ -32,9 +32,9 @@ SOMMAIRE
     8.1 Mode de Téléchargement. . . . . . . . . . . . . . . . . . . 9
       8.1.1 Mode ouvert. . . . . . . . . . . . . . . . . . . . . . .10
       8.1.2 Mode fermé. . . . . . . . . . . . . . . . . . . . . . . 11
-      8.1.3 Demande de block. . . . . . . . . . . . . . . . . . . . 11
+      8.1.3 Demande de chunk. . . . . . . . . . . . . . . . . . . . 11
       8.1.4 Annulation. . . . . . . . . . . . . . . . . . . . . . . 11
-      8.1.5 Envoie du block. . . . . . . . . . . . . . . . . . . . .11
+      8.1.5 Envoie du chunk. . . . . . . . . . . . . . . . . . . . .11
     8.2 Mode fermé. . . . . . . . . . . . . . . . . . . . . . . . . 11
       8.1.1 Connexion en chaîne. . . . . . . . . . . . . . . . . . .12 
       8.2.2 Réparation de la chaîne. . . . . . . . . . . . . . . . .13
@@ -122,7 +122,7 @@ SOMMAIRE
   +-----------------------+-----------------------+
   | 18 | needblock        | 19 | cancel           |
   +-----------------------+-----------------------+
-  | 20 | hereblock        | 21 | newchunk         |
+  | 20 | herechunk        | 21 | newchunk         |
   +-----------------------+-----------------------+
   | 22 | proxyopen        | 23 | anonymize        | 
   +-----------------------+-----------------------+
@@ -144,7 +144,7 @@ SOMMAIRE
   - 'username' et 'username_receiver' se réfèrent à une chaine de 
     charactères (string):
     - D'une taille comprise entre 2 et 32 charactères
-    - Encodée en UTF-16 (Unicode)
+    - Encodée en UTF-8
     - Ne contenant pas d'espaces ou de charactères invisibles
     - Ne contenant pas les sous-chaînes suivantes : @, #, :, /, 
     ```, chadow
@@ -174,6 +174,9 @@ SOMMAIRE
         +-----------------------+
         | (register) | username | 
         +-----------------------+
+
+    - TODO:
+      Message OK 
 
     - Si le nom d'utilisateur est déjà utilisé ou que le nom 
     d'utilisateur ne respecte pas les règles de formatage définies
@@ -206,9 +209,9 @@ SOMMAIRE
 
   usernames: 
     liste des usernames des clients connectés. Concaténation des 
-    utilisateurs <taille de l'username en int><username>.
+    utilisateurs <nombre de bytes de codant l'username (int)><username>.
     La liste se termine par 0.
-    Ex: 8morpheus7trinity0
+    Ex: 64morpheus56trinity0
                                                                 [page 4]
 
 4.2 Mise à jour des présences
@@ -229,12 +232,17 @@ SOMMAIRE
 
   Le client envoie une trame de publication de message global.
 
-  +-------------------------------------------+
-  | (yell) | creation_date | message (string) |
-  +-------------------------------------------+
+  +---------------------------+
+  | (yell) | message (string) |
+  +---------------------------+
 
   Le serveur retransmet la même trame à tous les clients même le 
-  client d'origine.
+  client d'origine, avec la date de réception du message
+  et l'username de l'envoyeur.
+
+  +-------------------------------------------------------------+
+  | (yell) | username_sender | creation_date | message (string) |
+  +-------------------------------------------------------------+
 
 4.4 Echange de messages entre utilisateurs
 
@@ -284,28 +292,18 @@ SOMMAIRE
   codex_id : le hachage (SHA1) du codex.
   codex : une structure comprenant les informations suivantes :
     - name : le nom du codex (string).
-    - chunk_length : la taille fixe des chunks du codex.
     - files_count : le nombre de fichiers (int).
     - chunks : la concaténation des identifiants (SHA1) de chaque chunk.
-  
-    Chaque fichier du codex est découpé en chunk d'une taille fixe en 
-    int, d'une puissance 2. De cette façon plusieurs sharers peuvent 
-    partager des bouts du fichiers en simultané, ce qui augmente sa 
-    disponibilité et la probabilité qu'un client aboutisse à compléter 
-    le téléchargement. Dans un optique de pouvoir télécharger des 
-    fichiers d'une taille jusqu'à 2Go on propose une taille de 256ko qui
-    donne un total de 7 813 chunks. 
-    Chaque chunk est ensuite hashé pour obtenir un identifiant SHA1. 
-    Pour un fichier de 2Go cette liste de sha1 (20 bytes) réprésente un 
-    poids de 156ko, ce qui est raisonnable. Le hashage permet aux 
-    clients de s'assurer de l'intégrité des données qu'il télécharge, en 
-    testant le hash du chunk reçu avec celui décrit dans le codex. 
+      Le hashage permet aux clients de s'assurer de l'intégrité des données 
+      qu'il télécharge, en testant le hash du fichier reçu avec celui 
+      décrit dans le codex. 
 
     files: 
-      une liste qui concatène tous les <nomfichier><path> des fichiers 
+      une liste qui concatène tous les <nomfichier><length><path> des fichiers 
       du codex. nomfichier et path sont des strings. 
       path représente le chemin absolu où nomfichier se situe dans le 
       codex.
+      length la taille du fichier en octets
   
 
 5.2 Téléchargement du codex
@@ -361,13 +359,8 @@ SOMMAIRE
     - filename : (string) le nom du fichier.
     - codex_id : (20 bytes) le hash d'information.
     - creation_date : (long) la date de création.
-    - seeders : (int) le nombre de seeders
-        (sharers qui partagent et possèdent les fichiers du codex à 
-        100%).
-    - leechers : (int) le nombre de leechers 
-        (clients qui partagent les fichiers du codex mais qui ne les ont
-         qu'en partie).
-
+    - sharers : (int) le nombre de clients qui possèdent 
+      les fichiers d'un codex à 100%
                                                                 [page 7]
 
 7. Annonce
@@ -418,13 +411,12 @@ SOMMAIRE
 
   Le serveur répond avec une trame pour répondre à la requête :
 
-  +-----------------------------------------------------------------------+
-  | (announce) | codex_id | seeders | leechers | wait | sharers | proxies |
-  +-----------------------------------------------------------------------+
+  +------------------------------------------------------------+
+  | (announce) | codex_id | seeders | wait | sharers | proxies |
+  +------------------------------------------------------------+
                                                                 [page 8]
 
   seeders: le nombre de sharers ayant les codex complet (int)
-  leechers: le nombre de clients ayant en partie les codex (int)
   wait: l'intervalle minimum que le client doit attendre avant de
         refaire une annonce (int)
   sharers: une liste de sharers actifs au partage du codex, chaque
@@ -462,7 +454,7 @@ SOMMAIRE
   Le client pourra alors renvoyer une annonce
 
 8. Téléchargement des fichiers du codex
-8.1 Mode ouverte
+8.1 Mode ouvert
 
   A ce stade le client possède un codex et donc 
   connaît la liste des chunks du codex et les fichiers qu'il contient.
@@ -478,85 +470,41 @@ SOMMAIRE
 
   Si le client reçoit un handshake avec un codex_id qu'il ne possède 
   pas où qu'il ne souhaite pas partager il peut terminer la connexion.
-  Dans ce cas on 
+  
   
   Le reste des trames échangées est préfixées par leur taille, afin de
   facilter la lecture sur le socket par le client.
 
-8.1.1 Champs de bits
-
-  Juste après le handshake le client et le sharers s'envoient 
-  respectivement le champs de bits des chunks qu'ils possèdent du codex.
-  Le bit de poids fort est le chunk d'indice 0.
-  Le client termine la connexion si le champs de bits n'est pas de la 
-  bonne taille.
-
-  +-------------------------------------+
-  | (have) | bitfield_length | bitfield |
-  +-------------------------------------+ 
-  
-  bitfield_length: Longueur du champ de bits (int).
-  bitfield: Champ de bits représentant les chunks possédés par le client
-            ou le pair. 
-            Chaque bit correspond à un chunk du codex, où le bit de 
-            poids fort représente le 
-            chunk d'indice 0. Un bit à 1 indique que le chunk 
-            correspondant est possédé, tandis qu'un bit à 0 indique 
-            qu'il ne l'est pas.
- 
-  Le client connaît les chunks que possèdent les sharers avec lesquels 
-  il est connecté grâce aux bitfields échangés. 
-  Lorsqu'il reçoit un nouveau chunk, le client sait quels sharers ne le 
-  possèdent pas. 
-  Il envoie alors une trame newchunk à ces sharers. Ces derniers
-  pourrons alors demander ce chunk au client.
-   
-  +--------------------------+
-  | (newchunk) | chunk_index |
-  +--------------------------+
-  
-  Cas de figure 
-                      A ---- C ---- B
-
-  Dans cette configuration à l'ouverture des deux connexions:
-    - A connaît les chunks de C
-    - C connaît les chunks de A et B
-    - B connaît les chunks C
-  
-  Au bout d'un moment C complète un chunk qu'il a téléchargé chez B.
-  C envoie (newchunk)<chunk_index> à A.
-  A qui n'avait pas le chunk et ne pouvait pas le télécharger chez C, 
-  peut désormais le faire.
                                                                [page 10]
 
-  8.1.2 Keep-alive
-
-  Le client doit aussi maintenir la connexion avec des message 
-  keep-alive, dans le cas contraire le pair peut y mettre fin s'il 
-  n'a rien reçu du client pendant une certaine durée.
-  La durée définie est de une minute et 30 secondes.
-
-  +-------------+
-  | (keepalive) | 
-  +-------------+
-
-
-  8.1.3 Demande de block
+  8.1.3 Demande de chunk 
   
+  Le chunk est une portion d'octet du fichier.
   Le client souhaite télécharger un chunk au sharer.
-  Le client ne télécharge pas les chunks mais par portions 
-  de chunks appelés 'blocks' de taille comprise entre 16ko et la 
-  taille du chunk.
 
-  +---------------------------------------------+
-  | (needblock) | chunk_index | offset | length |
-  +---------------------------------------------+
+  +-------------------------------+
+  | (needchunk) | offset | length |
+  +-------------------------------+
                                                                
-  chunk_index: l'indice du chunk demandé (int).
   offset:      l'indice du byte dans le chunk (int).
-  length:      la taille du block (int).
+  length:      la taille du chunk (int).
 
+  Le codex contenant plusieurs fichiers, 
+  pour savoir de quels fichiers il faut récupérer les données,
+  on doit considérer qu'il n'existe qu'un seul fichier dont le contenu 
+  est la concaténation des octets de chaque fichiers.
+
+  Ex:
+  0          10          20
+  [fichier 1 | fichier 2 | ...]
   
+  Le client peut demander le chunk d'offset 5 et de taille 5 (la seconde
+  moitié du fichier 1). Ou bien le chunk <10><15> du fichier 2
+
+  Pour simplification dans la réception et l'envoie on considérera toute 
+  demande de chunk qui chevauche deux fichiers comme erroné.  
+
+
   8.1.4 Annulation
   Le client peut envoyer une trame pour annuler la requête 
   (need_block) d'un block. La trame est identique à celle envoyée 
@@ -564,13 +512,12 @@ SOMMAIRE
 
   8.1.5 Envoie du block
   
-  Le sharer répond à une requête de block:
+  Le sharer répond à une requête de chunk:
 
-  +----------------------------------------------+
-  | (hereblock) | chunk_index | offset | payload |
-  +----------------------------------------------+ 
+  +---------------------------------+
+  | (herechunk) | offset |  payload |
+  +---------------------------------+ 
 
-  chunk_index: l'indice du chunk demandé (int).
   offset:      l'indice du byte dans le chunk (int).
   payload:     la donnée
 
@@ -593,7 +540,7 @@ SOMMAIRE
   +-------------------------------------------------+
   | (proxyopen) | codex_id | download_id | chain_id |
   +-------------------------------------------------+
-  | remaining_proxy_count                           |
+  | proxy_count                                     |
   +-------------------------------------------------+
 
   codex_id : hachage (SHA1) du codex.
@@ -601,7 +548,7 @@ SOMMAIRE
                 généré aléatoirement par le client.
   chain_id : identifiant unique de la chaîne de proxy (long) 
              généré aléatoirement par le client.
-  remaining_proxy_count : nombre de proxy restants dans la chaîne (int).
+  proxy_count : nombre de proxy restants dans la chaîne (int).
 
   Après avoir reçu la trame et établi la connexion, le proxy envoie une
   trame au serveur pour demander une adresse pour 
@@ -618,7 +565,7 @@ SOMMAIRE
   +-------------------------------------------------+
   | (anonymize) | codex_id | download_id | chain_id |
   +-------------------------------------------------+
-  | exists (byte) | ip | port                       |
+  | exists (byte) | ip | port | ip port |           |
   +-------------------------------------------------+
 
   exists: 
@@ -627,7 +574,7 @@ SOMMAIRE
   ip : adresse IP du client servant de proxy (4 octets).
   port : port du client servant de proxy (2 octets).
 
-  Lorsque remaining_proxy_count est à 0, le serveur envoie une trame de
+  Lorsque proxy_count est à 0, le serveur envoie une trame de
   réponse au dernier proxy de la chaîne, contenant les informations du 
   sharer dans ip et port. 
   Il associe le codex_id, l'id de téléchargement, l'id de chaînage le 
