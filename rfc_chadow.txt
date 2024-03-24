@@ -13,44 +13,34 @@ DESCRIPTION
 
 SOMMAIRE
 
-  1. Conventions. . . . . . . . . . . . . . . . . . . . . . . . . . 2
-  2. Encodage. . . . . . . . . . . . . . . . . . . . . . . . . . .  2
-  3. Identification. . . . . . . . . . . . . . . . . . . . . . . .  3  
-  4. Discussion. . . . . . . . . . . . . . . . . . . . . . . . . .  4
-    4.1 Découverte des utilisateurs. . . . . . . . . . . . . . . .  4
-    4.2 Mise à jour des présences. . . . . . . . . . . . . . . . .  5
-    4.3 Publication de messages globaux. . . . . . . . . . . . . .  5
-    4.4 Echange de message entre utilisateurs. . . . . . . . . . .  5
-  5. Codex. . . . . . . . . . . . . . . . . . . . . . . . . . . . . 5  
-    5.1 Publication du codex. . . . . . . . . . . . . . . . . . . . 6
-    5.2 Téléchargement du codex. . . . . . . . . . . . . . . . . .  6
-  6. Recherche de partage. . . . . . . . . . . . . . . . . . . . .  7
-  7. Annonce. . . . . . . . . . . . . . . . . . . . . . . . . . . . 8
-    7.1 Annonce de proxy. . . . . . . . . . . . . . . . . . . . . . 8              
-    7.2 Annonce de partage ou de téléchargement. . . . . . . . . . .8
-  8. Téléchargement des fichiers du codex. . . . . . . . . . . . .  9
-    8.1 Mode de Téléchargement. . . . . . . . . . . . . . . . . . . 9
-      8.1.1 Mode ouvert. . . . . . . . . . . . . . . . . . . . . . .10
-      8.1.2 Mode fermé. . . . . . . . . . . . . . . . . . . . . . . 11
-      8.1.3 Demande de chunk. . . . . . . . . . . . . . . . . . . . 11
-      8.1.4 Annulation. . . . . . . . . . . . . . . . . . . . . . . 11
-      8.1.5 Envoie du chunk. . . . . . . . . . . . . . . . . . . . .11
-    8.2 Mode fermé. . . . . . . . . . . . . . . . . . . . . . . . . 11
-      8.1.1 Connexion en chaîne. . . . . . . . . . . . . . . . . . .12 
-      8.2.2 Réparation de la chaîne. . . . . . . . . . . . . . . . .13
-      8.2.3 Déconnexion en chaîne. . . . . . . . . . . . . . . . . .13
-  9. Déconnexion. . . . . . . . . . . . . . . . . . . . . . . . . . 13
+  1. Conventions
+  2. Encodage
+  3. Identification 
+  4. Discussion
+    4.1 Découverte des utilisateurs
+    4.2 Mise à jour des présences
+    4.3 Publication de messages globaux
+    4.4 Echange de message entre utilisateurs
+  5. Codex  
+    5.1 Publication du codex
+    5.2 Téléchargement du codex
+  6. Recherche de partage
+  7. Annonce
+    7.1 Annonce de proxy              
+    7.2 Annonce de téléchargement
+  8. Téléchargement des fichiers du codex
+    8.1 Mode de Téléchargement
+      8.1.1 Mode ouvert
+      8.1.2 Mode fermé
+      8.1.3 Demande de chunk
+      8.1.4 Annulation
+      8.1.5 Envoie du chunk
+    8.2 Mode fermé
+      8.1.1 Connexion en chaîne 
+      8.2.2 Réparation de la chaîne
+      8.2.3 Déconnexion en chaîne
+  9. Déconnexion
 
-
-
-
-
-
-
-
-
-
-                                                                [page 1]
 
 1. Conventions
 
@@ -95,6 +85,7 @@ SOMMAIRE
    qu'il possède, permettant ainsi aux autres utilisateurs de 
    télécharger ces fichiers à partir de plusieurs sources.
 
+
 2. Encodage
 
   Opcode des trames
@@ -102,9 +93,6 @@ SOMMAIRE
   | 0  | error            | 1  | register         |
   +-----------------------+-----------------------+
   | 2  | discovery        | 3  | event            |
-  +-----------------------+-----------------------+
-                                                                [page 2]
-
   +-----------------------+-----------------------+
   | 4  | yell             | 5  | whisper          |
   +-----------------------+-----------------------+
@@ -126,8 +114,8 @@ SOMMAIRE
   +-----------------------+-----------------------+
   | 22 | proxyopen        | 23 | anonymize        | 
   +-----------------------+-----------------------+
-  | 24 | disconnect       |
-  +-----------------------+
+  | 24 | disconnect       | 24 | ok               |
+  +-----------------------+-----------------------+
                                                                 
   - un int représente 4 octets
   - un long représente 8 octets
@@ -151,20 +139,30 @@ SOMMAIRE
     Le serveur doit garantir qu'il n'existe pas deux clients avec le 
     même username.
 
+  - 'IP' représente une adresse IP. Elle est encodée comme suit :
+    - Un octet indiquant 4 pour une adresse IPv4 ou 6 pour une adresse 
+    IPv6.
+    - Suivi de l'adresse IP en binaire, composée de 4 octets pour IPv4 
+    ou 16 octets pour IPv6.
+
+- 'socket' représente une adresse IP et un numéro de port. Il est 
+encodé de la manière suivante :
+  - Une 'IP' selon la méthode décrite précédemment.
+  - Un numéro de port, représenté sous forme d'entier (int).
+
+
 3. Identification
 
   Le client doit connaître l'adresse du serveur avec lequel il 
-  souhaite communiquer.
-
-                                                                [page 3]
-  
+  souhaite communiquer.  
   Lorsqu'un client souhaite se connecter au serveur IRC, il envoie une 
   demande de connexion en spécifiant le nom d'utilisateur qu'il souhaite 
-  utiliser. Voici le format de la trame pour cette demande : 
+  utiliser pour la session ainsi que son socket d'écoute. 
+  Voici le format de la trame pour cette demande : 
 
-        +-----------------------+
-        | (register) | username | 
-        +-----------------------+
+      +--------------------------------+
+      | (register) | username | socket |
+      +--------------------------------+
 
   Le serveur répond au client pour indiquer si le nom d'utilisateur est 
   disponible ou non :
@@ -175,8 +173,10 @@ SOMMAIRE
         | (register) | username | 
         +-----------------------+
 
-    - TODO:
-      Message OK 
+    - le serveur accepte l'username et maintient la connexion
+        +------+
+        | (ok) | 
+        +------+
 
     - Si le nom d'utilisateur est déjà utilisé ou que le nom 
     d'utilisateur ne respecte pas les règles de formatage définies
@@ -192,6 +192,7 @@ SOMMAIRE
       Dans ce cas ci le client peut envoyer à nouveau une demande de 
       connexion au serveur.
       
+
 4. Discussion
 
 4.1 Découverte des utilisateurs 
@@ -209,10 +210,9 @@ SOMMAIRE
 
   usernames: 
     liste des usernames des clients connectés. Concaténation des 
-    utilisateurs <nombre de bytes de codant l'username (int)><username>.
+    utilisateurs <nombre d'octets codant l'username (int)><username>.
     La liste se termine par 0.
     Ex: 64morpheus56trinity0
-                                                                [page 4]
 
 4.2 Mise à jour des présences
 
@@ -238,7 +238,7 @@ SOMMAIRE
 
   Le serveur retransmet la même trame à tous les clients même le 
   client d'origine, avec la date de réception du message
-  et l'username de l'envoyeur.
+  et l'username de l'envoyeur. La taille 
 
   +-------------------------------------------------------------+
   | (yell) | username_sender | creation_date | message (string) |
@@ -253,7 +253,15 @@ SOMMAIRE
   | (whisper) | username_receiver | creation_date | message (string) |
   +------------------------------------------------------------------+
 
-  Le serveur la retransmet au client associé.
+  - message: le message à envoyer qui ne pourra pas dépasser 1024 octets.  
+
+  Le serveur retransmet le message au client destinataire 
+  ("username_receiver") :
+
+  +----------------------------------------------------------------+
+  | (whisper) | username_sender | creation_date | message (string) |
+  +----------------------------------------------------------------+
+
 
   Si le serveur ne connaît pas l'username (n'est plus connecté ou 
   n'existe pas), le serveur réponds une trame d'erreur.
@@ -262,7 +270,7 @@ SOMMAIRE
   | (error) | error_message (string)  |
   +-----------------------------------+
 
-  message: description de l'erreur human-readable
+  error_message: message human-readable ne dépassant pas les 1024 octets.
 
 
 5. Codex
@@ -270,7 +278,6 @@ SOMMAIRE
   codex.
   L'annuaire sait quels clients partage un codex. 
   Les clients peuvent chercher des codex dans l'annuaire.
-                                                                [page 5]
   Les clients peuvent demander à l'annuaire de rejoindre le réseau de 
   partage des fichiers du codex.
 
@@ -289,22 +296,35 @@ SOMMAIRE
   | (propose) | codex_id | codex |
   +------------------------------+
 
-  codex_id : le hachage (SHA1) du codex.
-  codex : une structure comprenant les informations suivantes :
-    - name : le nom du codex (string).
-    - files_count : le nombre de fichiers (int).
-    - chunks : la concaténation des identifiants (SHA1) de chaque chunk.
-      Le hashage permet aux clients de s'assurer de l'intégrité des données 
-      qu'il télécharge, en testant le hash du fichier reçu avec celui 
-      décrit dans le codex. 
+  codex_id : Le hachage (SHA1) unique du codex.
+  codex : Une structure comprenant les informations suivantes :
+    - name : Le nom du codex (string).
+    - files_count : Le nombre de fichiers (int).
 
-    files: 
-      une liste qui concatène tous les <nomfichier><length><path> des fichiers 
-      du codex. nomfichier et path sont des strings. 
-      path représente le chemin absolu où nomfichier se situe dans le 
-      codex.
-      length la taille du fichier en octets
-  
+    files:
+      Une liste concaténant les informations de chaque fichier partagé 
+      dans le codex :
+        - sha1 : Le hachage SHA1 du fichier, utilisé pour garantir
+                 l'intégrité des données lors du téléchargement.
+        - nomfichier : Le nom du fichier (string).
+        - length : La taille du fichier en octets.
+        - path : Le chemin absolu où le fichier est situé dans le 
+                 codex (string).
+
+  Exemple de trame pour le client qui propose un codex "MonCodex"
+  contenant 2 fichiers :
+
+  +----------------------------------------------------------------+
+  | (propose) | 3a2b1c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0 | MonCodex | 
+  +----------------------------------------------------------------+
+  | 2 | 9a2b0c4d5e6f768b9c0d1e2f3a4b5c6d7e8f9a0 | image.jpg        | 
+  +----------------------------------------------------------------+
+  | 1000 | /home/user/Downloads/image.jpg                          | 
+  +----------------------------------------------------------------+
+  | 13eb0c4d5e6f768b9c0d1e2f3a4b5c6d7e8f9a0 | video.mp4            |
+  +----------------------------------------------------------------+
+  | 2000 | /home/user/Downloads/video.mp4                          |
+  +----------------------------------------------------------------+
 
 5.2 Téléchargement du codex
 
@@ -313,7 +333,6 @@ SOMMAIRE
   +-----------------------------+
   | (request) | codex_id (SHA1) |
   +-----------------------------+
-                                                                [page 6]
 
   Le serveur répond avec la trame suivante :
 
@@ -361,37 +380,26 @@ SOMMAIRE
     - creation_date : (long) la date de création.
     - sharers : (int) le nombre de clients qui possèdent 
       les fichiers d'un codex à 100%
-                                                                [page 7]
 
-7. Annonce
 
-  Le client annonce à intervalle régulier, défini par le serveur, son 
-  état pour chaque codex partagés ou téléchargés, ainsi que sa 
-  disponibilité à servir de proxy.
-
-  7.1 Annonce de proxy
-
-  Le client envoie une trame pour annoncer s'il est disponible ou non
-  pour servir de proxy :
-
-  +---------------------------------+
-  | (announce_proxy) | availability |
-  +---------------------------------+
-
-  availability: (byte)
-    - 0 : indique que le client n'est pas disponible pour servir de 
-          proxy.
-    - 1 : indique que le client est disponible pour servir de proxy.
-
-  Le client effectue cette annonce à chaque changement d'état et doit
-  renvoyer une annonce une minute après la dernière annonce pour 
-  maintenir sa disponibilité actuelle à jour.
-
-  7.2 Annonce de partage ou de téléchargement
+7. Téléchargement des fichiers du codex
+8.1 Demande de téléchargement
 
   +-------------------------------------+
   | (announce) | codex_id | parameters |
   +-------------------------------------+
+
+  +------------------------+
+  | (sharing) | codex_id   |
+  +------------------------+
+stopsharing
+
+
+
+  +------------------------+
+  | (sharing) | codex_id   |
+  +------------------------+
+
 
   codex_id: (SHA1) hash du dictionnaire de données associé au partage
   paramètres: une liste comprenant :
@@ -414,7 +422,6 @@ SOMMAIRE
   +------------------------------------------------------------+
   | (announce) | codex_id | seeders | wait | sharers | proxies |
   +------------------------------------------------------------+
-                                                                [page 8]
 
   seeders: le nombre de sharers ayant les codex complet (int)
   wait: l'intervalle minimum que le client doit attendre avant de
@@ -423,25 +430,29 @@ SOMMAIRE
            sharer étant représenté par une série de 6 octets 
            d'informations:
 
-    +---------------------------------------------+
-    | sharers_count | ip | port | ip | port | ... |
-    +---------------------------------------------+
+    +-------------------------+
+    | sharers_count | sockets |
+    +-------------------------+
 
     - sharers_count: le nombre de sharers actifs (int)
-    - ip: l'adresse IP du sharer (4 octets)
-    - port: le port du sharer (2 octets)
+    - sockets: une liste de socket (défini dans la section "Encodage")
+               pour chaque sharer actif.
 
   proxies: présent lorsque le client télécharge en mode fermé. 
     Liste des clients disponibles pour agir en tant que proxy :
 
-    +---------------------------------------------+
-    | proxies_count | ip | port | ip | port | ... |
-    +---------------------------------------------+
+    +-------------------------------------------------------------+
+    | proxies_count | socket | chain_id | socket | chain_id | ... |
+    +-------------------------------------------------------------+
 
     - proxies_count: le nombre de clients disponibles pour agir en tant 
                      que proxy (int)
-    - ip: l'adresse IP du client (4 octets)
-    - port: le port du client (2 octets)
+    - une list de socket/chain_id:
+      - socket (défini dans la section "Encodage") du premier maillon de 
+      chainage de proxys.
+      - chain_id: l'id associé avec le téléchargement et le chaînage 
+        (pour le routage)
+               
 
 
   En cas d'erreur, le serveur répond avec la trame suivante : 
@@ -453,11 +464,14 @@ SOMMAIRE
   error_message: message human-readable
   Le client pourra alors renvoyer une annonce
 
-8. Téléchargement des fichiers du codex
-8.1 Mode ouvert
+7.2 Mise à jour des informations
+
+trame qui informe
+
+8.2 Mode ouvert
 
   A ce stade le client possède un codex et donc 
-  connaît la liste des chunks du codex et les fichiers qu'il contient.
+  connaît la liste des fichiers qu'il contient.
   Il connaît également les sharers qu'il doit contacter pour récupérer 
   les chunks.
 
@@ -466,18 +480,22 @@ SOMMAIRE
   +-------------------------+
   | (handshake) | codex_id  | 
   +-------------------------+
-                                                                [page 9]
 
   Si le client reçoit un handshake avec un codex_id qu'il ne possède 
-  pas où qu'il ne souhaite pas partager il peut terminer la connexion.
-  
-  
+  pas où qu'il ne souhaite pas partager il peut la refuse avec :
+
+  +-------------------------+
+  | (denied) | codex_id     | 
+  +-------------------------+
+
+  puis ferme la connexion.
+
+  Autrement la connexion reste ouverte.
   Le reste des trames échangées est préfixées par leur taille, afin de
   facilter la lecture sur le socket par le client.
 
-                                                               [page 10]
 
-  8.1.3 Demande de chunk 
+  8.2.1 Demande de chunk 
   
   Le chunk est une portion d'octet du fichier.
   Le client souhaite télécharger un chunk au sharer.
@@ -505,12 +523,12 @@ SOMMAIRE
   demande de chunk qui chevauche deux fichiers comme erroné.  
 
 
-  8.1.4 Annulation
+  8.2.2 Annulation
   Le client peut envoyer une trame pour annuler la requête 
   (need_block) d'un block. La trame est identique à celle envoyée 
   pour la requête mais l'opcode est remplacé par (cancel).
 
-  8.1.5 Envoie du block
+  8.2.3 Envoie du block
   
   Le sharer répond à une requête de chunk:
 
@@ -521,106 +539,70 @@ SOMMAIRE
   offset:      l'indice du byte dans le chunk (int).
   payload:     la donnée
 
-8.2 Mode fermé
+8.3 Mode fermé
 
   À ce stade, le client a envoyé une demande au serveur pour télécharger
   un codex en mode fermé. Si le nombre de clients est insuffisant pour 
   garantir le téléchargement du codex (seulement 2 client sont présent
   sur le serveur), le serveur agira comme un proxy pour le client, 
-                                                               [page 11]
 
-  échangeant ainsi les trames de demande de bloc avec le client et les 
-  trames de réponse avec le sharer.
 
-  8.2.1 Connexion en chaîne
+8.3.1  Création du routage des proxys
+
+  Les clients maintiennent :
+  - une table associative, appelée table de routage, associant à des chain_id une paire contenant un socket d'écoute
+
+  Le serveur doit garantir les propriétés suivantes :
+  - un même chain_id ne peut pas apparaître deux fois comme clé de table de routage ou dans un ensembles de tokens terminaux de client
+
+  Initialement, cette table et cet ensemble sont vides. Le serveur va indiquer aux clients comment remplir leur table :
+
+  +-----------------------------+
+  | (proxy) | chain_id | socket |
+  +-----------------------------+
+
+  chain_id : identifiant unique de la chaîne de proxy (long) 
+             généré aléatoirement par le serveur.
+  socket : socket de destination du prochain maillon de la chaîne de proxy.
+  
+  Quand le client reçoit cette commande, il associe le socket (ip_dest:port_dest) au chain_id dans la table de routage. 
+  Le client répond ok
+  +-----------------------+
+  | (proxy_ok) | chain_id |
+  +-----------------------+
+
+
+ le serveur doit trouver un autre proxy pour cette table de routage.
+
+
+  8.3.2 Connexion
 
   Après avoir reçu une liste de proxy par le serveur après 
-  son l'annonce, le client se connecte à un des proxys.
+  son l'annonce, le client se connecte à un des proxys (premier maillon
+  du chaînage).
 
-  +-------------------------------------------------+
-  | (proxyopen) | codex_id | download_id | chain_id |
-  +-------------------------------------------------+
-  | proxy_count                                     |
-  +-------------------------------------------------+
+  +-----------------------------------+
+  | (proxyopen) | chain_id | codex_id |
+  +-----------------------------------+
 
-  codex_id : hachage (SHA1) du codex.
-  download_id : identifiant unique du téléchargement (long) 
-                généré aléatoirement par le client.
   chain_id : identifiant unique de la chaîne de proxy (long) 
              généré aléatoirement par le client.
-  proxy_count : nombre de proxy restants dans la chaîne (int).
+  codex_id : hachage (SHA1) du codex.
 
-  Après avoir reçu la trame et établi la connexion, le proxy envoie une
-  trame au serveur pour demander une adresse pour 
-  le prochain proxy de la chaîne :
+  Si le chain_id est inconnu, la connexion est fermée.
+  Le proxy transmet la trame au prochain maillon (proxy ou sharer).
+  Le reste de la communication est indentique au mode ouvert, mais 
+  chaque trame contient au début un en-tête:
 
-  +-------------------------------------------------+
-  | (anonymize) | codex_id | download_id | chain_id |
-  +-------------------------------------------------+
-  | remaining_proxy_count                           |
-  +-------------------------------------------------+
+  +---------------------+
+  | (hidden) | chain_id |
+  +---------------------+
 
-  Le serveur répond:
-
-  +-------------------------------------------------+
-  | (anonymize) | codex_id | download_id | chain_id |
-  +-------------------------------------------------+
-  | exists (byte) | ip | port | ip port |           |
-  +-------------------------------------------------+
-
-  exists: 
-    - 0 : le serveur n'a pas pu fournir de nouveau proxy.
-    - 1 : le serveur a fourni une adresse pour le prochain proxy.
-  ip : adresse IP du client servant de proxy (4 octets).
-  port : port du client servant de proxy (2 octets).
-
-  Lorsque proxy_count est à 0, le serveur envoie une trame de
-  réponse au dernier proxy de la chaîne, contenant les informations du 
-  sharer dans ip et port. 
-  Il associe le codex_id, l'id de téléchargement, l'id de chaînage le 
-  client qu'il lui à transmis pour ne pas le lui transmettre à nouveau 
-  pour une nouvelle chaîne.
-                                                               [page 12]
-
-  Le client peut alors utiliser les mêmes trames que dans le mode ouvert
-  pour télécharger les chunks, les proxy servant de relais pour les 
-  trames de demande de bloc et de réponse.
-
-  8.2.2 Réparation de la chaîne
-
-  A chaque étape de la création du chaînage, le maillon (client ou 
-  proxy) peut abandonner le chaînage s'il n'a pu établir de connexion 
-  avec le prochain maillon après écoulement d'un timeout qu'il aura 
-  choisi (l'annuaire ne peut pas fournir de nouveau proxy ou de sharer, 
-  problème de latence,...).
-  Les proxys en amont peuvent décider de suivre ou de retenter la 
-  construction de la chaîne.
-  En cas de timeout non écoulé, le proxy demande en boucle à intervalle
-  de 4 secondes le nouveau maillon (proxy ou sharer).
-
-  (Left)                                (Right)
-  Client ---> Proxy A ---> Proxy B ---> Sharer 
-
-  Toute fermeture de connexion prevenant du côté gauche (côté client) 
-  d'un maillon de la chaîne entraîne la fermeture successive des 
-  connections de la chaîne à droite (côté sharer).
-  Toute fermeture à droite d'un maillon de la chaîne entraîne le même 
-  comportement que l'établissement de la chaîne décrit plus haut.
-  Ce fonctionnement optimiste permet la reconstruction d'un chaîne 
-  rompue en considérant que les proxy et l'état de partage du codex 
-  seront favorables.
-
-  8.2.3 Déconnexion en chaîne
+  Et le client doit précédé toutes ses réponses par le même en-tête.
 
   Dès qu'un proxy, le client ou le sharer se déconnecte, une déconnexion 
-  en chaîne est initiée. Le client doit informer le serveur qu'une 
-  chaîne a été fermée, lorsque que la connection avec le premier proxy
-  de la chaîne a été fermée. 
-  Le client envoie alors une trame de déconnexion au serveur :
-
-  +--------------------------------------------------+
-  | (disconnect) | codex_id | download_id | chain_id |
-  +--------------------------------------------------+  
+  en chaîne est initiée.  
+ 
 
 9. Deconnexion
   Lorsqu'un client se déconnecte du serveur, que ce soit de manière 
@@ -630,7 +612,3 @@ SOMMAIRE
   en informant tous les autres utilisateurs de sa déconnexion, 
   conformément aux spécifications de la partie "Discussion - Mise à jour 
   des présences".
-
-
-
-                                                               [page 13]
