@@ -18,6 +18,7 @@ public class ClientConsole {
   private final List<String> users = new ArrayList<>();
   private int userDisplayOffset;
   private int maxUserDisplay;
+  private String input = "";
   
   public ClientConsole(Client client, int lines, int columns) {
     Objects.requireNonNull(client);
@@ -30,6 +31,7 @@ public class ClientConsole {
   }
   
   private void updateScreen() {
+    System.out.println(CLIColor.CLEAR);
     this.maxUserDisplay = lines - 2;
   }
   
@@ -98,22 +100,21 @@ public class ClientConsole {
   }
   
   public void chat_loop() {
+    var sb = new StringBuilder();
     var maxUserLength = getMaxUserLength();
     var lineIndex = 0;
     // header
     var colsRemaining = columns - maxUserLength - 2;
-    System.out.print(CLIColor.CYAN_BACKGROUND);
-    System.out.print(CLIColor.WHITE);
+    sb.append(CLIColor.CYAN_BACKGROUND);
+    sb.append(CLIColor.WHITE);
     var title = ("%-" + colsRemaining + "s ").formatted("CHADOW CLIENT on " + client.serverHostName());
     colsRemaining -= title.length() + 2; // right side pannel of users + margin (  )
     var totalUsers = (CLIColor.BOLD + "" + CLIColor.BLACK + "%-"+ maxUserLength +"s").formatted("(" + users.size() + ")");
     colsRemaining -= totalUsers.length();
-    System.out.printf("%s %s", title, totalUsers);
-    for(var i = 0; i < colsRemaining; i++) {
-      System.out.print(" ");
-    }
-    System.out.print(CLIColor.RESET);
-    System.out.println("");
+    sb.append("%s %s".formatted(title, totalUsers));
+    sb.append(" ".repeat(Math.max(0, colsRemaining)));
+    sb.append(CLIColor.RESET);
+    sb.append('\n');
     // chat | presence
     for (var message: messages) {
       colsRemaining = columns;
@@ -125,34 +126,32 @@ public class ClientConsole {
       colsRemaining -= maxUserLength + 5; // right side pannel of users + margin ( | ) and (│ )
       var messageLines = sanitizeAndSplit(message.txt(), colsRemaining);
       var who = "%s%s".formatted(date, user);
-      var oldColsRemaining = colsRemaining;
-      var lineBreak = messageLines.size() > 1 ? "\n": ""; // inline message does not break
-      var separator = "";
       // breaking down the message into multiple lines
       for (var messageLine: messageLines) {
         messageLine = (" | %-" + colsRemaining + "s").formatted(messageLine);
-        System.out.printf("%s%s%s" + CLIColor.CYAN + "│ %s" + CLIColor.RESET
-            , separator, who, messageLine
-            , users.get(lineIndex) );
+        var formatedLine = String.format("%s%s" + CLIColor.CYAN + "│ %s\n",
+            who,
+            messageLine,
+            lineIndex < users.size() ? users.get(lineIndex) : "");
+        sb.append(formatedLine).append(CLIColor.RESET);
         who = " ".repeat(maxUserLength + 7);
-        colsRemaining = oldColsRemaining;
-        separator = lineBreak;
         lineIndex++;
       }
-      System.out.printf("\n");
-      lineIndex++;
     }
     // remaining lines on screen : display side pannel of users
     // we keep a line for the thematic break and the input
     for (; users.size() > lineIndex && lineIndex < lines - 2; lineIndex++) {
-      System.out.printf("%-"+ (columns - maxUserLength - 2) +"s" + CLIColor.CYAN + "| " , " ");
-      System.out.printf("%-"+ (maxUserLength)  +"s\n", users.get(lineIndex));
+      sb.append(String.format("%-"+ (columns - maxUserLength - 2) +"s" + CLIColor.CYAN + "| " , " "));
+      sb.append(String.format("%-"+ (maxUserLength)  +"s\n", users.get(lineIndex)));
     }
     // thematic break
-    for(var i = 0; i < columns; i++) {
-      System.out.print(CLIColor.CYAN + "—" + CLIColor.RESET);
-    }
-    System.out.println(": ");
+    sb.append(CLIColor.CYAN).append(CLIColor.BOLD);
+    sb.append("—".repeat(columns));
+    sb.append(CLIColor.RESET);
+    sb.append("\n");
+    sb.append(("%"+ (maxUserLength + 7) +"s: ").formatted( client.login()));
+    sb.append(CLIColor.RESET + "]");
+    System.out.println(sb);
   }
   
   private int getMaxUserLength() {
@@ -161,7 +160,8 @@ public class ClientConsole {
   
   /**
    * Split the message into multiple lines if it exceeds the maxCharacters
-   * or if it contains a newline character
+   * or if it contains a newline character.
+   * Replace tabulation with 4 spaces
    * @param message
    * @param maxCharacters
    * @return

@@ -194,6 +194,10 @@ public class Client {
         this.selector = Selector.open();
     }
     
+    public String login(){
+        return login;
+    }
+    
     /**
      * Send instructions to the selector via a BlockingQueue and wake it up
      *

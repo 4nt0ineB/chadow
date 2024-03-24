@@ -28,7 +28,8 @@ public enum CLIColor {
   BLUE_BACKGROUND("\u001B[44m"),
   PURPLE_BACKGROUND("\u001B[45m"),
   CYAN_BACKGROUND("\u001B[46m"),
-  WHITE_BACKGROUND("\u001B[47m");
+  WHITE_BACKGROUND("\u001B[47m"),
+  CLEAR("\033[H\033[2J");
   
   private final String str;
   
