@@ -21,9 +21,10 @@ public class ClientConsole {
   private int lines;
   private int columns;
   private final Chat chat;
+  private volatile View currentView;
   
   
-  private final ArrayBlockingQueue<View> viewQueue = new ArrayBlockingQueue<>(1);
+  private final ArrayBlockingQueue<View> viewQueue = new ArrayBlockingQueue<>(2);
   
   public ClientConsole(Client client, int lines, int columns) {
     Objects.requireNonNull(client);
@@ -34,6 +35,7 @@ public class ClientConsole {
     this.chat = new Chat(client, lines, columns, viewCanDisplay);
     this.lines = lines;
     this.columns = columns;
+    currentView = chat;
   }
   
 
@@ -46,9 +48,12 @@ public class ClientConsole {
     
     // Thread that display
     Thread.ofPlatform().daemon().start(() -> {
-      var view = viewQueue.poll();
-      viewQueue.peek();
-      view.pin();
+      if(viewQueue.size() == 1) {
+        currentView = viewQueue.peek();
+      } else {
+        currentView = viewQueue.poll();
+      }
+      currentView.pin();
     });
     
     // Thread that process the user inputs
@@ -78,28 +83,33 @@ public class ClientConsole {
     String inputField = "";
     var c = 0;
     var escape = false;
+    var breaks = 0;
     
     while ((c = reader.read()) != -1) {
       if(viewCanDisplay.get()) {
         if (c == '\n') {
-          var refresh = viewCanDisplay.get();
-          viewCanDisplay.set(!refresh);
-          chat.drawDiscussionThread();
+          viewCanDisplay.set(false);
+          currentView.clearViewAndRest(breaks);
+          currentView.draw();
         }
       }else {
         if (escape && !inputField.endsWith("\n")) {
-          System.out.print((" ".repeat(maxUserLength + 8) + "> "));
+          // " ".repeat(maxUserLength + 8) +
+          System.out.print("> ");
           inputField += '\n';
           escape = false;
         } else {
           // we escape with '\', and is stored has line break
           if (c == '\\' ) {
             escape = true;
+            breaks++;
           } else if (c == '\n') {
-            chat.processInput(inputField);
+            var letWrite = currentView.processInput(inputField);
+            currentView.clearViewAndRest(breaks);
+            viewCanDisplay.set(!letWrite);
+            currentView.draw();
             inputField = "";
-            var refresh = viewCanDisplay.get();
-            viewCanDisplay.set(!refresh);
+            breaks = 0;
           } else {
             inputField += (char) c;
           }

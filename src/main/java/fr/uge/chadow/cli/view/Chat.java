@@ -6,11 +6,10 @@ import fr.uge.chadow.client.Client;
 import fr.uge.chadow.core.Message;
 
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
@@ -22,20 +21,21 @@ public class Chat implements View{
     private enum MODE {
       CHAT_LIVE_REFRESH,
       CHAT_SCROLLER,
-      USERS_SCROLLER
+      USERS_SCROLLER,
+      HELP_WITH_SCROLL,
     }
   
     private final Client client;
     private final List<Message> messages = new ArrayList<>();
-    private final List<String> users = new ArrayList<>();
-    private final Scroller messageScroller = new Scroller(0);
-    private final Scroller userScroller = new Scroller(0);
+    private final SortedSet<String> users = new TreeSet<>();
+    private final Scroller messageScroller;
+    private final Scroller userScroller;
     
     private final LinkedBlockingQueue<Message> messagesQueue = new LinkedBlockingQueue<>();
     private int lines;
     private int columns;
     private final AtomicBoolean viewCanDisplay;
-    private MODE mode = MODE.CHAT_STATIC;
+    private MODE mode = MODE.CHAT_LIVE_REFRESH;
     
     
     public Chat(Client client, int lines, int columns, AtomicBoolean autoRefresh) {
@@ -44,7 +44,8 @@ public class Chat implements View{
       this.lines = lines;
       this.columns = columns;
       this.viewCanDisplay = autoRefresh;
-      
+      this.messageScroller = new Scroller(0, maxChatLines());
+      this.userScroller = new Scroller(0, maxChatLines());
     }
     
     @Override
@@ -52,7 +53,6 @@ public class Chat implements View{
       this.lines = lines;
       this.columns = cols;
     }
-    
     
     @Override
     public void pin() {
@@ -71,38 +71,52 @@ public class Chat implements View{
       users.add("Antoine");
       userScroller.setLines(users.size());
       
-      messages.add(new Message("test", "test"));
-      messages.add(new Message("test", "hello how are you"));
-      messages.add(new Message("Morpheus", "Wake up, Neo..."));
-      messages.add(new Message("Morpheus", "The Matrix has you..."));
-      messages.add(new Message("Morpheus", "Follow the white rabbit"));
-      messages.add(new Message("Neo", "what the hell is this"));
-      messages.add(new Message("Neo", "Just going to bed now"));
-      messages.add(new Message("Alan1", "Master CONTROL PROGRAM\nRELEASE TRON JA 307020...\nI HAVE PRIORITY ACCESS 7"));
-      messages.add(new Message("SKIDROW", "Here is the codex for the game: cdx:1eb49a28a0c02b47eed4d0b968bb9aec116a5a47"));
-      messages.add(new Message("Antoine", "Le lien vers le sujet : http://igm.univ-mlv.fr/coursprogreseau/tds/projet2024.html"));
+      messages.add(new Message("test", "test", System.currentTimeMillis()));
+      messages.add(new Message("test", "hello how are you", System.currentTimeMillis()));
+      messages.add(new Message("Morpheus", "Wake up, Neo...", System.currentTimeMillis()));
+      messages.add(new Message("Morpheus", "The Matrix has you...", System.currentTimeMillis()));
+      messages.add(new Message("Morpheus", "Follow the white rabbit", System.currentTimeMillis()));
+      messages.add(new Message("Neo", "what the hell is this", System.currentTimeMillis()));
+      messages.add(new Message("Neo", "Just going to bed now", System.currentTimeMillis()));
+      messages.add(new Message("Alan1", "Master CONTROL PROGRAM\nRELEASE TRON JA 307020...\nI HAVE PRIORITY ACCESS 7", System.currentTimeMillis()));
+      messages.add(new Message("SKIDROW", "Here is the codex for the game: cdx:1eb49a28a0c02b47eed4d0b968bb9aec116a5a47", System.currentTimeMillis()));
+      messages.add(new Message("Antoine", "Le lien vers le sujet : http://igm.univ-mlv.fr/coursprogreseau/tds/projet2024.html", System.currentTimeMillis()));
       messageScroller.setLines(messages.size());
       
-      Thread.ofPlatform().daemon().start(() -> {
-          while (true) {
-            try {
-              Thread.sleep(1000); // Sleep for 1 second
-              messagesQueue.put(new Message("test", "test"));
-            } catch (InterruptedException e) {
-              e.printStackTrace();
-            }
-          }
-        });
       
-        try {
-            chat_loop();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+      
+      Thread.ofPlatform().daemon().start(() -> {
+        while (true) {
+          try {
+            Thread.sleep(1000); // Sleep for 1 second
+            if(mode == MODE.CHAT_LIVE_REFRESH) {
+              messagesQueue.put(new Message("test", "test", System.currentTimeMillis()));
+            }
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
         }
+      });
+      
+      try {
+          chat_loop();
+      } catch (IOException e) {
+          throw new RuntimeException(e);
+      }
         
     }
   
-    private static void printHelp() {
+  @Override
+  public void draw() {
+    try {
+      drawDiscussionThread();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+  
+  
+  private static void printHelp() {
       var txt = "HELP ----------------\n";
       txt += "\tINFO display connected clients\n";
       System.out.println(txt);
@@ -110,26 +124,77 @@ public class Chat implements View{
     
     /**
      * Process the message or the command
-     * @param msg
+     * @param input
      * @throws InterruptedException
      */
     @Override
-    public void processInput(String msg) throws InterruptedException{
-      if(msg.isBlank()) {
-        return;
+    public boolean processInput(String input) throws InterruptedException{
+      if(input.isBlank()) {
+        return true;
       }
-      switch (msg) {
-        case ":h", ":help" -> printHelp();
-        case ":c", ":chat" -> mode = MODE.CHAT_SCROLLER;
-        case ":u", ":users" -> mode = MODE.USERS_SCROLLER;
-        case ":m", ":message" -> mode = MODE.CHAT_LIVE_REFRESH;
-        
-        // case ":m"
-        case ":exit" -> {}
+      return switch (input) {
+        // Standard commands
+        case ":h", "help" -> {
+          mode = MODE.HELP_WITH_SCROLL;
+          yield true;
+        }
+        case ":c", ":chat" -> {
+          mode = MODE.CHAT_SCROLLER;
+          messageScroller.setLines(messages.size());
+          yield true;
+        }
+        case ":u", ":users" -> {
+          mode = MODE.USERS_SCROLLER;
+          userScroller.setLines(messages.size());
+          userScroller.setCurrentLine(0);
+          yield true;
+        }
+        case ":m", ":message" -> {
+          mode = MODE.CHAT_LIVE_REFRESH;
+          yield false;
+        }
+        case ":exit" -> {
+          throw new Error("TODO exit");
+          //yield false;
+        }
         default -> {
-          messagesQueue.put(new Message(client.login(), msg));
+          yield switch (mode) {
+            case CHAT_LIVE_REFRESH -> processInputModeLiveRefresh(input);
+            case CHAT_SCROLLER -> processInputModeScroller(input, messageScroller);
+            case USERS_SCROLLER -> processInputModeScroller(input, userScroller);
+            case HELP_WITH_SCROLL -> {
+              throw new Error("TODO help");
+              //processInputModeScroller(input, null);
+            }
+          };
+        }
+      };
+    }
+    
+    private boolean processInputModeLiveRefresh(String input) throws InterruptedException {
+      switch (input) {
+        default -> {
+          if(!input.startsWith(":")) {
+            // just to see the message in the chat for now
+            messagesQueue.put(new Message(client.login(), input, System.currentTimeMillis()));
+            // when everything will be connected, will be
+            // client.sendMessage(input);
+          }
         }
       }
+      return false;
+    }
+    
+    private boolean processInputModeScroller(String input, Scroller scroller) {
+      switch (input) {
+        case "e" -> scroller.scrollUp(maxChatLines());
+        case "s" -> scroller.scrollDown(maxChatLines());
+        case ":exit" -> mode = MODE.CHAT_LIVE_REFRESH;
+        default -> {
+          return false;
+        }
+      }
+      return true;
     }
     
     private void addMessage(Message message) {
@@ -147,16 +212,19 @@ public class Chat implements View{
         var maxUserLength = getMaxUserLength();
         var position = new int[]{maxUserLength + 10, lines};
         while (true) {
-            try {
-                if(viewCanDisplay.get()) {
-                    drawDiscussionThread();
-                    // Wait for incoming messages
-                    var incomingMessage = messagesQueue.take();
-                    addMessage(incomingMessage);
-                }
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+          try {
+            if(viewCanDisplay.get() ) {
+                drawDiscussionThread();
+                if(mode == MODE.CHAT_LIVE_REFRESH) {
+                // Wait for incoming messages
+                var incomingMessage = messagesQueue.take();
+                addMessage(incomingMessage);
+              }
             }
+            Thread.sleep(250);
+          } catch (InterruptedException e) {
+              e.printStackTrace();
+          }
         }
     }
     
@@ -166,7 +234,7 @@ public class Chat implements View{
      */
     public void drawDiscussionThread() throws IOException {
         var maxUserLength = getMaxUserLength();
-        var position = new int[]{maxUserLength + 10, lines};
+        var position = new int[]{2, lines};
         View.moveCursorToPosition(1, 1);
         clearDisplayArea();
         printChatDisplay();
@@ -183,7 +251,14 @@ public class Chat implements View{
         }
         View.moveCursorToPosition(1, 1); // Move cursor back to the top
     }
-    
+  
+  @Override
+  public void clearViewAndRest(int rest) {
+    for(int i = 0; i < lines + rest; i++) {
+      View.moveCursorToPosition(1, i + 1);
+      System.out.print(CLIColor.CLEAR_LINE);
+    }
+  }
     
     /**
      * Get the max length of the usernames
@@ -205,15 +280,16 @@ public class Chat implements View{
         var sb = new StringBuilder();
         var maxUserLength = getMaxUserLength();
         var lineIndex = 0;
-        var maxChatLines = lines -3;
+        var maxChatLines = maxChatLines();
         var colsRemaining = columns - getMaxUserLength() - 2;
         sb.append(chatHeader());
         // chat | presence
+        var users = getUsersToDisplay();
         var iterator = getFormattedMessages().iterator();
         for (; iterator.hasNext() && lineIndex < maxChatLines; ) {
             var message = iterator.next();
             colsRemaining = columns;
-            var date = getADate() + "  ";
+            var date = getADate(message.epoch()) + "  ";
             colsRemaining -= date.length();
             var user = ("%" + maxUserLength + "s").formatted(message.login());
             colsRemaining -= user.length();
@@ -284,20 +360,22 @@ public class Chat implements View{
     private String inputField() {
         var inputField = "";
         if(!viewCanDisplay.get()) {
-            inputField = ("%"+ (getMaxUserLength() + 21) + "s> %n")
+          // (getMaxUserLength() + 21)
+            inputField = ("%s\n")
                 .formatted("[" + CLIColor.BOLD + CLIColor.CYAN + client.login() + CLIColor.RESET + "]");
         }else{
-            inputField = ("%"+ (getMaxUserLength() + 50) + "s  %n")
+          // (getMaxUserLength() + 50)
+            inputField = ("%s\n")
                 .formatted(CLIColor.GREY + "[" + CLIColor.GREY + CLIColor.BOLD + client.login() + CLIColor.RESET + CLIColor.GREY + "]" + CLIColor.RESET);
         }
-        return inputField;
+        return inputField + "> ";
     }
     
     // just for testing
-    private String getADate() {
-        var date = LocalDateTime.now();
-        var formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
-        var formattedDate = date.format(formatter);
+    private String getADate(long millis) {
+        var date =  new Date(millis);
+        var formatter = new SimpleDateFormat("HH:mm:ss");
+        var formattedDate = formatter.format(date);
         return formattedDate;
     }
   
@@ -314,10 +392,30 @@ public class Chat implements View{
    * @return
    */
   private List<Message> getFormattedMessages() {
-    var subList = messages.subList(Math.max(0, messages.size() - maxChatLines()), messages.size());
+    var subList = getMessagesToDisplay();
     return subList.stream()
                   .flatMap(message -> formatMessage(message, msgLineLength()))
                   .collect(Collectors.toList());
+  }
+  
+  private List<Message> getMessagesToDisplay() {
+    if(messages.size() <= maxChatLines()) {
+      return messages;
+    }
+    if(mode == MODE.CHAT_LIVE_REFRESH) {
+      return messages.subList(Math.max(0, messages.size() - maxChatLines()), messages.size());
+    }
+    return messages.subList(messageScroller.getA(), messageScroller.getB());
+  }
+  
+  private List<String> getUsersToDisplay() {
+    if(users.size() <= maxChatLines()) {
+      return new ArrayList<>(users);
+    }
+    if(mode == MODE.CHAT_LIVE_REFRESH) {
+      return users.stream().toList();
+    }
+    return users.stream().skip(userScroller.getA()).toList();
   }
   
   private int msgLineLength() {
@@ -336,7 +434,7 @@ public class Chat implements View{
   private Stream<Message> formatMessage(Message message, int lineLength) {
     var sanitizedLines = splitAndSanitize(message, lineLength);
     return IntStream.range(0, sanitizedLines.size())
-                    .mapToObj(index -> new Message(index == 0 ? message.login() : "", sanitizedLines.get(index)));
+                    .mapToObj(index -> new Message(index == 0 ? message.login() : "", sanitizedLines.get(index), message.epoch()));
   }
   
   /**
@@ -366,6 +464,6 @@ public class Chat implements View{
   }
   
   private int maxChatLines() {
-    return lines - 3;
+    return lines - 4;
   }
 }

@@ -38,7 +38,7 @@ public class MessageReader implements Reader<Message> {
 			txt = stringReader.get();
 		}
 		state = State.DONE;
-		value = new Message(login, txt);
+		value = new Message(login, txt, System.currentTimeMillis());
 		return ProcessStatus.DONE;
 	}
 

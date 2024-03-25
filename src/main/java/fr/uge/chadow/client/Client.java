@@ -215,7 +215,7 @@ public class Client {
     private void processCommands() {
     	var command = commandsQueue.poll();
     	if(command != null) {
-    		uniqueContext.queueMessage(new Message(login, command));
+    		uniqueContext.queueMessage(new Message(login, command, System.currentTimeMillis()));
     	}
     }
 
