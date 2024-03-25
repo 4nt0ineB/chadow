@@ -15,11 +15,11 @@ $ java -jar --enable-preview target/chadow-1.0.0.jar localhost 7777 25 238
 
 ### Chadow client CLI
 By default, the main view is in live reload and shows the new messages and connected users in real time.
-Because it needs to clear up the screen, meaning that the user can't type commands or messages at the same time 
-('live reload' mode is indicated by the user's login being greyed out)
-The user has to press enter to enter the 'input' mode. (the user's login is then shown in color);
+Because it needs to clear up the screen, the user can't type commands or messages at the same time 
+('live reload' mode is indicated by the user's login being greyed out).
+The user has to press enter to switch to 'input mode' (the user's login is then shown in color).
 
-The input field allows multiline input. It works by escaping by writing '\' before pressing enter. 
+The input field allows multiline input. It works by writing the character \ before pressing enter. 
 In 'message mode' any input that is not a command is considered as message to be sent to the server.
 
 The user can type the following commands:
