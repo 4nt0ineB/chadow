@@ -1,28 +1,36 @@
 package fr.uge.chadow.cli.scrollable;
 
-import fr.uge.chadow.cli.scrollable.Scrollable;
 
-public class Scroller {
-    private final Scrollable scrollable;
-    private final int lines;
+public class Scroller{
     private int currentLine = 0;
-
-    public Scroller(Scrollable scrollable, int lines) {
-        this.scrollable = scrollable;
+    private int lines = 0;
+    
+    public Scroller(int lines) {
         this.lines = lines;
     }
-
+    
+    /**
+     * Reset the scroller
+     * @param lines
+     */
+    public void setLines(int lines) {
+        this.lines = lines;
+        currentLine = 0;
+    }
+    
     public void scrollUp() {
         if (currentLine > 0) {
-            scrollable.scrollUp();
             currentLine--;
         }
     }
 
     public void scrollDown() {
         if (currentLine < lines) {
-            scrollable.scrollDown();
             currentLine++;
         }
+    }
+    
+    public int at(int index) {
+        return currentLine + index;
     }
 }

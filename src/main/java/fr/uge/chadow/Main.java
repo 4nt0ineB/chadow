@@ -10,7 +10,7 @@ public class Main {
   private static void usage() {
     System.out.println("Usage: hostname port lines columns");
   }
-  public static void main(String[] args) throws IOException {
+  public static void main(String[] args) throws IOException, InterruptedException {
     if (args.length < 4) {
       usage();
       return;
