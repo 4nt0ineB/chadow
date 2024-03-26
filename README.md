@@ -24,12 +24,16 @@ In 'message mode' any input that is not a command is considered as message to be
 
 The user can type the following commands:
 
-| Command       | Description                                                                                     |
-|---------------|-------------------------------------------------------------------------------------------------|
-| :m (:message) | select the default mode (message mode) described above                                          |
-| :c (:chat)    | to scroll on the chat (stops live reload), scroll with e (up) and s (down) |
-| :u (:users)   | to scroll on list of connected users (stops live reload), scroll with e (up) and s (down)       |
-
+```shell
+:h, :help - Display this help, scroll with e and s
+:u, :users - focus on the users list, enable scrolling with e and s
+:c, :chat - focus on the chat, enable scrolling with e and ss
+:m, :msg - back to the chat in live reload
+:w, :whisper <username> - goes to the private discussion view with the other user (WIP)
+:r <lines> <columns> - Resize the views
+:cdx <SHA-1> - Display the codex info with the given SHA-1                        (WIP)
+:exit - Exit the application                                                      (WIP)
+```
 
 @Todo<br>
 :q :quit<br> 

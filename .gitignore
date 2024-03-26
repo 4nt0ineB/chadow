@@ -161,3 +161,4 @@ replay_pid*
 **/brouillon
 .idea/
 target/
+./logs

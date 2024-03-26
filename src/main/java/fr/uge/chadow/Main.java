@@ -15,6 +15,10 @@ public class Main {
       usage();
       return;
     }
-    new ClientConsole(new Client("Flynn", new InetSocketAddress(args[0], Integer.parseInt(args[1]))), Integer.parseInt(args[2]), Integer.parseInt(args[3])).start();
+    var hostname = new InetSocketAddress(args[0], Integer.parseInt(args[1]));
+    var lines = Integer.parseInt(args[2]);
+    var columns = Integer.parseInt(args[3]);
+    new ClientConsole(new Client("Flynn", hostname), lines, columns)
+        .start();
   }
 }

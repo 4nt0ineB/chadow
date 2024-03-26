@@ -1,126 +1,71 @@
 package fr.uge.chadow.cli;
 
-import fr.uge.chadow.cli.view.Chat;
-import fr.uge.chadow.cli.view.View;
+import fr.uge.chadow.cli.display.Display;
 import fr.uge.chadow.client.Client;
+import fr.uge.chadow.core.Message;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Logger;
 
 public class ClientConsole {
+  private final InputReader inputReader;
+  private final Display display;
+  private final AtomicBoolean viewCanRefresh = new AtomicBoolean(true);
   
-  private static final Logger logger = Logger.getLogger(ClientConsole.class.getName());
-  private final Client client;
-  private final AtomicBoolean viewCanDisplay = new AtomicBoolean(true);
-  private int lines;
-  private int columns;
-  private final Chat chat;
-  private volatile View currentView;
-  
-  
-  private final ArrayBlockingQueue<View> viewQueue = new ArrayBlockingQueue<>(2);
-  
-  public ClientConsole(Client client, int lines, int columns) {
+  public ClientConsole(Client client, int lines, int cols) {
     Objects.requireNonNull(client);
-    if(lines <= 0 || columns <= 0) {
+    if(lines <= 0 || cols <= 0) {
       throw new IllegalArgumentException("lines and columns must be positive");
     }
-    this.client = client;
-    this.chat = new Chat(client, lines, columns, viewCanDisplay);
-    this.lines = lines;
-    this.columns = columns;
-    currentView = chat;
+    display = new Display(client, lines, cols, viewCanRefresh);
+    inputReader = new InputReader(client, lines, cols, viewCanRefresh, display);
   }
   
-
-  
-  
-  public void start() throws IOException, InterruptedException {
+  public void start() throws InterruptedException, IOException {
+    //System.err.println("----------------------Running with " + lines + " lines and " + cols + " columns");
+    display.draw();
+    // thread that manages the display
+    Thread.ofPlatform().daemon().start(display::startLoop);
     
-    System.out.println("Running with " + lines + " lines and " + columns + " columns");
-    viewQueue.put(chat);
+    // for dev: fake messages
+    fillWithFakeData();
     
-    // Thread that display
-    Thread.ofPlatform().daemon().start(() -> {
-      if(viewQueue.size() == 1) {
-        currentView = viewQueue.peek();
-      } else {
-        currentView = viewQueue.poll();
-      }
-      currentView.pin();
-    });
-    
-    // Thread that process the user inputs
-    userInput();
- 
+    // Thread that manages the user inputs
+    inputReader.start();
   }
   
-  /**
-   * Read user input from the console
-   * We talk about writeMode when autoRefresh is disabled.
-   * In autoRefresh mode (set to true), incoming messages are displayed automatically.
-   * The user can press enter to stop the auto refresh
-   * to be able to type a message (or a command).
-   * When the user press enter again the message (or the command) is processed,
-   * then the chat goes back into autoRefresh mode.
-   *
-   * In writeMode (autoRefresh set to false), the user can escape a line with '\' followed by enter.
-   * This is useful to write a multiline message.
-   *
-   *
-   * @throws IOException
-   */
-  private void userInput() throws IOException, InterruptedException {
-    // input
-    var maxUserLength = client.login().length();
-    var reader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
-    String inputField = "";
-    var c = 0;
-    var escape = false;
-    var breaks = 0;
-    
-    while ((c = reader.read()) != -1) {
-      if(viewCanDisplay.get()) {
-        if (c == '\n') {
-          viewCanDisplay.set(false);
-          currentView.clearViewAndRest(breaks);
-          currentView.draw();
-        }
-      }else {
-        if (escape && !inputField.endsWith("\n")) {
-          // " ".repeat(maxUserLength + 8) +
-          System.out.print("> ");
-          inputField += '\n';
-          escape = false;
-        } else {
-          // we escape with '\', and is stored has line break
-          if (c == '\\' ) {
-            escape = true;
-            breaks++;
-          } else if (c == '\n') {
-            var letWrite = currentView.processInput(inputField);
-            currentView.clearViewAndRest(breaks);
-            viewCanDisplay.set(!letWrite);
-            currentView.draw();
-            inputField = "";
-            breaks = 0;
-          } else {
-            inputField += (char) c;
-          }
-        }
-      }
+  private void fillWithFakeData() {
+    var users = new String[]{"test", "Morpheus", "Trinity", "Neo", "Flynn", "Alan", "Lora", "Gandalf", "ThorinSonOfThrainSonOfThror", "Bilbo", "SKIDROW", "Antoine"};
+    for(var user: users){
+      display.addUser(user);
     }
+    var messages = new Message[] {
+        new Message("test", "test", System.currentTimeMillis()),
+        new Message("test", "hello how are you", System.currentTimeMillis()),
+        new Message("Morpheus", "Wake up, Neo...", System.currentTimeMillis()),
+        new Message("Morpheus", "The Matrix has you...", System.currentTimeMillis()),
+        new Message("Morpheus", "Follow the white rabbit", System.currentTimeMillis()),
+        new Message("Neo", "what the hell is this", System.currentTimeMillis()),
+        new Message("Neo", "Just going to bed now", System.currentTimeMillis()),
+        new Message("Alan1", "Master CONTROL PROGRAM\nRELEASE TRON JA 307020...\nI HAVE PRIORITY ACCESS 7", System.currentTimeMillis()),
+        new Message("SKIDROW", "Here is the codex of the FOSS (.deb) : cdx:1eb49a28a0c02b47eed4d0b968bb9aec116a5a47", System.currentTimeMillis()),
+        new Message("Antoine", "Le lien vers le sujet : http://igm.univ-mlv.fr/coursprogreseau/tds/projet2024.html", System.currentTimeMillis())
+    };
+    for (var message: messages) {
+      display.addMessage(message);
+    }
+    // start a thread that adds a message every second
+    Thread.ofPlatform().daemon().start(() -> {
+      while (true) {
+        try {
+          Thread.sleep(1000); // Sleep for 1 second
+          display.addMessage(new Message("test", "test", System.currentTimeMillis()));
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+      }
+    });
   }
-  
-  
+
 }
-
-
-// stty size
-//  java -jar --enable-preview target/chadow-1.0.0.jar localhost 7777 25 238

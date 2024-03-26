@@ -1,4 +1,4 @@
-package fr.uge.chadow.cli.scrollable;
+package fr.uge.chadow.cli.display;
 
 
 import java.util.Objects;
