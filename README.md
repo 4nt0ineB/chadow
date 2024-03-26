@@ -35,13 +35,6 @@ The user can type the following commands:
 :exit - Exit the application                                                      (WIP)
 ```
 
-@Todo<br>
-:q :quit<br> 
-:h :help<br>
-
-
-
-
 ### Sources
 
 RFC:
