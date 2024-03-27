@@ -27,8 +27,8 @@ The user can type the following commands:
 ```shell
 :h, :help - Display this help, scroll with e and s
 :u, :users - focus on the users list, enable scrolling with e and s
-:c, :chat - focus on the chat, enable scrolling with e and ss
-:m, :msg - back to the chat in live reload
+:c, :chat - back to the chat in live reload focus
+:m, :msg - on the chat, enable scrolling through the messages with e and s
 :w, :whisper <username> - goes to the private discussion view with the other user (WIP)
 :r <lines> <columns> - Resize the views
 :cdx <SHA-1> - Display the codex info with the given SHA-1                        (WIP)

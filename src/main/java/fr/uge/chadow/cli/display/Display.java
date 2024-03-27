@@ -1,8 +1,9 @@
 package fr.uge.chadow.cli.display;
 
 import fr.uge.chadow.cli.CLIColor;
-import fr.uge.chadow.client.Client;
+import fr.uge.chadow.cli.ClientConsoleController;
 import fr.uge.chadow.core.Message;
+import fr.uge.chadow.cli.ClientConsoleController.Mode;
 
 import java.io.IOException;
 import java.util.*;
@@ -13,13 +14,18 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+
 public class Display {
   
-  private final Client client;
+  private final ClientConsoleController controller;
   private final List<Message> messages = new ArrayList<>();
   private final SortedSet<String> users = new TreeSet<>();
   private final Scroller messageScroller;
   private final Scroller userScroller;
+  
+  private final String login;
+  private final String hostName;
+  
   
   private final LinkedBlockingQueue<Message> messagesQueue = new LinkedBlockingQueue<>();
   
@@ -27,17 +33,21 @@ public class Display {
   private final ReentrantLock lock = new ReentrantLock();
   private int lines;
   private int columns;
-  private MODE mode = MODE.CHAT_LIVE_REFRESH;
+  private Mode mode = Mode.CHAT_LIVE_REFRESH;
   private ScrollableView helpView;
-  public Display(Client client, int lines, int cols, AtomicBoolean viewCanRefresh) {
-    Objects.requireNonNull(client);
+  
+  
+  public Display(int lines, int cols, String login, String hostName, AtomicBoolean viewCanRefresh, ClientConsoleController controller) {
     Objects.requireNonNull(viewCanRefresh);
+    Objects.requireNonNull(controller);
     if (lines <= 0 || cols <= 0) {
       throw new IllegalArgumentException("lines and cols must be positive");
     }
-    this.client = client;
+    this.controller = controller;
     this.lines = lines;
     this.columns = cols;
+    this.login = login;
+    this.hostName = hostName;
     this.viewCanRefresh = viewCanRefresh;
     this.messageScroller = new Scroller(0, View.maxLinesView(lines));
     this.userScroller = new Scroller(0, View.maxLinesView(lines));
@@ -72,11 +82,11 @@ public class Display {
     while (true) {
       try {
         if (viewCanRefresh.get()) {
-          if (mode == MODE.HELP_SCROLLER) {
+          if (mode == Mode.HELP_SCROLLER) {
             helpView.draw();
           } else {
             draw();
-            if (mode == MODE.CHAT_LIVE_REFRESH) {
+            if (mode == Mode.CHAT_LIVE_REFRESH) {
               // Wait for incoming messages
               var incomingMessage = messagesQueue.take();
               messages.add(incomingMessage);
@@ -116,76 +126,9 @@ public class Display {
     }
   }
   
-  /**
-   * Process the message or the command
-   *
-   * @param input
-   * @return true if the user can type again, otherwise it's the view's turn.
-   * @throws InterruptedException
-   */
-  public boolean processInput(String input) throws InterruptedException {
-    lock.lock();
-    try {
-      return switch (input) {
-        case ":c", ":chat" -> {
-          mode = MODE.CHAT_SCROLLER;
-          messageScroller.setLines(messages.size());
-          yield true;
-        }
-        case ":u", ":users" -> {
-          mode = MODE.USERS_SCROLLER;
-          userScroller.setLines(messages.size());
-          userScroller.setCurrentLine(0);
-          yield true;
-        }
-        case ":m", ":message" -> {
-          mode = MODE.CHAT_LIVE_REFRESH;
-          yield false;
-        }
-        case ":exit" -> {
-          throw new Error("TODO exit");
-          //yield false;
-        }
-        case ":h", ":help" -> {
-          mode = MODE.HELP_SCROLLER;
-          helpView = helpView();
-          yield true;
-        }
-        // specific mode commands
-        default -> switch (mode) {
-          case CHAT_LIVE_REFRESH -> processInputModeLiveRefresh(input);
-          case CHAT_SCROLLER -> processInputModeScroller(input, messageScroller);
-          case USERS_SCROLLER -> processInputModeScroller(input, userScroller);
-          case HELP_SCROLLER -> processInputModeScroller(input, helpView.scroller());
-        };
-      };
-    } finally {
-      lock.unlock();
-    }
-  }
-  
-  private boolean processInputModeLiveRefresh(String input) throws InterruptedException {
-    if (!input.startsWith(":") && !input.isBlank()) {
-      // just to see the message in the chat for now
-      addMessage(new Message(client.login(), input, System.currentTimeMillis()));
-      // when everything will be connected, will be
-      // client.sendMessage(input);
-    }
-    return false;
-  }
-  
-  private boolean processInputModeScroller(String input, Scroller scroller) {
-    switch (input) {
-      case "e" -> scroller.scrollUp(View.maxLinesView(lines));
-      case "s" -> scroller.scrollDown(View.maxLinesView(lines));
-    }
-    return true;
-  }
-  
   public void addMessage(Message message) {
     Objects.requireNonNull(message);
     try {
-      System.err.println(message);
       messagesQueue.put(message);
     } catch (InterruptedException e) {
       throw new RuntimeException(e);  // TODO ?
@@ -198,6 +141,7 @@ public class Display {
     try {
       users.add(user);
       userScroller.setLines(users.size());
+      userScroller.setCurrentLine(0);
     } finally {
       lock.unlock();
     }
@@ -291,7 +235,7 @@ public class Display {
     var colsRemaining = columns - getMaxUserLength() - 2;
     sb.append(CLIColor.CYAN_BACKGROUND);
     sb.append(CLIColor.WHITE);
-    var title = ("%-" + colsRemaining + "s ").formatted("CHADOW CLIENT on " + client.serverHostName());
+    var title = ("%-" + colsRemaining + "s ").formatted("CHADOW CLIENT on " + hostName);
     colsRemaining -= title.length() + 2; // right side pannel of users + margin (  )
     var totalUsers = (CLIColor.BOLD + "" + CLIColor.BLACK + "%-" + getMaxUserLength() + "s").formatted("(" + users.size() + ")");
     colsRemaining -= totalUsers.length();
@@ -307,11 +251,11 @@ public class Display {
     if (!viewCanRefresh.get()) {
       // (getMaxUserLength() + 21)
       inputField = ("%s\n")
-          .formatted("[" + CLIColor.BOLD + CLIColor.CYAN + client.login() + CLIColor.RESET + "]");
+          .formatted("[" + CLIColor.BOLD + CLIColor.CYAN + login + CLIColor.RESET + "]");
     } else {
       // (getMaxUserLength() + 50)
       inputField = ("%s\n")
-          .formatted(CLIColor.GREY + "[" + CLIColor.GREY + CLIColor.BOLD + client.login() + CLIColor.RESET + CLIColor.GREY + "]" + CLIColor.RESET);
+          .formatted(CLIColor.GREY + "[" + CLIColor.GREY + CLIColor.BOLD + login + CLIColor.RESET + CLIColor.GREY + "]" + CLIColor.RESET);
     }
     return inputField + "> ";
   }
@@ -332,7 +276,7 @@ public class Display {
     if (messages.size() <= View.maxLinesView(lines)) {
       return messages;
     }
-    if (mode == MODE.CHAT_LIVE_REFRESH) {
+    if (mode == Mode.CHAT_LIVE_REFRESH) {
       return messages.subList(Math.max(0, messages.size() - View.maxLinesView(lines)), messages.size());
     }
     return messages.subList(messageScroller.getA(), messageScroller.getB());
@@ -342,7 +286,7 @@ public class Display {
     if (users.size() <= View.maxLinesView(lines)) {
       return new ArrayList<>(users);
     }
-    if (mode == MODE.CHAT_LIVE_REFRESH) {
+    if (mode == Mode.CHAT_LIVE_REFRESH) {
       return users.stream()
                   .toList();
     }
@@ -371,25 +315,55 @@ public class Display {
                     .mapToObj(index -> new Message(index == 0 ? message.login() : "", sanitizedLines.get(index), message.epoch()));
   }
   
+  public Mode getMode() {
+    lock.lock();
+    try {
+      return mode;
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  public void scrollerUp() {
+    switch (mode) {
+      case CHAT_SCROLLER -> messageScroller.scrollUp(View.maxLinesView(lines));
+      case USERS_SCROLLER -> userScroller.scrollUp(View.maxLinesView(lines));
+      case HELP_SCROLLER -> helpView.scrollUp(View.maxLinesView(lines));
+    }
+  }
+  
+  public void scrollerDown() {
+    switch (mode) {
+      case CHAT_SCROLLER -> messageScroller.scrollDown(View.maxLinesView(lines));
+      case USERS_SCROLLER -> userScroller.scrollDown(View.maxLinesView(lines));
+      case HELP_SCROLLER -> helpView.scrollDown(View.maxLinesView(lines));
+    }
+  }
+
+  
+  public void setMode(Mode mode) {
+    lock.lock();
+    try {
+      this.mode = mode;
+      if(mode == Mode.HELP_SCROLLER) {
+        helpView = helpView();
+      }
+    } finally {
+      lock.unlock();
+    }
+  }
+  
   private ScrollableView helpView() {
     var txt = """
         :h, :help - Display this help, scroll with e and s
         :u, :users - focus on the users list, enable scrolling with e and s
-        :c, :chat - focus on the chat, enable scrolling with e and s\s
-        :m, :msg - back to the chat in live reload
+        :c, :chat - back to the chat in live reload focus
+        :m, :msg - on the chat, enable scrolling through the messages with e and s
         :w, :whisper <username> - goes to the private discussion view with the other user (WIP)
         :r <lines> <columns> - Resize the view\s
         :cdx <SHA-1> - Display the codex info with the given SHA-1                        (WIP)
         :exit - Exit the application                                                      (WIP)
         """;
-    return View.scrollableViewString(client, "Help", lines, columns, txt, viewCanRefresh);
+    return View.scrollableViewFromString("Help", login, lines, columns, txt);
   }
-  
-  private enum MODE {
-    CHAT_LIVE_REFRESH,
-    CHAT_SCROLLER,
-    USERS_SCROLLER,
-    HELP_SCROLLER,
-  }
-  
 }

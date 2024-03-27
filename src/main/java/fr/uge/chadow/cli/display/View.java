@@ -61,18 +61,16 @@ public interface View {
   /**
    * Create a scrollable view from a string
    *
-   * @param client
    * @param title
+   * @param login
    * @param lines
    * @param cols
    * @param help
-   * @param viewCanDisplay
    * @return
    */
-  static ScrollableView scrollableViewString(Client client, String title, int lines, int cols, String help,
-                                             AtomicBoolean viewCanDisplay) {
+  static ScrollableView scrollableViewFromString(String title, String login, int lines, int cols, String help) {
     var textLines = splitAndSanitize(help, cols);
-    return new ScrollableView(client, title, lines, cols, textLines, viewCanDisplay);
+    return new ScrollableView(title, login, lines, cols, textLines);
   }
   
   /**

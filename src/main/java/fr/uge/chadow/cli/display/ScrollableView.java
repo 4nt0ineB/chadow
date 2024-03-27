@@ -14,28 +14,23 @@ public class ScrollableView implements View {
   private final ArrayList<String> textLines;
   private final Scroller scroller;
   private final String title;
-  private final Client client;
-  private final AtomicBoolean viewCanRefresh;
   private int lines;
   private int columns;
+  private final String login;
   
-  public ScrollableView(Client client, String title, int lines, int cols, List<String> textLines,
-                        AtomicBoolean viewCanRefresh) {
-    Objects.requireNonNull(client);
-    Objects.requireNonNull(textLines);
+  public ScrollableView(String title, String login, int lines, int cols, List<String> textLines) {
     Objects.requireNonNull(title);
-    Objects.requireNonNull(viewCanRefresh);
+    Objects.requireNonNull(login);
+    Objects.requireNonNull(textLines);
     if (lines <= 0 || cols <= 0) {
       throw new IllegalArgumentException("lines and columns must be positive");
     }
     this.lines = lines;
     this.columns = cols;
     this.title = title;
-    this.client = client;
+    this.login = login;
     this.textLines = new ArrayList<>(textLines);
     this.scroller = new Scroller(textLines.size(), View.maxLinesView(lines));
-    this.viewCanRefresh = viewCanRefresh;
-    
   }
   
   @Override
@@ -110,12 +105,16 @@ public class ScrollableView implements View {
   }
   
   private String inputField() {
-    var inputField = ("%s\n").formatted("[" + CLIColor.BOLD + CLIColor.CYAN + client.login() + CLIColor.RESET + "]");
+    var inputField = ("%s\n").formatted("[" + CLIColor.BOLD + CLIColor.CYAN + login + CLIColor.RESET + "]");
     return inputField + "> ";
   }
   
-  
-  public Scroller scroller() {
-    return scroller;
+  public void scrollUp(int lines) {
+    scroller.scrollUp(lines);
   }
+  
+  public void scrollDown(int lines) {
+    scroller.scrollDown(lines);
+  }
+
 }
