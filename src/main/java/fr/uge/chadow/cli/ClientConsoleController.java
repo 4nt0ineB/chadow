@@ -7,10 +7,13 @@ import fr.uge.chadow.client.Client;
 import fr.uge.chadow.core.Message;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Logger;
 
 public class ClientConsoleController {
+  private final static Logger logger = Logger.getLogger(ClientConsoleController.class.getName());
   
   public enum Mode {
     CHAT_LIVE_REFRESH,
@@ -22,14 +25,9 @@ public class ClientConsoleController {
   private final Client client;
   private final InputReader inputReader;
   private final Display display;
-  private final AtomicBoolean viewCanRefresh = new AtomicBoolean(true);
   private int lines;
   private int cols;
   
-  private final List<Message> messages = new ArrayList<>();
-  private final SortedSet<String> users = new TreeSet<>();
-  
-
   public ClientConsoleController(Client client, int lines, int cols) {
     Objects.requireNonNull(client);
     if(lines <= 0 || cols <= 0) {
@@ -38,11 +36,12 @@ public class ClientConsoleController {
     this.client = client;
     this.lines = lines;
     this.cols = cols;
+    AtomicBoolean viewCanRefresh = new AtomicBoolean(true);
     display = new Display(lines, cols, client.login(), client.serverHostName(), viewCanRefresh, this);
     inputReader = new InputReader(viewCanRefresh, this);
   }
   
-  public void start() throws InterruptedException, IOException {
+  public void start()  {
     //System.err.println("----------------------Running with " + lines + " lines and " + cols + " columns");
     
     // client
@@ -59,10 +58,15 @@ public class ClientConsoleController {
     Thread.ofPlatform().daemon().start(display::startLoop);
     // for dev: fake messages
     fillWithFakeData();
-    // thread that fetches the messages
-    launchMessageFetcher();
+    client.subscribe(display::addMessage);
     // Thread that manages the user inputs
-    inputReader.start();
+    try {
+      inputReader.start();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } catch (InterruptedException e) {
+     logger.severe("User input reader was interrupted." + e.getMessage());
+    }
   }
   
   /**
@@ -122,6 +126,7 @@ public class ClientConsoleController {
   }
   
   public void drawDisplay() {
+    display.clear();
     display.draw();
   }
 
@@ -177,21 +182,21 @@ public class ClientConsoleController {
     });*/
   }
   
-  public void launchMessageFetcher() {
+ /* public void launchMessageFetcher() {
     Thread.ofPlatform().daemon().start(() -> {
       while (!Thread.interrupted()) {
         try {
-          var messages = client.getLastMessages(10);
+          var messages = client.getLastMessages(1);
           for (var message : messages) {
             display.addMessage(message);
           }
-          Thread.sleep(1000);
+          Thread.sleep(300);
         } catch (InterruptedException e) {
         
         }
       }
     });
-  }
+  }*/
   
   private void exitNicely() {
     // inputReader.stop();

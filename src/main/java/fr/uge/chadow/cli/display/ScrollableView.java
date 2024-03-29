@@ -58,13 +58,10 @@ public class ScrollableView implements View {
   
   @Override
   public void draw() {
-    View.moveCursorToPosition(1, 1);
-    View.clearDisplayArea(lines);
-    printTextLines();
-    View.moveToInputField(lines);
+    System.out.println(view());
   }
   
-  private void printTextLines() {
+  private String view() {
     var sb = new StringBuilder();
     var lineIndex = 0;
     var maxLinesView = View.maxLinesView(lines);
@@ -78,8 +75,7 @@ public class ScrollableView implements View {
     sb.append("\n".repeat(maxLinesView - lineIndex));
     sb.append(View.thematicBreak(columns));
     sb.append(inputField());
-    System.out.print(sb);
-    sb.setLength(0);
+    return sb.toString();
   }
   
   @Override
@@ -89,6 +85,7 @@ public class ScrollableView implements View {
   
   @Override
   public void clear() {
+    View.moveCursorToPosition(1, 1);
     View.clearDisplayArea(lines);
   }
   

@@ -15,6 +15,7 @@ import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Objects;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Consumer;
@@ -88,10 +89,15 @@ public class Client {
     }
   }
   
+  public void subscribe(Consumer<Message> subscriber) {
+    Objects.requireNonNull(subscriber);
+    uniqueContext.messageConsumer = subscriber;
+  }
+  
   public void launch() throws IOException {
     sc.configureBlocking(false);
     var key = sc.register(selector, SelectionKey.OP_CONNECT);
-    uniqueContext = new Context(key, receivedMessages::add);
+    uniqueContext = new Context(key);
     key.attach(uniqueContext);
     sc.connect(serverAddress);
     
@@ -140,12 +146,11 @@ public class Client {
     private final ArrayDeque<Message> queue = new ArrayDeque<>();
     private final MessageReader messageReader = new MessageReader();
     private boolean closed = false;
-    private final Consumer<Message> messageConsumer;
+    private Consumer<Message> messageConsumer = null;
     
-    private Context(SelectionKey key, Consumer<Message> messageConsumer) {
+    private Context(SelectionKey key) {
       this.key = key;
       this.sc = (SocketChannel) key.channel();
-      this.messageConsumer = messageConsumer;
     }
     
     /**
@@ -160,8 +165,13 @@ public class Client {
         switch (status) {
           case DONE:
             var msg = messageReader.get();
-            messageConsumer.accept(msg);
-            messageReader.reset();
+            if(messageConsumer == null){
+              logger.info("C'est null");
+            }else {
+              messageConsumer.accept(msg);
+              messageReader.reset();
+              
+            }
             break;
           case REFILL:
             return;

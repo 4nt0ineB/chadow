@@ -47,9 +47,10 @@ public class InputReader {
     var numberOfLineBreak = 0;
     
     while ((c = reader.read()) != -1) {
+      var canRefresh = viewCanRefresh.get();
       if (viewCanRefresh.get()) {
         if (c == '\n') {
-          viewCanRefresh.set(false);
+          viewCanRefresh.set(!canRefresh);
           controller.clearDisplayAndMore(numberOfLineBreak);
           controller.drawDisplay();
         }

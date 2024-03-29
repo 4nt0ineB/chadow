@@ -47,6 +47,7 @@ public class ServerChaton {
 		      case DONE:
 		        var value = messageReader.get();
 		        server.broadcast(value);
+						System.err.println(value);
 		        messageReader.reset();
 		        break;
 		      case REFILL:
@@ -244,13 +245,17 @@ public class ServerChaton {
 		}
 	}
 
-	public static void main(String[] args) throws NumberFormatException, IOException {
+	public static void main(String[] args) {
 		if (args.length != 1) {
 			usage();
 			return;
 		}
-		new ServerChaton(Integer.parseInt(args[0])).launch();
-	}
+    try {
+			new ServerChaton(Integer.parseInt(args[0])).launch();
+    } catch (IOException e) {
+			logger.severe("Error while launching server: " + e.getMessage());
+    }
+  }
 
 	private static void usage() {
 		System.out.println("Usage : ServerSumBetter port");

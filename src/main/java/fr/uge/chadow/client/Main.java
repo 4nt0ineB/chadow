@@ -27,11 +27,10 @@ public class Main {
       usage();
       return;
     }
-    var hostname = new InetSocketAddress(args[0], Integer.parseInt(args[1]));
+    var socket = new InetSocketAddress(args[0], Integer.parseInt(args[1]));
     var lines = Integer.parseInt(args[2]);
     var columns = Integer.parseInt(args[3]);
-    new ClientConsoleController(new Client("Flynn", hostname), lines, columns)
-        .start();
+    new ClientConsoleController(new Client("Flynn", socket), lines, columns).start();
   }
   
   public static void main(String[] args) throws IOException, InterruptedException {

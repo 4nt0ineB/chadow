@@ -82,16 +82,12 @@ public class Display {
     while (true) {
       try {
         if (viewCanRefresh.get()) {
-          if (mode == Mode.HELP_SCROLLER) {
-            helpView.draw();
-          } else {
-            draw();
-            if (mode == Mode.CHAT_LIVE_REFRESH) {
-              // Wait for incoming messages
-              var incomingMessage = messagesQueue.take();
-              messages.add(incomingMessage);
-              messageScroller.setLines(messages.size());
-            }
+          draw();
+          if (mode == Mode.CHAT_LIVE_REFRESH) {
+            // Wait for incoming messages
+            var incomingMessage = messagesQueue.take();
+            messages.add(incomingMessage);
+            messageScroller.setLines(messages.size());
           }
         }
         Thread.sleep(100);
@@ -101,14 +97,21 @@ public class Display {
     }
   }
   
+  public void clear() {
+    View.moveCursorToPosition(1, 1);
+    View.clearDisplayArea(lines);
+  }
+  
+  
   public void draw() {
+    lock.lock();
     try {
-      View.moveCursorToPosition(1, 1);
-      View.clearDisplayArea(lines);
       drawInContext();
       View.moveToInputField(lines);
     } catch (IOException e) {
       throw new RuntimeException(e); // TODO ?
+    } finally {
+      lock.unlock();
     }
   }
   
@@ -118,20 +121,38 @@ public class Display {
    * @throws IOException
    */
   private void drawInContext() throws IOException {
-    switch (mode) {
-      case CHAT_LIVE_REFRESH,
-          CHAT_SCROLLER,
-          USERS_SCROLLER -> printChatDisplay();
-      case HELP_SCROLLER -> helpView.draw();
+    lock.lock();
+    try {
+      switch (mode) {
+        case CHAT_LIVE_REFRESH,
+            CHAT_SCROLLER,
+            USERS_SCROLLER ->
+        {
+          clear();
+          System.out.print(chatHeader());
+          System.out.print(chatDisplay());
+          System.out.print(View.thematicBreak(columns));
+          System.out.print(inputField());
+        }
+        case HELP_SCROLLER -> {
+          helpView.clear();
+          helpView.draw();
+        }
+      }
+    } finally {
+      lock.unlock();
     }
   }
   
   public void addMessage(Message message) {
     Objects.requireNonNull(message);
+    lock.lock();
     try {
       messagesQueue.put(message);
     } catch (InterruptedException e) {
       throw new RuntimeException(e);  // TODO ?
+    } finally {
+      lock.unlock();
     }
   }
   
@@ -154,10 +175,16 @@ public class Display {
    * @return
    */
   private int getMaxUserLength() {
-    return Math.max(users.stream()
-                         .mapToInt(String::length)
-                         .max()
-                         .orElse(0), 5);
+    lock.lock();
+    try {
+      return Math.max(users.stream()
+                           .mapToInt(String::length)
+                           .max()
+                           .orElse(0), 5);
+    }finally {
+      lock.unlock();
+    }
+    
   }
   
   /**
@@ -168,13 +195,12 @@ public class Display {
    *
    * @throws IOException
    */
-  private void printChatDisplay() throws IOException {
+  private String chatDisplay() throws IOException {
     var sb = new StringBuilder();
     var maxUserLength = getMaxUserLength();
     var lineIndex = 0;
     var maxLinesView = View.maxLinesView(lines);
     var colsRemaining = columns - getMaxUserLength() - 2;
-    sb.append(chatHeader());
     // chat | presence
     var users = getUsersToDisplay();
     var iterator = getFormattedMessages().iterator();
@@ -224,10 +250,7 @@ public class Display {
       }
       sb.append("\n");
     }
-    sb.append(View.thematicBreak(columns));
-    sb.append(inputField());
-    System.out.print(sb);
-    sb.setLength(0);
+    return sb.toString();
   }
   
   private String chatHeader() {
@@ -266,33 +289,49 @@ public class Display {
    * @return
    */
   private List<Message> getFormattedMessages() {
-    var subList = getMessagesToDisplay();
-    return subList.stream()
-                  .flatMap(message -> formatMessage(message, msgLineLength()))
-                  .collect(Collectors.toList());
+    lock.lock();
+    try {
+      var subList = getMessagesToDisplay();
+      return subList.stream()
+                    .flatMap(message -> formatMessage(message, msgLineLength()))
+                    .collect(Collectors.toList());
+    } finally {
+      lock.unlock();
+    }
+    
   }
   
   private List<Message> getMessagesToDisplay() {
-    if (messages.size() <= View.maxLinesView(lines)) {
-      return messages;
+    lock.lock();
+    try {
+      if (messages.size() <= View.maxLinesView(lines)) {
+        return messages;
+      }
+      if (mode == Mode.CHAT_LIVE_REFRESH) {
+        return messages.subList(Math.max(0, messages.size() - View.maxLinesView(lines)), messages.size());
+      }
+      return messages.subList(messageScroller.getA(), messageScroller.getB());
+    } finally {
+      lock.unlock();
     }
-    if (mode == Mode.CHAT_LIVE_REFRESH) {
-      return messages.subList(Math.max(0, messages.size() - View.maxLinesView(lines)), messages.size());
-    }
-    return messages.subList(messageScroller.getA(), messageScroller.getB());
   }
   
   private List<String> getUsersToDisplay() {
-    if (users.size() <= View.maxLinesView(lines)) {
-      return new ArrayList<>(users);
-    }
-    if (mode == Mode.CHAT_LIVE_REFRESH) {
+    lock.lock();
+    try {
+      if (users.size() <= View.maxLinesView(lines)) {
+        return new ArrayList<>(users);
+      }
+      if (mode == Mode.CHAT_LIVE_REFRESH) {
+        return users.stream()
+                    .toList();
+      }
       return users.stream()
+                  .skip(userScroller.getA())
                   .toList();
+    } finally {
+      lock.unlock();
     }
-    return users.stream()
-                .skip(userScroller.getA())
-                .toList();
   }
   
   private int msgLineLength() {
@@ -310,9 +349,15 @@ public class Display {
    * @return
    */
   private Stream<Message> formatMessage(Message message, int lineLength) {
-    var sanitizedLines = View.splitAndSanitize(message.txt(), lineLength);
-    return IntStream.range(0, sanitizedLines.size())
-                    .mapToObj(index -> new Message(index == 0 ? message.login() : "", sanitizedLines.get(index), message.epoch()));
+    lock.lock();
+    try {
+      var sanitizedLines = View.splitAndSanitize(message.txt(), lineLength);
+      return IntStream.range(0, sanitizedLines.size())
+                      .mapToObj(index -> new Message(index == 0 ? message.login() : "", sanitizedLines.get(index), message.epoch()));
+    } finally {
+      lock.unlock();
+    }
+    
   }
   
   public Mode getMode() {
@@ -325,18 +370,28 @@ public class Display {
   }
   
   public void scrollerUp() {
-    switch (mode) {
-      case CHAT_SCROLLER -> messageScroller.scrollUp(View.maxLinesView(lines));
-      case USERS_SCROLLER -> userScroller.scrollUp(View.maxLinesView(lines));
-      case HELP_SCROLLER -> helpView.scrollUp(View.maxLinesView(lines));
+    lock.lock();
+    try {
+      switch (mode) {
+        case CHAT_SCROLLER -> messageScroller.scrollUp(View.maxLinesView(lines));
+        case USERS_SCROLLER -> userScroller.scrollUp(View.maxLinesView(lines));
+        case HELP_SCROLLER -> helpView.scrollUp(View.maxLinesView(lines));
+      }
+    } finally {
+      lock.unlock();
     }
   }
   
   public void scrollerDown() {
-    switch (mode) {
-      case CHAT_SCROLLER -> messageScroller.scrollDown(View.maxLinesView(lines));
-      case USERS_SCROLLER -> userScroller.scrollDown(View.maxLinesView(lines));
-      case HELP_SCROLLER -> helpView.scrollDown(View.maxLinesView(lines));
+    lock.lock();
+    try {
+      switch (mode) {
+        case CHAT_SCROLLER -> messageScroller.scrollDown(View.maxLinesView(lines));
+        case USERS_SCROLLER -> userScroller.scrollDown(View.maxLinesView(lines));
+        case HELP_SCROLLER -> helpView.scrollDown(View.maxLinesView(lines));
+      }
+    } finally {
+      lock.unlock();
     }
   }
 
