@@ -29,9 +29,13 @@ The user can type the following commands:
 :u, :users - focus on the users list, enable scrolling with e and s
 :c, :chat - back to the chat in live reload focus
 :m, :msg - on the chat, enable scrolling through the messages with e and s
-:w, :whisper <username> - goes to the private discussion view with the other user (WIP)
+:w, :whisper <username> - goes to the private discussion view with the other user (TODO)
 :r <lines> <columns> - Resize the views
-:cdx <SHA-1> - Display the codex info with the given SHA-1                        (WIP)
+:new <path> - Create a codex from a file or directory                             (WIP)
+:share <SHA-1> - Share a codex with the given SHA-1                               (TODO)
+:unshare <SHA-1> - Unshare a codex with the given SHA-1                           (TODO)
+:mycdx cdx - Display the list of your codex
+:cdx <SHA-1> - Retrieves and display the codex info with the given SHA-1          (TODO)
 :exit - Exit the application                                                      (WIP)
 ```
 

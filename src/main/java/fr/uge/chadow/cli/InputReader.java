@@ -7,6 +7,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
@@ -38,7 +39,7 @@ public class InputReader {
    *
    * @throws IOException
    */
-  public void start() throws IOException, InterruptedException {
+  public void start() throws IOException, InterruptedException, NoSuchAlgorithmException {
     var reader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
     StringBuilder inputField = new StringBuilder();
     var c = 0;

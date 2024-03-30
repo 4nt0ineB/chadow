@@ -70,7 +70,7 @@ public class ScrollableView implements View {
     var end = scroller.getB();
     var formattedLines = View.splitAndSanitize(textLines.subList(start, end), columns);
     for (; lineIndex < maxLinesView && lineIndex < formattedLines.size(); lineIndex++) {
-      sb.append(formattedLines.get(lineIndex))
+      sb.append("%s".formatted(View.beautifyCodexLink(formattedLines.get(lineIndex))))
         .append("\n");
     }
     sb.append("\n".repeat(Math.max(0, maxLinesView - lineIndex)));
@@ -86,6 +86,7 @@ public class ScrollableView implements View {
   public void clear() {
     View.moveCursorToPosition(1, 1);
     View.clearDisplayArea(lines);
+    View.moveCursorToPosition(1, 1); // Move cursor back to the top
   }
   
   private String chatHeader() {

@@ -2,6 +2,7 @@ package fr.uge.chadow.cli.display;
 
 import fr.uge.chadow.cli.CLIColor;
 import fr.uge.chadow.client.Client;
+import fr.uge.chadow.client.Codex;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -32,11 +33,7 @@ public interface View {
    * Clear the display, everything above the input field.
    */
   static void clearDisplayArea(int lines) {
-    for (int i = 0; i < lines - 2; i++) {
-      View.moveCursorToPosition(1, i + 1); // Move cursor to each line in the chat area
-      System.out.print(CLIColor.CLEAR_LINE); // Clear the line
-    }
-    View.moveCursorToPosition(1, 1); // Move cursor back to the top
+    clearDisplayAndMore(lines, lines);
   }
   
   /**
@@ -45,12 +42,13 @@ public interface View {
    * @param rest
    */
   static void clearDisplayAndMore(int lines, int rest) {
-    for (int i = 0; i < lines + rest; i++) {
+    //clearAllScreen();
+    for (int i = 0; i < lines + lines; i++) {
       View.moveCursorToPosition(1, i + 1);
       System.out.print(CLIColor.CLEAR_LINE);
     }
   }
-  
+
   /**
    * Calculate the maximum number of lines of content that can be displayed
    * (thus excluding the input field and the header)
@@ -98,8 +96,12 @@ public interface View {
   static List<String> splitAndSanitize(String txt, int maxCharacters) {
     var lines = new ArrayList<String>();
     txt = txt.replace("\t", "    ");
-    var messageLines = txt.split("\n");
+    var messageLines = txt.split("\\n", -1);
     for (var line : messageLines) {
+      if (line.isEmpty()) {
+        lines.add("");
+        continue;
+      }
       int start = 0;
       while (start < line.length()) {
         var end = Math.min(start + maxCharacters, line.length());
@@ -113,12 +115,13 @@ public interface View {
             end = start + maxCharacters;
           }
         }
-        lines.add(line.substring(start, end).trim());
+        lines.add(line.substring(start, end));
         start = end;
       }
     }
     return lines;
   }
+  
   
   static List<String> splitAndSanitize(List<String> txt, int maxCharacters) {
     var lines = new ArrayList<String>();
@@ -149,6 +152,25 @@ public interface View {
     return formatter.format(date);
   }
   
+  static String bytesToHumanReadable(long bytes) {
+    if (bytes < 0) {
+      throw new IllegalArgumentException("bytes must be positive");
+    }
+    if (bytes < 1024) {
+      return bytes + " B";
+    } else if (bytes < 1024 * 1024) {
+      return String.format("%.2f KB", (double) bytes / 1024);
+    } else if (bytes < 1024 * 1024 * 1024) {
+      return String.format("%.2f MB", (double) bytes / (1024 * 1024));
+    } else if (bytes < 1024L * 1024 * 1024 * 1024) {
+      return String.format("%.2f GB", (double) bytes / (1024 * 1024 * 1024));
+    } else if (bytes < 1024L * 1024 * 1024 * 1024 * 1024) {
+      return String.format("%.2f TB", (double) bytes / (1024 * 1024 * 1024 * 1024));
+    } else {
+      return "+inf (╯°□°)╯︵ ┻━┻";
+    }
+  }
+  
   /**
    * Process the message or the command
    *
@@ -167,4 +189,5 @@ public interface View {
   void clearDisplayAndMore(int rest);
   
   void clear();
+  
 }

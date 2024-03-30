@@ -3,6 +3,7 @@ package fr.uge.chadow.cli.display;
 import fr.uge.chadow.cli.CLIColor;
 import fr.uge.chadow.client.ClientConsoleController;
 import fr.uge.chadow.client.ClientConsoleController.Mode;
+import fr.uge.chadow.client.Codex;
 import fr.uge.chadow.core.reader.Message;
 
 import java.io.IOException;
@@ -15,12 +16,15 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import static fr.uge.chadow.cli.display.View.splitAndSanitize;
+
 
 public class Display {
   
   private final ClientConsoleController controller;
   private final Scroller messageScroller;
   private final Scroller userScroller;
+  private final Scroller codexScroller;
   
   private final AtomicBoolean viewCanRefresh;
   private final ReentrantLock lock = new ReentrantLock();
@@ -42,6 +46,7 @@ public class Display {
     this.viewCanRefresh = viewCanRefresh;
     this.messageScroller = new Scroller(0, View.maxLinesView(lines));
     this.userScroller = new Scroller(0, View.maxLinesView(lines));
+    this.codexScroller = new Scroller(0, View.maxLinesView(lines));
     helpView = helpView();
   }
   
@@ -83,7 +88,7 @@ public class Display {
             messageScroller.setLines(controller.numberofMessages());
           }
         }
-        Thread.sleep(100);
+        Thread.sleep(200);
       } catch (InterruptedException | IOException e) {
         e.printStackTrace();
       }
@@ -93,13 +98,7 @@ public class Display {
   public void clear() {
     View.moveCursorToPosition(1, 1);
     View.clearDisplayArea(lines);
-  }
-  
-  public void draw() throws IOException {
-    
-    drawInContext();
-    View.moveToInputField(lines);
-    
+    View.moveCursorToPosition(1, 1); // Move cursor back to the top
   }
   
   /**
@@ -107,7 +106,7 @@ public class Display {
    *
    * @throws IOException
    */
-  private void drawInContext() throws IOException {
+  public void draw() throws IOException {
     
     switch (mode) {
       case CHAT_LIVE_REFRESH,
@@ -121,11 +120,18 @@ public class Display {
         helpView.clear();
         helpView.draw();
       }
+      case CODEX_DETAILS -> {
+        var codex = controller.currentCodex();
+        assert codex != null;
+        var view = codexView(codex);
+        view.clear();
+        view.draw();
+      }
     }
     //System.out.print(View.thematicBreak(columns));
     System.out.print(lowInfoBar(columns));
     System.out.print(inputField());
-    
+    View.moveToInputField(lines);
   }
   
   /**
@@ -302,7 +308,7 @@ public class Display {
    */
   private Stream<Message> formatMessage(Message message, int lineLength) {
     
-    var sanitizedLines = View.splitAndSanitize(message.txt(), lineLength);
+    var sanitizedLines = splitAndSanitize(message.txt(), lineLength);
     return IntStream.range(0, sanitizedLines.size())
                     .mapToObj(index -> new Message(index == 0 ? message.login() : "", sanitizedLines.get(index), message.epoch()));
     
@@ -329,6 +335,7 @@ public class Display {
       case CHAT_SCROLLER -> messageScroller.scrollUp(View.maxLinesView(lines));
       case USERS_SCROLLER -> userScroller.scrollUp(View.maxLinesView(lines));
       case HELP_SCROLLER -> helpView.scrollUp(View.maxLinesView(lines));
+      case CODEX_DETAILS -> codexScroller.scrollUp(View.maxLinesView(lines));
     }
     
   }
@@ -339,27 +346,68 @@ public class Display {
       case CHAT_SCROLLER -> messageScroller.scrollDown(View.maxLinesView(lines));
       case USERS_SCROLLER -> userScroller.scrollDown(View.maxLinesView(lines));
       case HELP_SCROLLER -> helpView.scrollDown(View.maxLinesView(lines));
+      case CODEX_DETAILS -> codexScroller.scrollDown(View.maxLinesView(lines));
     }
     
   }
   
   private ScrollableView helpView() {
     var txt = """
+        ##  ┓┏  ┓
+        ##  ┣┫┏┓┃┏┓
+        ##  ┛┗┗━┗┣┛
+        ##       ┛
+        
         :h, :help - Display this help, scroll with e and s
         :u, :users - focus on the users list, enable scrolling with e and s
         :c, :chat - back to the chat in live reload focus
         :m, :msg - on the chat, enable scrolling through the messages with e and s
         :w, :whisper <username> - goes to the private discussion view with the other user (TODO)
         :r <lines> <columns> - Resize the view\s
-        :create <path > - Create a codex from a folder or directory                       (TODO)
+        :new <path> - Create a codex from a file or directory                             (WIP)
         :share <SHA-1> - Share a codex with the given SHA-1                               (TODO)
         :unshare <SHA-1> - Unshare a codex with the given SHA-1                           (TODO)
         :mycdx cdx - Display the list of your codex
         :cdx <SHA-1> - Retrieves and display the codex info with the given SHA-1          (TODO)
-        
         :exit - Exit the application                                                      (WIP)
         
         """;
     return View.scrollableViewFromString("Help", controller.clientLogin(), lines, columns, txt);
+  }
+  
+  private String colorize(CLIColor color, String txt) {
+    return (color + "%s" + CLIColor.RESET).formatted(txt);
+  }
+  
+  private ScrollableView codexView(Codex codex) {
+    var sb = new StringBuilder();
+    
+    var splash = """
+        ## ┏┓   ┓
+        ## ┃ ┏┓┏┫┏┓┓┏
+        ## ┗┛┗┛┻┗┗ ┛┗
+        
+        """;
+    sb.append(splash);
+    sb.append("cdx:")
+      .append(Codex.fingerprintAsString(codex.id())).append("\n");
+    sb.append(colorize(CLIColor.BOLD, "Title: "))
+      .append(codex.name()).append("\n");
+    var infoFiles = codex.files();
+    sb.append(colorize(CLIColor.BOLD, "Number of files:  "))
+      .append(codex.files().size()).append("\n");
+    var size = infoFiles.stream().mapToLong(Codex.FileInfo::length).sum();
+    sb.append(colorize(CLIColor.BOLD, "Total size:   "))
+      .append(View.bytesToHumanReadable(size)).append("\n\n");
+    sb.append(colorize(CLIColor.BOLD, "Files:  \n"));
+    infoFiles.stream()
+             .collect(Collectors.groupingBy(Codex.FileInfo::absolutePath))
+             .forEach((dir, files) -> {
+               sb.append(colorize(CLIColor.BOLD, STR."[\{dir}]\n"));
+               files.forEach(file -> {
+                 sb.append("\t- ").append(file.filename()).append("\n");
+               });
+             });
+    return View.scrollableViewFromString(STR."[Codex] \{codex.name()}", controller.clientLogin(), lines, columns, sb.toString());
   }
 }

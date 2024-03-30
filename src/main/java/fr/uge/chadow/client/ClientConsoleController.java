@@ -6,6 +6,7 @@ import fr.uge.chadow.cli.display.View;
 import fr.uge.chadow.core.reader.Message;
 
 import java.io.IOException;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
@@ -20,9 +21,15 @@ public class ClientConsoleController {
   private final HashMap<String, List<Message>> privateMessages = new HashMap<>();
   private final SortedSet<String> users = new TreeSet<>();
   private final HashMap<String, Codex> codexes = new HashMap<>();
+  private Codex selectedCodexForDetails;
+  
+  // we can't have reentrant locks because this thread runs inputReader that call display
+  // that itself call this controller to get the messages and users.
+  // Plus we have incoming messages from client, so can have concurrent modifications on the lists
   private final Object lock = new Object();
   private int lines;
   private int cols;
+  
   public ClientConsoleController(Client client, int lines, int cols) {
     Objects.requireNonNull(client);
     if (lines <= 0 || cols <= 0) {
@@ -90,7 +97,7 @@ public class ClientConsoleController {
       inputReader.start();
     } catch (IOException e) {
       throw new RuntimeException(e);
-    } catch (InterruptedException e) {
+    } catch (InterruptedException | NoSuchAlgorithmException e) {
       logger.severe("User input reader was interrupted." + e.getMessage());
     }
   }
@@ -107,6 +114,10 @@ public class ClientConsoleController {
     }
   }
   
+  public Codex currentCodex() {
+    return selectedCodexForDetails;
+  }
+  
   /**
    * Process the message or the command
    *
@@ -114,7 +125,7 @@ public class ClientConsoleController {
    * @return true if the user can type again, otherwise it's the view's turn.
    * @throws InterruptedException
    */
-  public boolean processInput(String input) throws InterruptedException, IOException {
+  public boolean processInput(String input) throws InterruptedException, IOException, NoSuchAlgorithmException {
     if (input.startsWith(":r ")) {
       var split = input.split(" ");
       if (split.length == 3) {
@@ -136,14 +147,16 @@ public class ClientConsoleController {
     }
     // pattern to get a file path
     // https://stackoverflow.com/a/33021907
-    var pattern = Pattern.compile(":create\\s+(.*)");
+    var pattern = Pattern.compile(":new\\s+(.*)");
     var matcher = pattern.matcher(input);
     if (matcher.find()) {
       var path = matcher.group(1);
       logger.info(":create " + path + "\n");
-      var localCodex = Codex.fromPath("My first codex", path);
-      codexes.put(localCodex.getIdAsString(), localCodex);
-      return false;
+      var codex = Codex.fromPath("My first codex", path);
+      selectedCodexForDetails = codex;
+      codexes.put(Codex.fingerprintAsString(codex.id()), codex);
+      display.setMode(Mode.CODEX_DETAILS);
+      return true;
     }
     
     return switch (input) {
@@ -217,9 +230,7 @@ public class ClientConsoleController {
         new Message("test", "hello how are you", System.currentTimeMillis()),
         new Message("Morpheus", "Wake up, Neo...", System.currentTimeMillis()),
         new Message("Morpheus", "The Matrix has you...", System.currentTimeMillis()),
-        new Message("Morpheus", "Follow the white rabbit", System.currentTimeMillis()),
         new Message("Neo", "what the hell is this", System.currentTimeMillis()),
-        new Message("Neo", "Just going to bed now", System.currentTimeMillis()),
         new Message("Alan1", "Master CONTROL PROGRAM\nRELEASE TRON JA 307020...\nI HAVE PRIORITY ACCESS 7", System.currentTimeMillis()),
         new Message("SKIDROW", "Here is the codex of the FOSS (.deb) : cdx:1eb49a28a0c02b47eed4d0b968bb9aec116a5a47", System.currentTimeMillis()),
         new Message("Antoine", "Le lien vers le sujet : http://igm.univ-mlv.fr/coursprogreseau/tds/projet2024.html", System.currentTimeMillis())
@@ -243,9 +254,9 @@ public class ClientConsoleController {
    */
   private List<Message> splashLogo() {
     return List.of(
-        new Message("", "╔═╗┬ ┬┌─┐┌┬┐┌─┐┬ ┬", 0),
-        new Message("", "║  ├─┤├─┤ │││ ││││", 0),
-        new Message("", "╚═╝┴ ┴┴ ┴─┴┘└─┘└┴┘ v1.0.0 - by Bastos & Sebbah", 0)
+        new Message("", "┏┓┓    ┓", 0),
+        new Message("", "┃ ┣┓┏┓┏┫┏┓┓┏┏", 0),
+        new Message("", "┗┛┗┗┗┗┗┗┗┛┗┛┛ v1.0.0 - Bastos & Sebbah", 0)
     );
   }
   
@@ -261,37 +272,25 @@ public class ClientConsoleController {
 
 /*
 
-╔═╗┬ ┬┌─┐┌┬┐┌─┐┬ ┬
-║  ├─┤├─┤ │││ ││││
-╚═╝┴ ┴┴ ┴─┴┘└─┘└┴┘
-   ___ _               _
-  / __\ |__   __ _  __| | _____      __
- / /  | '_ \ / _` |/ _` |/ _ \ \ /\ / /
-/ /___| | | | (_| | (_| | (_) \ V  V /
-\____/|_| |_|\__,_|\__,_|\___/ \_/\_/
- 
-
-   ____ _               _
-  / ___| |__   __ _  __| | _____      __
- | |   | '_ \ / _` |/ _` |/ _ \ \ /\ / /
- | |___| | | | (_| | (_| | (_) \ V  V /
-  \____|_| |_|\__,_|\__,_|\___/ \_/\_/
+  ┓┏  ┓
+  ┣┫┏┓┃┏┓
+  ┛┗┗━┗┣┛
+       ┛
+  ┏┓┓    ┓
+  ┃ ┣┓┏┓┏┫┏┓┓┏┏
+  ┗┛┗┗┛┗┛┗┛┗┛┛┛
   
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+      ┓
+  ┏┏┓┏┫┏┓┓┏
+  ┗┗┛┗┻┗ ┛┗
+  
+┌─┐┌─┐┌┬┐┌─┐─┐┌─
+│  │ │ ││├┤  │┤
+└─┘└─┘─┴┘└─┘─┘└─
+  ╦ ╦┌─┐┬  ┌─┐
+  ╠═╣├┤ │  ├─┘
+  ╩ ╩└─┘┴─┘┴
+  ╔═╗┬ ┬┌─┐┌┬┐┌─┐┬ ┬
+  ║  ├─┤├─┤ │││ ││││
+  ╚═╝┴ ┴┴ ┴─┴┘└─┘└┴┘
  */
