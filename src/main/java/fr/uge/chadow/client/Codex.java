@@ -8,10 +8,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.logging.Logger;
 
 /**
@@ -70,7 +67,7 @@ public class Codex {
       fileInfo.add(fileInfofromPath(rootPath.toPath()));
     } else if(rootPath.isDirectory()) {
       Path start = Paths.get(rootPath.getAbsolutePath());
-      var it = Files.walk(start).filter(Files::isRegularFile).iterator();
+      var it = Files.walk(start).filter(Files::isRegularFile).sorted(Comparator.comparing(Path::toString)).iterator();
       while(it.hasNext()){
         var path = it.next();
         fileInfo.add(fileInfofromPath(path));
