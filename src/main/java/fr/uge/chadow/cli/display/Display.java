@@ -19,12 +19,8 @@ import java.util.stream.Stream;
 public class Display {
   
   private final ClientConsoleController controller;
-  //private final List<Message> messages = new ArrayList<>();
-  //private final SortedSet<String> users = new TreeSet<>();
   private final Scroller messageScroller;
   private final Scroller userScroller;
-  
-  //private final LinkedBlockingQueue<Message> messagesQueue = new LinkedBlockingQueue<>();
   
   private final AtomicBoolean viewCanRefresh;
   private final ReentrantLock lock = new ReentrantLock();
@@ -50,12 +46,7 @@ public class Display {
   }
   
   static String lowInfoBar(int columns) {
-    String sb = String.valueOf(CLIColor.CYAN) +
-        CLIColor.BOLD +
-        "\u25A0".repeat(columns) +
-        CLIColor.RESET +
-        "\n";
-    return sb;
+    return STR."\{String.valueOf(CLIColor.CYAN)}\{CLIColor.BOLD}\{"\u25A0".repeat(columns)}\{CLIColor.RESET}\n";
   }
   
   /**
@@ -89,9 +80,6 @@ public class Display {
         if (viewCanRefresh.get()) {
           draw();
           if (mode == Mode.CHAT_LIVE_REFRESH) {
-            // Wait for incoming messages
-            /*var incomingMessage = messagesQueue.take();
-            messages.add(incomingMessage);*/
             messageScroller.setLines(controller.numberofMessages());
           }
         }
@@ -140,30 +128,6 @@ public class Display {
     
   }
   
-/*  public void addMessage(Message message) {
-    Objects.requireNonNull(message);
-    lock.lock();
-    try {
-      messagesQueue.put(message);
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);  // TODO ?
-    } finally {
-      lock.unlock();
-    }
-  }*/
-  
- /* public void addUser(String user) {
-    Objects.requireNonNull(user);
-    lock.lock();
-    try {
-      users.add(user);
-      userScroller.setLines(users.size());
-      userScroller.setCurrentLine(0);
-    } finally {
-      lock.unlock();
-    }
-  }*/
-  
   /**
    * Get the max length of the usernames
    * Default size is 5
@@ -207,16 +171,16 @@ public class Display {
       }
       colsRemaining = columns;
       var date = message.login()
-                        .isBlank() ? " ".repeat(10) : View.formatDate(message.epoch()) + "  ";
+                        .isBlank() ? " ".repeat(10) : STR."\{View.formatDate(message.epoch())}  ";
       colsRemaining -= date.length();
-      var user = ("%" + maxUserLength + "s").formatted(message.login());
+      var user = (STR."%\{maxUserLength}s").formatted(message.login());
       colsRemaining -= user.length();
       colsRemaining -= maxUserLength + 5; // right side pannel of users + margin ( | ) and (│ )
-      var who = ("%s" + loginColor + CLIColor.BOLD + "%s" + CLIColor.RESET).formatted(date, user);
-      var separator = message.login().isBlank() ? CLIColor.BOLD  + " │ " + CLIColor.RESET: " ▒ ";
-      var messageLine = (loginColor + separator + CLIColor.RESET + "%-" + colsRemaining + "s").formatted(message.txt());
+      var who = (STR."%s\{loginColor}\{CLIColor.BOLD}%s\{CLIColor.RESET}").formatted(date, user);
+      var separator = message.login().isBlank() ? STR."\{CLIColor.BOLD} │ \{CLIColor.RESET}" : " ▒ ";
+      var messageLine = (STR."\{loginColor}\{separator}\{CLIColor.RESET}%-\{colsRemaining}s").formatted(message.txt());
       messageLine = View.beautifyCodexLink(messageLine);
-      var formatedLine = String.format("%s%s" + CLIColor.CYAN + "│ ",
+      var formatedLine = String.format(STR."%s%s\{CLIColor.CYAN}│ ",
           who,
           messageLine);
       sb.append(formatedLine);
@@ -228,7 +192,7 @@ public class Display {
         } else {
           sb.append(CLIColor.BOLD)
             .append(CLIColor.ORANGE)
-            .append("++ (" + (users.size() - lineIndex) + " more)");
+            .append(STR."++ (\{users.size() - lineIndex} more)");
         }
       }
       sb.append(CLIColor.RESET)
@@ -239,9 +203,9 @@ public class Display {
     }
     // Draw empty remaining lines on screen and display side panel of users
     for (; lineIndex < maxLinesView; lineIndex++) {
-      sb.append(String.format("%-" + (columns - maxUserLength - 2) + "s" + CLIColor.CYAN + "│ ", " "));
+      sb.append(String.format(STR."%-\{columns - maxUserLength - 2}s\{CLIColor.CYAN}│ ", " "));
       if (users.size() > lineIndex) {
-        sb.append(String.format("%-" + (maxUserLength) + "s", users.get(lineIndex)));
+        sb.append(String.format(STR."%-\{maxUserLength}s", users.get(lineIndex)));
       }
       sb.append("\n");
     }
@@ -253,9 +217,9 @@ public class Display {
     var colsRemaining = columns - getMaxUserLength() - 2;
     sb.append(CLIColor.CYAN_BACKGROUND);
     sb.append(CLIColor.WHITE);
-    var title = ("%-" + colsRemaining + "s ").formatted("CHADOW CLIENT on " + controller.clientServerHostName());
+    var title = (STR."%-\{colsRemaining}s ").formatted(STR."CHADOW CLIENT on \{controller.clientServerHostName()}");
     colsRemaining -= title.length() + 2; // right side pannel of users + margin (  )
-    var totalUsers = (CLIColor.BOLD + "" + CLIColor.BLACK + "%-" + getMaxUserLength() + "s").formatted("(" + controller.totalUsers() + ")");
+    var totalUsers = (STR."\{CLIColor.BOLD}\{CLIColor.BLACK}%-\{getMaxUserLength()}s").formatted(STR."(\{controller.totalUsers()})");
     colsRemaining -= totalUsers.length();
     sb.append("%s %s".formatted(title, totalUsers));
     sb.append(" ".repeat(Math.max(0, colsRemaining)));
@@ -269,11 +233,11 @@ public class Display {
     if (!viewCanRefresh.get()) {
       // (getMaxUserLength() + 21)
       inputField = ("%s\n")
-          .formatted("[" + CLIColor.BOLD + CLIColor.CYAN + controller.clientLogin() + CLIColor.RESET + "]");
+          .formatted(STR."[\{CLIColor.BOLD}\{CLIColor.CYAN}\{controller.clientLogin()}\{CLIColor.RESET}]");
     } else {
       // (getMaxUserLength() + 50)
       inputField = ("%s\n")
-          .formatted(CLIColor.GREY + "[" + CLIColor.GREY + CLIColor.BOLD + controller.clientLogin() + CLIColor.RESET + CLIColor.GREY + "]" + CLIColor.RESET);
+          .formatted(STR."\{CLIColor.GREY}[\{CLIColor.GREY}\{CLIColor.BOLD}\{controller.clientLogin()}\{CLIColor.RESET}\{CLIColor.GREY}]\{CLIColor.RESET}");
     }
     return inputField + View.inviteCharacter() + CLIColor.BOLD;
   }
