@@ -68,6 +68,7 @@ public class Display {
     try {
       this.lines = lines;
       this.columns = cols;
+      helpView.setDimensions(lines, cols);
     } finally {
       lock.unlock();
     }
@@ -292,9 +293,10 @@ public class Display {
     lock.lock();
     try {
       var subList = getMessagesToDisplay();
-      return subList.stream()
+      var list = subList.stream()
                     .flatMap(message -> formatMessage(message, msgLineLength()))
                     .collect(Collectors.toList());
+      return list.subList(Math.max(0, list.size() - View.maxLinesView(lines)), list.size());
     } finally {
       lock.unlock();
     }

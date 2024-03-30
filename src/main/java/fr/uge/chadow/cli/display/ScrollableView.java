@@ -58,7 +58,10 @@ public class ScrollableView implements View {
   
   @Override
   public void draw() {
-    System.out.println(view());
+    System.out.print(chatHeader());
+    System.out.print(view());
+    System.out.print(View.thematicBreak(columns));
+    System.out.print(inputField());
   }
   
   private String view() {
@@ -67,14 +70,12 @@ public class ScrollableView implements View {
     var maxLinesView = View.maxLinesView(lines);
     var start = scroller.getA();
     var end = scroller.getB();
-    sb.append(chatHeader());
-    for (; lineIndex < textLines.size(); lineIndex++) {
-      sb.append(textLines.get(lineIndex))
+    var formattedLines = View.splitAndSanitize(textLines.subList(start, end), columns);
+    for (; lineIndex < maxLinesView && lineIndex < formattedLines.size(); lineIndex++) {
+      sb.append(formattedLines.get(lineIndex))
         .append("\n");
     }
-    sb.append("\n".repeat(maxLinesView - lineIndex));
-    sb.append(View.thematicBreak(columns));
-    sb.append(inputField());
+    sb.append("\n".repeat(Math.max(0, maxLinesView - lineIndex)));
     return sb.toString();
   }
   

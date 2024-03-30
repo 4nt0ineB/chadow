@@ -95,17 +95,31 @@ public interface View {
     var lines = new ArrayList<String>();
     txt = txt.replace("\t", "    ");
     var messageLines = txt.split("\n");
-    var restfromLineAbove = new StringBuilder();
     for (var line : messageLines) {
-      var currentLine = restfromLineAbove;
-      var take = Math.min(maxCharacters - currentLine.length(), line.length());
-      currentLine.append(line, 0, take);
-      lines.add(currentLine.toString());
-      restfromLineAbove.setLength(0);
-      restfromLineAbove.append(line, take, line.length());
+      int start = 0;
+      while (start < line.length()) {
+        var end = Math.min(start + maxCharacters, line.length());
+        if (end - start > maxCharacters) {
+          // on cherche d'abord le dernier espace avant maxCharacters pour découper
+          // sinon on découpe quand même
+          int lastSpace = line.substring(start, end).lastIndexOf(' ');
+          if (lastSpace != -1) {
+            end = start + lastSpace;
+          } else {
+            end = start + maxCharacters;
+          }
+        }
+        lines.add(line.substring(start, end).trim());
+        start = end;
+      }
     }
-    if (restfromLineAbove.length() > 0) {
-      lines.add(restfromLineAbove.toString());
+    return lines;
+  }
+  
+  static List<String> splitAndSanitize(List<String> txt, int maxCharacters) {
+    var lines = new ArrayList<String>();
+    for (var line : txt) {
+      lines.addAll(splitAndSanitize(line, maxCharacters));
     }
     return lines;
   }

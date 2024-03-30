@@ -86,10 +86,10 @@ public class ClientConsoleController {
           if(x <= 0 || y <= 0) {
             return false;
           }
-          View.clearDisplayArea(lines);
-          lines = y;
           cols = x;
+          lines = y;
           display.setDimensions(x, y);
+          drawDisplay();
         } catch (NumberFormatException e) {
           return false;
         }
@@ -150,7 +150,7 @@ public class ClientConsoleController {
   }
   
   private void fillWithFakeData() {
-    var users = new String[]{"test", "Morpheus", "Trinity", "Neo", "Flynn", "Alan", "Lora", "Gandalf", "ThorinSonOfThrainSonOfThror", "Bilbo", "SKIDROW", "Antoine"};
+    var users = new String[]{"test", "Morpheus", "Trinity", "Neo", "Flynn", "Alan", "Lora", "Gandalf", "Bilbo", "SKIDROW", "Antoine"};
     for(var user: users){
       display.addUser(user);
     }
@@ -169,34 +169,7 @@ public class ClientConsoleController {
     for (var message: messages) {
       display.addMessage(message);
     }
-    // start a thread that adds a message every second
-    /*Thread.ofPlatform().daemon().start(() -> {
-      while (true) {
-        try {
-          Thread.sleep(1000); // Sleep for 1 second
-          display.addMessage(new Message("test", "test", System.currentTimeMillis()));
-        } catch (InterruptedException e) {
-          e.printStackTrace();
-        }
-      }
-    });*/
   }
-  
- /* public void launchMessageFetcher() {
-    Thread.ofPlatform().daemon().start(() -> {
-      while (!Thread.interrupted()) {
-        try {
-          var messages = client.getLastMessages(1);
-          for (var message : messages) {
-            display.addMessage(message);
-          }
-          Thread.sleep(300);
-        } catch (InterruptedException e) {
-        
-        }
-      }
-    });
-  }*/
   
   private void exitNicely() {
     // inputReader.stop();

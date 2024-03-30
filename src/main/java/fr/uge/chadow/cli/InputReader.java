@@ -66,10 +66,11 @@ public class InputReader {
             escape = true;
             numberOfLineBreak++;
           } else if (c == '\n') {
-            controller.clearDisplayAndMore(numberOfLineBreak);
+            
             var letWrite = controller.processInput(inputField);
-            controller.drawDisplay();
+            controller.clearDisplayAndMore(numberOfLineBreak);
             viewCanRefresh.set(!letWrite);
+            controller.drawDisplay();
             inputField = "";
             numberOfLineBreak = 0;
           } else {
