@@ -1,8 +1,7 @@
 package fr.uge.chadow.cli;
 
-import fr.uge.chadow.cli.display.Display;
 import fr.uge.chadow.cli.display.View;
-import fr.uge.chadow.client.Client;
+import fr.uge.chadow.client.ClientConsoleController;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -41,7 +40,7 @@ public class InputReader {
    */
   public void start() throws IOException, InterruptedException {
     var reader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
-    var inputField = "";
+    StringBuilder inputField = new StringBuilder();
     var c = 0;
     var escape = false;
     var numberOfLineBreak = 0;
@@ -55,10 +54,11 @@ public class InputReader {
           controller.drawDisplay();
         }
       } else {
-        if (escape && !inputField.endsWith("\n")) {
+        if (escape && !inputField.toString()
+                                 .endsWith("\n")) {
           // escape '\' is replaced as line break in the inputField
-          System.out.print("> ");
-          inputField += '\n';
+          System.out.print(View.inviteCharacter());
+          inputField.append('\n');
           escape = false;
         } else {
           // we escape with '\'
@@ -66,15 +66,14 @@ public class InputReader {
             escape = true;
             numberOfLineBreak++;
           } else if (c == '\n') {
-            
-            var letWrite = controller.processInput(inputField);
+            var letWrite = controller.processInput(inputField.toString());
             controller.clearDisplayAndMore(numberOfLineBreak);
             viewCanRefresh.set(!letWrite);
             controller.drawDisplay();
-            inputField = "";
+            inputField.setLength(0);
             numberOfLineBreak = 0;
           } else {
-            inputField += (char) c;
+            inputField.append((char) c);
           }
         }
       }

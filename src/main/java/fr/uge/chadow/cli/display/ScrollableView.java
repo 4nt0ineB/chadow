@@ -60,8 +60,6 @@ public class ScrollableView implements View {
   public void draw() {
     System.out.print(chatHeader());
     System.out.print(view());
-    System.out.print(View.thematicBreak(columns));
-    System.out.print(inputField());
   }
   
   private String view() {

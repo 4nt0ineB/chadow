@@ -1,0 +1,26 @@
+package fr.uge.chadow.core.protocol;
+
+public enum Opcode {
+  ERROR,
+  REGISTER,
+  DISCOVERY,
+  EVENT,
+  YELL,
+  WHISPER,
+  PROPOSE,
+  ANNOUNCE,
+  SEARCH,
+  REQUEST,
+  HANDSHAKE,
+  NEEDCHUNK,
+  CANCEL,
+  HERECHUNK,
+  DENIED,
+  PROXY,
+  PROXYOPEN,
+  PROXYOK,
+  HIDDEN,
+  SHARING,
+  STOPSHARING,
+  OK
+}

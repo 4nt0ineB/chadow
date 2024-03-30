@@ -98,25 +98,23 @@ SOMMAIRE
   +-----------------------+-----------------------+
   | 6  | propose          | 7  | request          |
   +-----------------------+-----------------------+
-  | 8  | announce         | 9  | update           |
+  | 8  | announce         | 9  | search           |
   +-----------------------+-----------------------+
   | 10 | request          | 11 | handshake        |
   +-----------------------+-----------------------+
-  | 12 | keepalive        | 13 | choke            |
+  | 18 | needchunk        | 19 | cancel           |
   +-----------------------+-----------------------+
-  | 14 | unchoke          | 15 | interested       |
+  | 20 | herechunk        | 21 | denied           |
   +-----------------------+-----------------------+
-  | 16 | notinterested    | 17 | have             |
+  | 22 | proxy            | 23 | proxyopen        |
   +-----------------------+-----------------------+
-  | 18 | needblock        | 19 | cancel           |
+  | 24 | proxyok          | 24 | hidden           |
   +-----------------------+-----------------------+
-  | 20 | herechunk        | 21 | newchunk         |
+  | 26 | sharing          | 27 |  stopsharing     |
   +-----------------------+-----------------------+
-  | 22 | proxyopen        | 23 | anonymize        | 
+  | 28 | ok               |                       |
   +-----------------------+-----------------------+
-  | 24 | disconnect       | 24 | ok               |
-  +-----------------------+-----------------------+
-                                                                
+
   - un int représente 4 octets
   - un long représente 8 octets
   - une string est toujours précédée par sa taille en int (4 octets) 

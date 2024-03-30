@@ -1,6 +1,5 @@
 package fr.uge.chadow.client;
 
-import fr.uge.chadow.cli.ClientConsoleController;
 import fr.uge.chadow.server.ServerChaton;
 
 import java.io.IOException;

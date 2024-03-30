@@ -24,6 +24,10 @@ public interface View {
     return sb;
   }
   
+  static String inviteCharacter() {
+    return CLIColor.BOLD  + "\u00BB ";
+  }
+  
   /**
    * Clear the display, everything above the input field.
    */
@@ -130,8 +134,7 @@ public interface View {
    * @param lines
    */
   static void moveToInputField(int lines) {
-    var position = new int[]{2, lines};
-    View.moveCursorToPosition(position[0], position[1]);
+    View.moveCursorToPosition(2, lines);
   }
   
   /**
