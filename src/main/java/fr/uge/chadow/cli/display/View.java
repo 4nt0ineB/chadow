@@ -11,6 +11,10 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public interface View {
+  void setDimensions(int lines, int cols);
+  void draw();
+  void clear();
+  
   static void moveCursorToPosition(int x, int y) {
     System.out.print("\033[" + y + ";" + x + "H");
     System.out.flush();
@@ -64,15 +68,14 @@ public interface View {
    * Create a scrollable view from a string
    *
    * @param title
-   * @param login
    * @param lines
    * @param cols
    * @param help
    * @return
    */
-  static ScrollableView scrollableViewFromString(String title, String login, int lines, int cols, String help) {
+  static ScrollableView scrollableViewFromString(String title, int lines, int cols, String help) {
     var textLines = splitAndSanitize(help, cols);
-    return new ScrollableView(title, login, lines, cols, textLines);
+    return new ScrollableView(title, lines, cols, textLines);
   }
   
   /**
@@ -122,7 +125,6 @@ public interface View {
     return lines;
   }
   
-  
   static List<String> splitAndSanitize(List<String> txt, int maxCharacters) {
     var lines = new ArrayList<String>();
     for (var line : txt) {
@@ -137,7 +139,11 @@ public interface View {
    * @param lines
    */
   static void moveToInputField(int lines) {
-    View.moveCursorToPosition(2, lines);
+    View.moveCursorToPosition(3, lines);
+  }
+  
+  static String colorize(CLIColor color, String txt) {
+    return (color + "%s" + CLIColor.RESET).formatted(txt);
   }
   
   /**
@@ -158,36 +164,20 @@ public interface View {
     }
     if (bytes < 1024) {
       return bytes + " B";
-    } else if (bytes < 1024 * 1024) {
-      return String.format("%.2f KB", (double) bytes / 1024);
-    } else if (bytes < 1024 * 1024 * 1024) {
-      return String.format("%.2f MB", (double) bytes / (1024 * 1024));
-    } else if (bytes < 1024L * 1024 * 1024 * 1024) {
-      return String.format("%.2f GB", (double) bytes / (1024 * 1024 * 1024));
-    } else if (bytes < 1024L * 1024 * 1024 * 1024 * 1024) {
-      return String.format("%.2f TB", (double) bytes / (1024 * 1024 * 1024 * 1024));
-    } else {
-      return "+inf (╯°□°)╯︵ ┻━┻";
     }
+    if (bytes < 1024 * 1024) {
+      return String.format("%.2f KB", (double) bytes / 1024);
+    }
+    if (bytes < 1024 * 1024 * 1024) {
+      return String.format("%.2f MB", (double) bytes / (1024 * 1024));
+    }
+    if (bytes < 1024L * 1024 * 1024 * 1024) {
+      return String.format("%.2f GB", (double) bytes / (1024 * 1024 * 1024));
+    }
+    if (bytes < 1024L * 1024 * 1024 * 1024 * 1024) {
+      return String.format("%.2f TB", (double) bytes / (1024 * 1024 * 1024 * 1024));
+    }
+    return "+inf (╯°□°)╯︵ ┻━┻";
   }
-  
-  /**
-   * Process the message or the command
-   *
-   * @param input
-   * @return true if the user can type again, otherwise it's the view's turn.
-   * @throws InterruptedException
-   */
-  boolean processInput(String input) throws InterruptedException;
-  
-  void setDimensions(int lines, int cols);
-  
-  void pin();
-  
-  void draw();
-  
-  void clearDisplayAndMore(int rest);
-  
-  void clear();
   
 }

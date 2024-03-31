@@ -22,6 +22,7 @@ public class ClientConsoleController {
   private final SortedSet<String> users = new TreeSet<>();
   private final HashMap<String, Codex> codexes = new HashMap<>();
   private Codex selectedCodexForDetails;
+  private volatile boolean mustClose = false;
   
   // we can't have reentrant locks because this thread runs inputReader that call display
   // that itself call this controller to get the messages and users.
@@ -80,15 +81,24 @@ public class ClientConsoleController {
             try {
               client.launch();
             } catch (IOException e) {
-              // TODO: handle exception -> inform the user and quit
-              throw new RuntimeException(e);
+              logger.severe(STR."Client was interrupted. \{e.getMessage()}");
+            } finally {
+              mustClose = true;
             }
           });
     display.draw();
     // thread that manages the display
     Thread.ofPlatform()
           .daemon()
-          .start(display::startLoop);
+          .start(() -> {
+            try {
+              display.startLoop();
+            } catch (IOException | InterruptedException e) {
+              logger.severe(STR."Display was interrupted. \{e.getMessage()}");
+            } finally {
+              mustClose = true;
+            }
+          });
     // for dev: fake messages
     fillWithFakeData();
     client.subscribe(this::addMessage);
@@ -99,6 +109,8 @@ public class ClientConsoleController {
       throw new RuntimeException(e);
     } catch (InterruptedException | NoSuchAlgorithmException e) {
       logger.severe("User input reader was interrupted." + e.getMessage());
+    } finally {
+      // exitNicely();
     }
   }
   
@@ -146,35 +158,43 @@ public class ClientConsoleController {
       }
     }
     // pattern to get a file path
-    // https://stackoverflow.com/a/33021907
-    var pattern = Pattern.compile(":new\\s+(.*)");
-    var matcher = pattern.matcher(input);
+    var patternNew = Pattern.compile(":new\\s+(.*),\\s+(.*)");
+    var matcher = patternNew.matcher(input);
     if (matcher.find()) {
-      var path = matcher.group(1);
+      var codexName = matcher.group(1);
+      var path = matcher.group(2);
       logger.info(":create " + path + "\n");
-      var codex = Codex.fromPath("My first codex", path);
+      var codex = Codex.fromPath(codexName, path);
       selectedCodexForDetails = codex;
       codexes.put(Codex.fingerprintAsString(codex.id()), codex);
       display.setMode(Mode.CODEX_DETAILS);
       return true;
     }
     
-    return switch (input) {
-      case ":m", ":message" -> {
-        display.setMode(Mode.CHAT_SCROLLER);
-        yield true;
+    var patternRetrieve = Pattern.compile(":cdx:(.*)");
+    var matcherRetrieve = patternRetrieve.matcher(input);
+    if (matcherRetrieve.find()) {
+      var fingerprint = matcherRetrieve.group(1);
+      logger.info(":cdx: " + fingerprint + "\n");
+      var codex = codexes.get(fingerprint);
+      if (codex == null) {
+        logger.info("Codex not found");
+        // client.retrieveCodex(fingerprint);
+        return false;
       }
-      case ":u", ":users" -> {
-        display.setMode(Mode.USERS_SCROLLER);
+      selectedCodexForDetails = codex;
+      display.setMode(Mode.CODEX_DETAILS);
+      return true;
+    }
+    
+    
+    return switch (input) {
+      case ":d" -> {
+        drawDisplay();
         yield true;
       }
       case ":c", ":chat" -> {
         display.setMode(Mode.CHAT_LIVE_REFRESH);
-        yield false;
-      }
-      case ":create" -> {
-        //var localCodex = LocalCodex.fromDirectory();
-        
         yield false;
       }
       case ":exit" -> {
@@ -190,7 +210,7 @@ public class ClientConsoleController {
         case CHAT_LIVE_REFRESH -> processInputModeLiveRefresh(input);
         case CHAT_SCROLLER, USERS_SCROLLER, HELP_SCROLLER -> processInputModeScroller(input);
         case CODEX_SEARCH -> false;
-        case CODEX_DETAILS -> false;
+        case CODEX_DETAILS -> processInputModeCodexDetails(input);
       };
     };
   }
@@ -200,12 +220,50 @@ public class ClientConsoleController {
       display.clear();
       display.draw();
     }
-    
+  }
+  
+  private boolean processInputModeCodexDetails(String input) {
+    switch (input) {
+      case ":share" -> {
+        if(currentCodex().isComplete()) {
+          if(currentCodex().isSharing()) {
+            currentCodex().stopSharing();
+          }else {
+            currentCodex().share();
+          }
+          display.setMode(Mode.CODEX_DETAILS);
+        }
+      }
+      case ":download" -> {
+        if(!currentCodex().isComplete()) {
+          if(currentCodex().isDownloading()) {
+            currentCodex().stopDownloading();
+          }else {
+            currentCodex().download();
+          }
+          display.setMode(Mode.CODEX_DETAILS);
+        }
+      }
+      default -> {
+        return processInputModeScroller(input);
+      }
+    }
+    return true;
   }
   
   private boolean processInputModeLiveRefresh(String input) throws InterruptedException {
     if (!input.startsWith(":") && !input.isBlank()) {
       client.sendMessage(input);
+    }
+    switch (input) {
+      case ":u", ":users" -> {
+        display.setMode(Mode.USERS_SCROLLER);
+        return true;
+      }
+      case ":c", ":chat" -> {
+        display.setMode(Mode.CHAT_SCROLLER);
+        return true;
+      }
     }
     return false;
   }
@@ -242,7 +300,7 @@ public class ClientConsoleController {
   private void exitNicely() {
     // inputReader.stop();
     // display.stop();
-    // client.stop();
+    // client.shutdown();
     
     // just for now
     System.exit(0);

@@ -1,8 +1,6 @@
 package fr.uge.chadow.client;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -16,18 +14,49 @@ import java.util.logging.Logger;
  * creation / download / upload
  * on the client machine
  */
-public class Codex {
+public class Codex{
   
-
+  public static int CHUNK_SIZE = 1024;
   
-  public record FileInfo(byte[] fingerprint, String filename, long length, String absolutePath) {}
+  public record FileInfo(byte[] fingerprint,
+                         String filename,
+                         long length,
+                         String absolutePath,
+                         BitSet chunks) {
+    
+    public FileInfo {
+      Objects.requireNonNull(fingerprint);
+      Objects.requireNonNull(filename);
+      Objects.requireNonNull(absolutePath);
+    }
+    
+    public int numberOfChunks() {
+      return (int) Math.ceil((double) length / CHUNK_SIZE);
+    }
+    
+    public boolean isComplete() {
+      return chunks.cardinality() == chunks.size();
+    }
+    
+    public int completedChunks() {
+      return chunks.cardinality();
+    }
+    
+    public int totalChunks() {
+      return chunks.size();
+    }
+    
+    public double completionRate() {
+      return (double) completedChunks() / totalChunks();
+    }
+  }
   
   private static final String ALGORITHM = "SHA-1";
-  
   private static final Logger logger = Logger.getLogger(Codex.class.getName());
   private final byte[] id;
   private final String name;
   private final List<FileInfo> files;
+  private final long totalSize;
   
   private boolean downloading = false;
   private boolean sharing = false;
@@ -36,6 +65,53 @@ public class Codex {
     this.id = id;
     this.name = name;
     this.files = files;
+    this.totalSize = files.stream().mapToLong(FileInfo::length).sum();
+  }
+  
+  public boolean isComplete() {
+    return files.stream().allMatch(FileInfo::isComplete);
+  }
+  
+  public void share() {
+    if(downloading){
+      throw new IllegalStateException("Codex is downloading, can't share it");
+    }
+    sharing = true;
+    loggin("is now sharing");
+  }
+  
+  public void download() {
+    if(sharing){
+      throw new IllegalStateException("Codex is sharing, can't download it");
+    }
+    downloading = true;
+    loggin("is now downloading");
+  }
+  
+  public void stopSharing() {
+    sharing = false;
+    loggin("stops sharing");
+  }
+  
+  public void stopDownloading() {
+    downloading = false;
+    loggin("stops downloading");
+  }
+  
+  private void loggin(String message) {
+    logger.info(STR."Codex \{name} with id: \{fingerprintAsString(id)} - \{message}");
+  }
+  
+  public long totalSize() {
+    return totalSize;
+  }
+  
+  public boolean isDownloading() {
+    return downloading;
+  }
+  
+  public boolean isSharing() {
+    return sharing;
   }
   
   public List<FileInfo> files() {
@@ -141,7 +217,10 @@ public class Codex {
   private static FileInfo fileInfofromPath(Path path) throws NoSuchAlgorithmException, IOException {
     var file = path.toFile();
     var fingerprint = fingerprint(file);
-    return new FileInfo(fingerprint, file.getName(), file.length(), file.getParent());
+    var bitSet = new BitSet((int) Math.ceil(file.length() / CHUNK_SIZE));
+    // creation of codex from local file, then all chunks are available
+    bitSet.flip(0, bitSet.size());
+    return new FileInfo(fingerprint, file.getName(), file.length(), file.getParent(), bitSet);
   }
   
 }

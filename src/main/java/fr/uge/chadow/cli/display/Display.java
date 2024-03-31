@@ -12,19 +12,20 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static fr.uge.chadow.cli.display.View.splitAndSanitize;
-
+import static fr.uge.chadow.cli.display.View.colorize;
 
 public class Display {
+  private static final Logger logger = Logger.getLogger(Display.class.getName());
   
   private final ClientConsoleController controller;
   private final Scroller messageScroller;
   private final Scroller userScroller;
-  private final Scroller codexScroller;
   
   private final AtomicBoolean viewCanRefresh;
   private final ReentrantLock lock = new ReentrantLock();
@@ -32,6 +33,7 @@ public class Display {
   private int columns;
   private Mode mode = Mode.CHAT_LIVE_REFRESH;
   private ScrollableView helpView;
+  private ScrollableView codexView;
   
   
   public Display(int lines, int cols, AtomicBoolean viewCanRefresh, ClientConsoleController controller) {
@@ -46,8 +48,8 @@ public class Display {
     this.viewCanRefresh = viewCanRefresh;
     this.messageScroller = new Scroller(0, View.maxLinesView(lines));
     this.userScroller = new Scroller(0, View.maxLinesView(lines));
-    this.codexScroller = new Scroller(0, View.maxLinesView(lines));
     helpView = helpView();
+    helpView.moveToTop();
   }
   
   static String lowInfoBar(int columns) {
@@ -69,6 +71,7 @@ public class Display {
       this.lines = lines;
       this.columns = cols;
       helpView.setDimensions(lines, cols);
+      codexView.setDimensions(lines, cols);
     } finally {
       lock.unlock();
     }
@@ -77,21 +80,17 @@ public class Display {
   /**
    * Start the loop that will refresh the view
    */
-  public void startLoop() {
+  public void startLoop() throws InterruptedException, IOException {
     System.out.print(CLIColor.CLEAR);
     System.out.flush();
-    while (true) {
-      try {
-        if (viewCanRefresh.get()) {
-          draw();
-          if (mode == Mode.CHAT_LIVE_REFRESH) {
-            messageScroller.setLines(controller.numberofMessages());
-          }
+    while (!Thread.interrupted()) {
+      if (viewCanRefresh.get()) {
+        draw();
+        if (mode == Mode.CHAT_LIVE_REFRESH) {
+          messageScroller.setLines(controller.numberofMessages());
         }
-        Thread.sleep(200);
-      } catch (InterruptedException | IOException e) {
-        e.printStackTrace();
       }
+      Thread.sleep(200);
     }
   }
   
@@ -121,11 +120,8 @@ public class Display {
         helpView.draw();
       }
       case CODEX_DETAILS -> {
-        var codex = controller.currentCodex();
-        assert codex != null;
-        var view = codexView(codex);
-        view.clear();
-        view.draw();
+        codexView.clear();
+        codexView.draw();
       }
     }
     //System.out.print(View.thematicBreak(columns));
@@ -183,7 +179,8 @@ public class Display {
       colsRemaining -= user.length();
       colsRemaining -= maxUserLength + 5; // right side pannel of users + margin ( | ) and (│ )
       var who = (STR."%s\{loginColor}\{CLIColor.BOLD}%s\{CLIColor.RESET}").formatted(date, user);
-      var separator = message.login().isBlank() ? STR."\{CLIColor.BOLD} │ \{CLIColor.RESET}" : " ▒ ";
+      var separator = message.login()
+                             .isBlank() ? STR."\{CLIColor.BOLD} │ \{CLIColor.RESET}" : " ▒ ";
       var messageLine = (STR."\{loginColor}\{separator}\{CLIColor.RESET}%-\{colsRemaining}s").formatted(message.txt());
       messageLine = View.beautifyCodexLink(messageLine);
       var formatedLine = String.format(STR."%s%s\{CLIColor.CYAN}│ ",
@@ -223,7 +220,7 @@ public class Display {
     var colsRemaining = columns - getMaxUserLength() - 2;
     sb.append(CLIColor.CYAN_BACKGROUND);
     sb.append(CLIColor.WHITE);
-    var title = (STR."%-\{colsRemaining}s ").formatted(STR."CHADOW CLIENT on \{controller.clientServerHostName()}");
+    var title = (STR."%-\{colsRemaining}s ").formatted(STR."CHADOW CLIENT on \{controller.clientServerHostName()} (" + lines + "x" + columns + ")");
     colsRemaining -= title.length() + 2; // right side pannel of users + margin (  )
     var totalUsers = (STR."\{CLIColor.BOLD}\{CLIColor.BLACK}%-\{getMaxUserLength()}s").formatted(STR."(\{controller.totalUsers()})");
     colsRemaining -= totalUsers.length();
@@ -315,18 +312,20 @@ public class Display {
   }
   
   public Mode getMode() {
-    
     return mode;
-    
   }
   
   public void setMode(Mode mode) {
-    
     this.mode = mode;
     if (mode == Mode.HELP_SCROLLER) {
       helpView = helpView();
+      helpView.moveToTop();
+    } else if (mode == Mode.CODEX_DETAILS) {
+      var codex = controller.currentCodex();
+      assert codex != null;
+      codexView = codexView(codex);
+      codexView.moveToTop();
     }
-    
   }
   
   public void scrollerUp() {
@@ -335,7 +334,10 @@ public class Display {
       case CHAT_SCROLLER -> messageScroller.scrollUp(View.maxLinesView(lines));
       case USERS_SCROLLER -> userScroller.scrollUp(View.maxLinesView(lines));
       case HELP_SCROLLER -> helpView.scrollUp(View.maxLinesView(lines));
-      case CODEX_DETAILS -> codexScroller.scrollUp(View.maxLinesView(lines));
+      case CODEX_DETAILS -> {
+        logger.info("scrolling up");
+        codexView.scrollUp(View.maxLinesView(lines));
+      }
     }
     
   }
@@ -346,68 +348,106 @@ public class Display {
       case CHAT_SCROLLER -> messageScroller.scrollDown(View.maxLinesView(lines));
       case USERS_SCROLLER -> userScroller.scrollDown(View.maxLinesView(lines));
       case HELP_SCROLLER -> helpView.scrollDown(View.maxLinesView(lines));
-      case CODEX_DETAILS -> codexScroller.scrollDown(View.maxLinesView(lines));
+      case CODEX_DETAILS -> codexView.scrollDown(View.maxLinesView(lines));
     }
     
   }
   
   private ScrollableView helpView() {
     var txt = """
+        
         ##  ┓┏  ┓
         ##  ┣┫┏┓┃┏┓
         ##  ┛┗┗━┗┣┛
         ##       ┛
         
-        :h, :help - Display this help, scroll with e and s
-        :u, :users - focus on the users list, enable scrolling with e and s
-        :c, :chat - back to the chat in live reload focus
-        :m, :msg - on the chat, enable scrolling through the messages with e and s
-        :w, :whisper <username> - goes to the private discussion view with the other user (TODO)
-        :r <lines> <columns> - Resize the view\s
-        :new <path> - Create a codex from a file or directory                             (WIP)
-        :share <SHA-1> - Share a codex with the given SHA-1                               (TODO)
-        :unshare <SHA-1> - Unshare a codex with the given SHA-1                           (TODO)
-        :mycdx cdx - Display the list of your codex
-        :cdx <SHA-1> - Retrieves and display the codex info with the given SHA-1          (TODO)
-        :exit - Exit the application                                                      (WIP)
+        
+        (scrollable) - scroll down with 'e', scroll up with 's', the only commands not starting with ':'.
+        
+        [GLOBAL COMMANDS]
+          :h, :help - Display this help (scrollable)
+          :c, :chat - Back to the chat in live reload
+          :w, :whisper <username> - Display the private discussion with the other user (TODO)
+          :d - Update and draw the display
+          :r <lines> <columns> - Resize the view
+          :new <codexName>, <path> - Create a codex from a file or directory
+          and display the details of new created codex (WIP). (mind the space between , and <path>)
+          
+          :mycdx - Display the list of your codex
+          :cdx:<SHA-1> - Retrieves and display the codex info with the given SHA-1          (TODO)
+          :exit - Exit the application                                                      (WIP)
+          
+        [CHAT]
+          when the live reload is disabled (indicated by the coloured input field)
+          any input not starting with ':' will be considered as a message to be sent
+          
+          :m, :msg - Focus on chat (scrollable)
+          :u, :users - Focus on the users list (scrollable)
+          
+        [CODEX]
+        (scrollable)
+        :share - Share/stop sharing the codex
+        :download - Download/stop downloading the codex
         
         """;
-    return View.scrollableViewFromString("Help", controller.clientLogin(), lines, columns, txt);
+
+    return View.scrollableViewFromString("Help", lines, columns, txt);
   }
   
-  private String colorize(CLIColor color, String txt) {
-    return (color + "%s" + CLIColor.RESET).formatted(txt);
-  }
-  
+
   private ScrollableView codexView(Codex codex) {
     var sb = new StringBuilder();
     
     var splash = """
         ## ┏┓   ┓
         ## ┃ ┏┓┏┫┏┓┓┏
-        ## ┗┛┗┛┻┗┗ ┛┗
+        ## ┗┛┗┛┻┗┗━┛┗
         
         """;
     sb.append(splash);
     sb.append("cdx:")
-      .append(Codex.fingerprintAsString(codex.id())).append("\n");
+      .append(Codex.fingerprintAsString(codex.id()))
+      .append("\n");
+    if (codex.isComplete()) {
+      sb.append(CLIColor.BLUE)
+        .append("▓ Complete\n")
+        .append(CLIColor.RESET);
+    }
+    if (codex.isDownloading() || codex.isSharing()) {
+      sb.append(CLIColor.ITALIC)
+        .append(CLIColor.BOLD)
+        .append(CLIColor.ORANGE)
+        .append(codex.isDownloading() ? "▓ Downloading ..." : codex.isSharing() ? "▓ Sharing... " : "")
+        .append(CLIColor.RESET)
+        .append("\n\n");
+    }
+    
     sb.append(colorize(CLIColor.BOLD, "Title: "))
-      .append(codex.name()).append("\n");
+      .append(codex.name())
+      .append("\n");
     var infoFiles = codex.files();
     sb.append(colorize(CLIColor.BOLD, "Number of files:  "))
-      .append(codex.files().size()).append("\n");
-    var size = infoFiles.stream().mapToLong(Codex.FileInfo::length).sum();
+      .append(codex.files()
+                   .size())
+      .append("\n");
     sb.append(colorize(CLIColor.BOLD, "Total size:   "))
-      .append(View.bytesToHumanReadable(size)).append("\n\n");
+      .append(View.bytesToHumanReadable(codex.totalSize()))
+      .append("\n\n");
     sb.append(colorize(CLIColor.BOLD, "Files:  \n"));
     infoFiles.stream()
              .collect(Collectors.groupingBy(Codex.FileInfo::absolutePath))
              .forEach((dir, files) -> {
                sb.append(colorize(CLIColor.BOLD, STR."[\{dir}]\n"));
-               files.forEach(file -> {
-                 sb.append("\t- ").append(file.filename()).append("\n");
-               });
+               files.forEach(file -> sb.append("\t- ")
+                                     .append(CLIColor.BOLD)
+                                     .append("%10s".formatted(View.bytesToHumanReadable(file.length())))
+                                     .append("  ")
+                                     .append("%.2f%%".formatted(file.completionRate() * 100))
+                                     .append("  ")
+                                     .append(CLIColor.RESET)
+                                     .append(file.filename())
+                                     .append("\n"));
              });
-    return View.scrollableViewFromString(STR."[Codex] \{codex.name()}", controller.clientLogin(), lines, columns, sb.toString());
+    return View.scrollableViewFromString(STR."[Codex] \{codex.name()}", lines, columns, sb.toString());
   }
 }

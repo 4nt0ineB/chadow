@@ -25,18 +25,32 @@ In 'message mode' any input that is not a command is considered as message to be
 The user can type the following commands:
 
 ```shell
-:h, :help - Display this help, scroll with e and s
-:u, :users - focus on the users list, enable scrolling with e and s
-:c, :chat - back to the chat in live reload focus
-:m, :msg - on the chat, enable scrolling through the messages with e and s
-:w, :whisper <username> - goes to the private discussion view with the other user (TODO)
-:r <lines> <columns> - Resize the views
-:new <path> - Create a codex from a file or directory                             (WIP)
-:share <SHA-1> - Share a codex with the given SHA-1                               (TODO)
-:unshare <SHA-1> - Unshare a codex with the given SHA-1                           (TODO)
-:mycdx cdx - Display the list of your codex
-:cdx <SHA-1> - Retrieves and display the codex info with the given SHA-1          (TODO)
-:exit - Exit the application                                                      (WIP)
+(scrollable) - scroll down with 'e', scroll up with 's', the only commands not starting with ':'.
+
+[GLOBAL COMMANDS]
+  :h, :help - Display this help (scrollable)
+  :c, :chat - Back to the chat in live reload
+  :w, :whisper <username> - Display the private discussion with the other user (TODO)
+  :d - Update and draw the display
+  :r <lines> <columns> - Resize the view
+  :new <codexName>, <path> - Create a codex from a file or directory
+  and display the details of new created codex (WIP). (mind the space between , and <path>)
+  
+  :mycdx - Display the list of your codex
+  :cdx:<SHA-1> - Retrieves and display the codex info with the given SHA-1          (TODO)
+  :exit - Exit the application                                                      (WIP)
+  
+[CHAT]
+  when the live reload is disabled (indicated by the coloured input field)
+  any input not starting with ':' will be considered as a message to be sent
+  
+  :m, :msg - Focus on chat (scrollable)
+  :u, :users - Focus on the users list (scrollable)
+  
+[CODEX]
+(scrollable)
+:share - Share/stop sharing the codex
+:download - Download/stop downloading the codex
 ```
 
 ### Sources
