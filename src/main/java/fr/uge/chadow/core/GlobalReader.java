@@ -29,4 +29,8 @@ public class GlobalReader<T extends Record> implements Reader<T> {
   public void reset() {
 
   }
+
+  public static void main(String[] args) {
+
+  }
 }
