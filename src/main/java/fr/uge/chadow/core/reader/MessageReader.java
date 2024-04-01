@@ -1,5 +1,7 @@
 package fr.uge.chadow.core.reader;
 
+import fr.uge.chadow.core.protocol.Message;
+
 import java.nio.ByteBuffer;
 
 public class MessageReader implements Reader<Message> {

@@ -1,6 +1,6 @@
 package fr.uge.chadow.server;
 
-import fr.uge.chadow.core.reader.Message;
+import fr.uge.chadow.core.protocol.Message;
 import fr.uge.chadow.core.reader.MessageReader;
 import fr.uge.chadow.core.reader.Reader;
 

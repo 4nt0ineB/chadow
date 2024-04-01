@@ -4,7 +4,7 @@ import fr.uge.chadow.cli.CLIColor;
 import fr.uge.chadow.client.ClientConsoleController;
 import fr.uge.chadow.client.ClientConsoleController.Mode;
 import fr.uge.chadow.client.Codex;
-import fr.uge.chadow.core.reader.Message;
+import fr.uge.chadow.core.protocol.Message;
 
 import java.io.IOException;
 import java.util.ArrayList;

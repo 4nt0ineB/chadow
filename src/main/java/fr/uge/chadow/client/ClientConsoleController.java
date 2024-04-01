@@ -3,7 +3,7 @@ package fr.uge.chadow.client;
 import fr.uge.chadow.cli.InputReader;
 import fr.uge.chadow.cli.display.Display;
 import fr.uge.chadow.cli.display.View;
-import fr.uge.chadow.core.reader.Message;
+import fr.uge.chadow.core.protocol.Message;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;

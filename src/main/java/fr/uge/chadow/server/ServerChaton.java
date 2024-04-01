@@ -7,7 +7,7 @@ import java.nio.channels.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import fr.uge.chadow.core.reader.Message;
+import fr.uge.chadow.core.protocol.Message;
 
 public class ServerChaton {
 	private static final Logger logger = Logger.getLogger(ServerChaton.class.getName());
