@@ -37,6 +37,14 @@
         <!-- plugin versions -->
         <version.plugin.compiler>3.11.0</version.plugin.compiler>
     </properties>
+    <dependencies>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>RELEASE</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 
     <build>
         <finalName>${project.artifactId}</finalName>

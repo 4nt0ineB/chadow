@@ -4,7 +4,7 @@ import fr.uge.chadow.cli.CLIColor;
 import fr.uge.chadow.client.ClientConsoleController;
 import fr.uge.chadow.client.ClientConsoleController.Mode;
 import fr.uge.chadow.client.Codex;
-import fr.uge.chadow.core.reader.Message;
+import fr.uge.chadow.core.protocol.Message;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -22,11 +22,11 @@ import static fr.uge.chadow.cli.display.View.colorize;
 
 public class Display {
   private static final Logger logger = Logger.getLogger(Display.class.getName());
-  
+
   private final ClientConsoleController controller;
   private final Scroller messageScroller;
   private final Scroller userScroller;
-  
+
   private final AtomicBoolean viewCanRefresh;
   private final ReentrantLock lock = new ReentrantLock();
   private int lines;
@@ -34,7 +34,7 @@ public class Display {
   private Mode mode = Mode.CHAT_LIVE_REFRESH;
   private ScrollableView helpView;
   private ScrollableView codexView;
-  
+
   
   public Display(int lines, int cols, AtomicBoolean viewCanRefresh, ClientConsoleController controller) {
     Objects.requireNonNull(viewCanRefresh);
@@ -51,7 +51,7 @@ public class Display {
     helpView = helpView();
     helpView.moveToTop();
   }
-  
+
   static String lowInfoBar(int columns) {
     return STR."\{String.valueOf(CLIColor.CYAN)}\{CLIColor.BOLD}\{"\u25A0".repeat(columns)}\{CLIColor.RESET}\n";
   }
@@ -106,7 +106,7 @@ public class Display {
    * @throws IOException
    */
   public void draw() throws IOException {
-    
+
     switch (mode) {
       case CHAT_LIVE_REFRESH,
           CHAT_SCROLLER,
@@ -137,14 +137,14 @@ public class Display {
    * @return
    */
   private int getMaxUserLength() {
-    
+
     return Math.max(controller.users()
                               .stream()
                               .mapToInt(String::length)
                               .max()
                               .orElse(0), 15);
-    
-    
+
+
   }
   
   /**
@@ -251,20 +251,20 @@ public class Display {
    * @return
    */
   private List<Message> getFormattedMessages() {
-    
+
     var subList = getMessagesToDisplay();
     var list = subList.stream()
                       .flatMap(message -> formatMessage(message, msgLineLength()))
                       .collect(Collectors.toList());
     return list.subList(Math.max(0, list.size() - View.maxLinesView(lines)), list.size());
-    
+
   }
-  
-  
+
+
   private List<Message> getMessagesToDisplay() {
-    
+
     var messages = controller.messages();
-    
+
     if (messages.size() <= View.maxLinesView(lines)) {
       return messages;
     }
@@ -272,7 +272,7 @@ public class Display {
       return messages.subList(Math.max(0, messages.size() - View.maxLinesView(lines)), messages.size());
     }
     return messages.subList(messageScroller.getA(), messageScroller.getB());
-    
+
   }
   
   private List<String> getUsersToDisplay() {
@@ -304,17 +304,17 @@ public class Display {
    * @return
    */
   private Stream<Message> formatMessage(Message message, int lineLength) {
-    
+
     var sanitizedLines = splitAndSanitize(message.txt(), lineLength);
     return IntStream.range(0, sanitizedLines.size())
                     .mapToObj(index -> new Message(index == 0 ? message.login() : "", sanitizedLines.get(index), message.epoch()));
-    
+
   }
   
   public Mode getMode() {
     return mode;
   }
-  
+
   public void setMode(Mode mode) {
     this.mode = mode;
     if (mode == Mode.HELP_SCROLLER) {
@@ -329,7 +329,7 @@ public class Display {
   }
   
   public void scrollerUp() {
-    
+
     switch (mode) {
       case CHAT_SCROLLER -> messageScroller.scrollUp(View.maxLinesView(lines));
       case USERS_SCROLLER -> userScroller.scrollUp(View.maxLinesView(lines));
@@ -339,18 +339,18 @@ public class Display {
         codexView.scrollUp(View.maxLinesView(lines));
       }
     }
-    
+
   }
   
   public void scrollerDown() {
-    
+
     switch (mode) {
       case CHAT_SCROLLER -> messageScroller.scrollDown(View.maxLinesView(lines));
       case USERS_SCROLLER -> userScroller.scrollDown(View.maxLinesView(lines));
       case HELP_SCROLLER -> helpView.scrollDown(View.maxLinesView(lines));
       case CODEX_DETAILS -> codexView.scrollDown(View.maxLinesView(lines));
     }
-    
+
   }
   
   private ScrollableView helpView() {
@@ -393,11 +393,11 @@ public class Display {
 
     return View.scrollableViewFromString("Help", lines, columns, txt);
   }
-  
+
 
   private ScrollableView codexView(Codex codex) {
     var sb = new StringBuilder();
-    
+
     var splash = """
         ## ┏┓   ┓
         ## ┃ ┏┓┏┫┏┓┓┏
@@ -421,7 +421,7 @@ public class Display {
         .append(CLIColor.RESET)
         .append("\n\n");
     }
-    
+
     sb.append(colorize(CLIColor.BOLD, "Title: "))
       .append(codex.name())
       .append("\n");
