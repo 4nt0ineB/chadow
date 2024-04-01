@@ -77,6 +77,10 @@ public class ScrollableView implements View {
     return sb.toString();
   }
   
+  public void scrollPageUp() {
+    scroller.scrollPageUp();
+  }
+  
   public void scrollUp(int lines) {
     scroller.scrollUp(lines);
   }
@@ -89,4 +93,11 @@ public class ScrollableView implements View {
     scroller.moveToTop();
   }
   
+  public void moveToBottom() {
+    scroller.moveToBottom();
+  }
+  
+  public void scrollPageDown() {
+    scroller.scrollPageDown();
+  }
 }

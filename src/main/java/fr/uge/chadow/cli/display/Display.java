@@ -87,7 +87,7 @@ public class Display {
       if (viewCanRefresh.get()) {
         draw();
         if (mode == Mode.CHAT_LIVE_REFRESH) {
-          messageScroller.setLines(controller.numberofMessages());
+          messageScroller.setLines(controller.numberOfMessages());
         }
       }
       Thread.sleep(200);
@@ -328,29 +328,49 @@ public class Display {
     }
   }
   
-  public void scrollerUp() {
-    
+  public void scrollerPageUp() {
     switch (mode) {
-      case CHAT_SCROLLER -> messageScroller.scrollUp(View.maxLinesView(lines));
-      case USERS_SCROLLER -> userScroller.scrollUp(View.maxLinesView(lines));
-      case HELP_SCROLLER -> helpView.scrollUp(View.maxLinesView(lines));
-      case CODEX_DETAILS -> {
-        logger.info("scrolling up");
-        codexView.scrollUp(View.maxLinesView(lines));
-      }
+      case CHAT_SCROLLER -> messageScroller.scrollPageUp();
+      case USERS_SCROLLER -> userScroller.scrollPageUp();
+      case HELP_SCROLLER -> helpView.scrollPageUp();
+      case CODEX_DETAILS -> codexView.scrollPageUp();
     }
-    
   }
   
-  public void scrollerDown() {
-    
+  public void scrollerPageDown() {
     switch (mode) {
-      case CHAT_SCROLLER -> messageScroller.scrollDown(View.maxLinesView(lines));
-      case USERS_SCROLLER -> userScroller.scrollDown(View.maxLinesView(lines));
-      case HELP_SCROLLER -> helpView.scrollDown(View.maxLinesView(lines));
-      case CODEX_DETAILS -> codexView.scrollDown(View.maxLinesView(lines));
+      case CHAT_SCROLLER -> messageScroller.scrollPageDown();
+      case USERS_SCROLLER -> userScroller.scrollPageDown();
+      case HELP_SCROLLER -> helpView.scrollPageDown();
+      case CODEX_DETAILS -> codexView.scrollPageDown();
     }
-    
+  }
+  
+  public void scrollerBottom() {
+    switch (mode) {
+      case CHAT_SCROLLER -> messageScroller.setLines(controller.numberOfMessages());
+      case USERS_SCROLLER -> userScroller.setLines(controller.users().size());
+      case HELP_SCROLLER -> helpView.moveToBottom();
+      case CODEX_DETAILS -> codexView.moveToBottom();
+    }
+  }
+  
+  public void scrollerLineUp() {
+    switch (mode) {
+      case CHAT_SCROLLER -> messageScroller.scrollUp(1);
+      case USERS_SCROLLER -> userScroller.scrollUp(1);
+      case HELP_SCROLLER -> helpView.scrollUp(1);
+      case CODEX_DETAILS -> codexView.scrollUp(1);
+    }
+  }
+  
+  public void scrollerLineDown() {
+    switch (mode) {
+      case CHAT_SCROLLER -> messageScroller.scrollDown(1);
+      case USERS_SCROLLER -> userScroller.scrollDown(1);
+      case HELP_SCROLLER -> helpView.scrollDown(1);
+      case CODEX_DETAILS -> codexView.scrollDown(1);
+    }
   }
   
   private ScrollableView helpView() {
@@ -362,7 +382,13 @@ public class Display {
         ##       ┛
         
         
-        (scrollable) - scroll down with 'e', scroll up with 's', the only commands not starting with ':'.
+        'scrollable' elements:
+          e - scroll one page up
+          s - scroll one page down
+          r - scroll one line up
+          d - scroll one line down
+          t - scroll to the top
+          b - scroll to the bottom
         
         [GLOBAL COMMANDS]
           :h, :help - Display this help (scrollable)
@@ -450,4 +476,15 @@ public class Display {
              });
     return View.scrollableViewFromString(STR."[Codex] \{codex.name()}", lines, columns, sb.toString());
   }
+  
+  public void scrollerTop() {
+    switch (mode) {
+      case CHAT_SCROLLER -> messageScroller.moveToTop();
+      case USERS_SCROLLER -> userScroller.moveToTop();
+      case HELP_SCROLLER -> helpView.moveToTop();
+      case CODEX_DETAILS -> codexView.moveToTop();
+    }
+  }
+  
+
 }

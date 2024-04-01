@@ -25,7 +25,13 @@ In 'message mode' any input that is not a command is considered as message to be
 The user can type the following commands:
 
 ```shell
-(scrollable) - scroll down with 'e', scroll up with 's', the only commands not starting with ':'.
+'scrollable' elements:
+  e - scroll one page up
+  s - scroll one page down
+  r - scroll one line up
+  d - scroll one line down
+  t - scroll to the top
+  b - scroll to the bottom
 
 [GLOBAL COMMANDS]
   :h, :help - Display this help (scrollable)
@@ -51,6 +57,7 @@ The user can type the following commands:
 (scrollable)
 :share - Share/stop sharing the codex
 :download - Download/stop downloading the codex
+        
 ```
 
 ### Sources

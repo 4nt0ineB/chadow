@@ -6,6 +6,7 @@ import fr.uge.chadow.cli.display.View;
 import fr.uge.chadow.core.reader.Message;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -13,6 +14,15 @@ import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
 public class ClientConsoleController {
+  public enum Mode {
+    CHAT_LIVE_REFRESH, // default
+    CHAT_SCROLLER,     // :c, :chat
+    USERS_SCROLLER,    // :u, :users
+    HELP_SCROLLER,     // :h, :help
+    CODEX_SEARCH,      // :search <name>
+    CODEX_DETAILS,     // :cdx:<fingerprint>
+    CODEX_LIST,        // :mycdx
+  }
   private final static Logger logger = Logger.getLogger(ClientConsoleController.class.getName());
   private final Client client;
   private final InputReader inputReader;
@@ -50,6 +60,12 @@ public class ClientConsoleController {
     }
   }
   
+  public List<Codex> codexes() {
+    synchronized (lock) {
+      return codexes.values().stream().toList();
+    }
+  }
+  
   public List<String> users() {
     synchronized (lock) {
       return users.stream()
@@ -72,49 +88,26 @@ public class ClientConsoleController {
   }
   
   public void start() throws IOException {
-    //System.err.println("----------------------Running with " + lines + " lines and " + cols + " columns");
-    
+    logger.info(STR."Starting console (\{lines} rows \{cols} cols");
     // client
-    Thread.ofPlatform()
-          .daemon()
-          .start(() -> {
-            try {
-              client.launch();
-            } catch (IOException e) {
-              logger.severe(STR."Client was interrupted. \{e.getMessage()}");
-            } finally {
-              mustClose = true;
-            }
-          });
+    startClient();
     display.draw();
     // thread that manages the display
-    Thread.ofPlatform()
-          .daemon()
-          .start(() -> {
-            try {
-              display.startLoop();
-            } catch (IOException | InterruptedException e) {
-              logger.severe(STR."Display was interrupted. \{e.getMessage()}");
-            } finally {
-              mustClose = true;
-            }
-          });
+    startDisplay();
     // for dev: fake messages
     fillWithFakeData();
     client.subscribe(this::addMessage);
     // Thread that manages the user inputs
     try {
       inputReader.start();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    } catch (InterruptedException | NoSuchAlgorithmException e) {
-      logger.severe("User input reader was interrupted." + e.getMessage());
+    } catch (UncheckedIOException | IOException | InterruptedException | NoSuchAlgorithmException e) {
+      logger.severe(STR."The client was interrupted.\{e.getMessage()}");
     } finally {
-      // exitNicely();
+      exitNicely();
     }
   }
   
-  public int numberofMessages() {
+  public int numberOfMessages() {
     synchronized (lock) {
       return publicMessages.size();
     }
@@ -130,67 +123,81 @@ public class ClientConsoleController {
     return selectedCodexForDetails;
   }
   
+  public void startClient() {
+    Thread.ofPlatform()
+          .daemon()
+          .start(() -> {
+            try {
+              client.launch();
+            } catch (IOException e) {
+              logger.severe(STR."Client was interrupted. \{e.getMessage()}");
+            } finally {
+              mustClose = true;
+            }
+          });
+  }
+  
+  public void startDisplay() {
+    Thread.ofPlatform()
+          .daemon()
+          .start(() -> {
+            try {
+              display.startLoop();
+            } catch (IOException | InterruptedException e) {
+              logger.severe(STR."The console display was interrupted. \{e.getMessage()}");
+            } finally {
+              mustClose = true;
+            }
+          });
+  }
+  
+  public void drawDisplay() throws IOException {
+    synchronized (lock) {
+      display.clear();
+      display.draw();
+    }
+  }
+  
+  public void clearDisplayAndMore(int numberOfLineBreak) {
+    View.clearDisplayAndMore(lines, numberOfLineBreak);
+  }
+  
+  private void exitNicely() {
+    // inputReader.stop();
+    // display.stop();
+    // client.shutdown();
+    // just for now
+    System.exit(0);
+  }
+  
+  /**
+   * Create a splash screen logo with a list of messages
+   * showing le title "Chadow" in ascii art and the version
+   */
+  private List<Message> splashLogo() {
+    return List.of(
+        new Message("", "┏┓┓    ┓", 0),
+        new Message("", "┃ ┣┓┏┓┏┫┏┓┓┏┏", 0),
+        new Message("", "┗┛┗┗┗┗┗┗┗┛┗┛┛ v1.0.0 - Bastos & Sebbah", 0)
+    );
+  }
+  
   /**
    * Process the message or the command
    *
-   * @param input
+   * @param input the user input
    * @return true if the user can type again, otherwise it's the view's turn.
-   * @throws InterruptedException
    */
-  public boolean processInput(String input) throws InterruptedException, IOException, NoSuchAlgorithmException {
-    if (input.startsWith(":r ")) {
-      var split = input.split(" ");
-      if (split.length == 3) {
-        try {
-          var x = Integer.parseInt(split[1]);
-          var y = Integer.parseInt(split[2]);
-          if (x <= 0 || y <= 0) {
-            return false;
-          }
-          cols = x;
-          lines = y;
-          display.setDimensions(x, y);
-          drawDisplay();
-        } catch (NumberFormatException e) {
-          return false;
-        }
-        return false;
-      }
-    }
-    // pattern to get a file path
-    var patternNew = Pattern.compile(":new\\s+(.*),\\s+(.*)");
-    var matcher = patternNew.matcher(input);
-    if (matcher.find()) {
-      var codexName = matcher.group(1);
-      var path = matcher.group(2);
-      logger.info(":create " + path + "\n");
-      var codex = Codex.fromPath(codexName, path);
-      selectedCodexForDetails = codex;
-      codexes.put(Codex.fingerprintAsString(codex.id()), codex);
-      display.setMode(Mode.CODEX_DETAILS);
-      return true;
-    }
-    
-    var patternRetrieve = Pattern.compile(":cdx:(.*)");
-    var matcherRetrieve = patternRetrieve.matcher(input);
-    if (matcherRetrieve.find()) {
-      var fingerprint = matcherRetrieve.group(1);
-      logger.info(":cdx: " + fingerprint + "\n");
-      var codex = codexes.get(fingerprint);
-      if (codex == null) {
-        logger.info("Codex not found");
-        // client.retrieveCodex(fingerprint);
-        return false;
-      }
-      selectedCodexForDetails = codex;
-      display.setMode(Mode.CODEX_DETAILS);
-      return true;
-    }
-    
-    
-    return switch (input) {
+  public boolean processInput(String input) throws IOException {
+    logger.info(STR."Processing input: \{input}");
+    return processComplexCommands(input).orElseGet(() -> switch (input) {
       case ":d" -> {
-        drawDisplay();
+        try {
+          drawDisplay();
+        } catch (IOException e) {
+          logger.severe(STR."Error while drawing display.\{e.getMessage()}");
+          throw new UncheckedIOException(e);
+        }
         yield true;
       }
       case ":c", ":chat" -> {
@@ -205,21 +212,8 @@ public class ClientConsoleController {
         display.setMode(Mode.HELP_SCROLLER);
         yield true;
       }
-      // specific mode commands
-      default -> switch (display.getMode()) {
-        case CHAT_LIVE_REFRESH -> processInputModeLiveRefresh(input);
-        case CHAT_SCROLLER, USERS_SCROLLER, HELP_SCROLLER -> processInputModeScroller(input);
-        case CODEX_SEARCH -> false;
-        case CODEX_DETAILS -> processInputModeCodexDetails(input);
-      };
-    };
-  }
-  
-  public void drawDisplay() throws IOException {
-    synchronized (lock) {
-      display.clear();
-      display.draw();
-    }
+      default -> processCommandInContext(input);
+    });
   }
   
   private boolean processInputModeCodexDetails(String input) {
@@ -251,16 +245,44 @@ public class ClientConsoleController {
     return true;
   }
   
+  private boolean processCommandInContext(String input) {
+    return switch (display.getMode()) {
+      case CHAT_LIVE_REFRESH -> {
+        try {
+          yield processInputModeLiveRefresh(input);
+        } catch (InterruptedException e) {
+          logger.severe(STR."Interrupted while processing input in live refresh mode.\{e.getMessage()}");
+          throw new RuntimeException(e);
+        }
+      }
+      case CHAT_SCROLLER, USERS_SCROLLER, HELP_SCROLLER -> processInputModeScroller(input);
+      case CODEX_SEARCH -> throw new Error("Not implemented");
+      case CODEX_DETAILS -> processInputModeCodexDetails(input);
+      case CODEX_LIST -> processInputModeCodexList(input);
+    };
+  }
+  
+  private boolean processInputModeCodexList(String input) {
+    return switch(input) {
+      case  ":see" -> {
+        // select codex
+        yield true;
+      }
+      default -> false;
+    };
+  }
+  
   private boolean processInputModeLiveRefresh(String input) throws InterruptedException {
     if (!input.startsWith(":") && !input.isBlank()) {
       client.sendMessage(input);
+      logger.info(STR."send message: \{input}");
     }
     switch (input) {
       case ":u", ":users" -> {
         display.setMode(Mode.USERS_SCROLLER);
         return true;
       }
-      case ":c", ":chat" -> {
+      case ":m", ":msg" -> {
         display.setMode(Mode.CHAT_SCROLLER);
         return true;
       }
@@ -270,14 +292,89 @@ public class ClientConsoleController {
   
   private boolean processInputModeScroller(String input) {
     switch (input) {
-      case "e" -> display.scrollerUp();
-      case "s" -> display.scrollerDown();
+      case "e" -> display.scrollerPageUp();
+      case "s" -> display.scrollerPageDown();
+      case "t" -> display.scrollerTop();
+      case "b" -> display.scrollerBottom();
+      case "r" -> display.scrollerLineUp();
+      case "d" -> display.scrollerLineDown();
     }
     return true;
   }
   
-  public void clearDisplayAndMore(int numberOfLineBreak) {
-    View.clearDisplayAndMore(lines, numberOfLineBreak);
+  private Optional<Boolean> processComplexCommands(String input) throws IOException {
+    return commandResize(input)
+        .or(() -> {
+          try {
+            return commandNew(input);
+          } catch (IOException e) {
+            throw new UncheckedIOException(e);
+          } catch (NoSuchAlgorithmException e) {
+            logger.severe(STR."Error while creating new codex. The \{e.getMessage()}");
+            throw new RuntimeException(e);
+          } finally {
+            mustClose = true;
+          }
+        })
+        .or(() -> commandCdxDetails(input)) ;
+  }
+  
+  private Optional<Boolean> commandResize(String input) throws IOException {
+    if (input.startsWith(":r ")) {
+      var split = input.split(" ");
+      if (split.length == 3) {
+        try {
+          var x = Integer.parseInt(split[1]);
+          var y = Integer.parseInt(split[2]);
+          if (x <= 0 || y <= 0) {
+            return Optional.of(false);
+          }
+          cols = x;
+          lines = y;
+          display.setDimensions(x, y);
+          drawDisplay();
+        } catch (NumberFormatException e) {
+          return Optional.of(false);
+        }
+        return Optional.of(false);
+      }
+    }
+    return Optional.empty();
+  }
+  
+  private Optional<Boolean> commandNew(String input) throws IOException, NoSuchAlgorithmException {
+    var patternNew = Pattern.compile(":new\\s+(.*),\\s+(.*)");
+    var matcher = patternNew.matcher(input);
+    if (matcher.find()) {
+      var codexName = matcher.group(1);
+      var path = matcher.group(2);
+      logger.info(STR.":create \{path}\n");
+      var codex = Codex.fromPath(codexName, path);
+      selectedCodexForDetails = codex;
+      codexes.put(Codex.fingerprintAsString(codex.id()), codex);
+      display.setMode(Mode.CODEX_DETAILS);
+      return Optional.of(true);
+    }
+    return Optional.empty();
+  }
+  
+  private Optional<Boolean> commandCdxDetails(String input) {
+    var patternRetrieve = Pattern.compile(":cdx:(.*)");
+    var matcherRetrieve = patternRetrieve.matcher(input);
+    if (matcherRetrieve.find()) {
+      var fingerprint = matcherRetrieve.group(1);
+      logger.info(STR.":cdx: \{fingerprint}\n");
+      var codex = codexes.get(fingerprint);
+      if (codex == null) {
+        logger.info("Codex not found");
+        // client.retrieveCodex(fingerprint);
+        return Optional.of(false);
+      }
+      selectedCodexForDetails = codex;
+      display.setMode(Mode.CODEX_DETAILS);
+      return Optional.of(true);
+    }
+    return Optional.empty();
   }
   
   private void fillWithFakeData() {
@@ -296,59 +393,4 @@ public class ClientConsoleController {
     this.publicMessages.addAll(splashLogo());
     this.publicMessages.addAll(Arrays.asList(messages));
   }
-  
-  private void exitNicely() {
-    // inputReader.stop();
-    // display.stop();
-    // client.shutdown();
-    
-    // just for now
-    System.exit(0);
-  }
-  
-  /**
-   * Create a splash screen logo with a list of messages
-   * showing le title "Chadow" in ascii art and the version
-   */
-  private List<Message> splashLogo() {
-    return List.of(
-        new Message("", "┏┓┓    ┓", 0),
-        new Message("", "┃ ┣┓┏┓┏┫┏┓┓┏┏", 0),
-        new Message("", "┗┛┗┗┗┗┗┗┗┛┗┛┛ v1.0.0 - Bastos & Sebbah", 0)
-    );
-  }
-  
-  public enum Mode {
-    CHAT_LIVE_REFRESH,
-    CHAT_SCROLLER,
-    USERS_SCROLLER,
-    HELP_SCROLLER,
-    CODEX_SEARCH,
-    CODEX_DETAILS
-  }
 }
-
-/*
-
-  ┓┏  ┓
-  ┣┫┏┓┃┏┓
-  ┛┗┗━┗┣┛
-       ┛
-  ┏┓┓    ┓
-  ┃ ┣┓┏┓┏┫┏┓┓┏┏
-  ┗┛┗┗┛┗┛┗┛┗┛┛┛
-  
-      ┓
-  ┏┏┓┏┫┏┓┓┏
-  ┗┗┛┗┻┗ ┛┗
-  
-┌─┐┌─┐┌┬┐┌─┐─┐┌─
-│  │ │ ││├┤  │┤
-└─┘└─┘─┴┘└─┘─┘└─
-  ╦ ╦┌─┐┬  ┌─┐
-  ╠═╣├┤ │  ├─┘
-  ╩ ╩└─┘┴─┘┴
-  ╔═╗┬ ┬┌─┐┌┬┐┌─┐┬ ┬
-  ║  ├─┤├─┤ │││ ││││
-  ╚═╝┴ ┴┴ ┴─┴┘└─┘└┴┘
- */
