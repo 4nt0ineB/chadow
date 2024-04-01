@@ -93,7 +93,7 @@ public class Client {
     Objects.requireNonNull(subscriber);
     uniqueContext.messageConsumer = subscriber;
   }
-  
+
   public void launch() throws IOException {
     sc.configureBlocking(false);
     var key = sc.register(selector, SelectionKey.OP_CONNECT);
@@ -170,7 +170,7 @@ public class Client {
             }else {
               messageConsumer.accept(msg);
               messageReader.reset();
-              
+
             }
             break;
           case REFILL:
