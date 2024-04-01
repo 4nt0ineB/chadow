@@ -101,7 +101,7 @@ public class ServerChaton {
     try {
 			new ServerChaton(Integer.parseInt(args[0])).launch();
     } catch (IOException e) {
-			logger.severe("Error while launching server: " + e.getMessage());
+			logger.severe(STR."Error while launching server: \{e.getMessage()}");
     }
   }
 
