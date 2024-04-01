@@ -23,7 +23,6 @@ public class GlobalReaderTest {
     bb.putInt(txtBuffer.remaining());
     bb.put(txtBuffer);
     bb.putLong(messageTime);
-    bb.flip();
     assertEquals(Reader.ProcessStatus.DONE, reader.process(bb));
     assertEquals(new Message(login, txt, messageTime), reader.get());
   }

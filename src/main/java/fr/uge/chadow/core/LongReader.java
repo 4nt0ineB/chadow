@@ -35,7 +35,7 @@ public class LongReader implements Reader<Long> {
     }
     state = State.DONE;
     internalBuffer.flip();
-    value = internalBuffer.getInt();
+    value = internalBuffer.getLong();
     return ProcessStatus.DONE;
   }
 
