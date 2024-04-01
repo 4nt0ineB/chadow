@@ -1,4 +1,4 @@
-package fr.uge.chadow.core;
+package fr.uge.chadow.core.readers;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.RecordComponent;

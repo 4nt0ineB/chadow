@@ -10,9 +10,9 @@ import java.util.ArrayDeque;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import fr.uge.chadow.core.MessageReader;
-import fr.uge.chadow.core.Message;
-import fr.uge.chadow.core.Reader;
+import fr.uge.chadow.core.readers.MessageReader;
+import fr.uge.chadow.core.packet.Message;
+import fr.uge.chadow.core.readers.Reader;
 
 public class ServerChaton {
 	static private class Context {

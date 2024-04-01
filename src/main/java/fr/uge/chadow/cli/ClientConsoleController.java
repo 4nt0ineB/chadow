@@ -1,10 +1,9 @@
 package fr.uge.chadow.cli;
 
 import fr.uge.chadow.cli.display.Display;
-import fr.uge.chadow.cli.display.Scroller;
 import fr.uge.chadow.cli.display.View;
 import fr.uge.chadow.client.Client;
-import fr.uge.chadow.core.Message;
+import fr.uge.chadow.core.packet.Message;
 
 import java.io.IOException;
 import java.util.*;

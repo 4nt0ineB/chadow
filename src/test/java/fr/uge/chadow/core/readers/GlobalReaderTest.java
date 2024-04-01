@@ -1,12 +1,12 @@
-package fr.uge.chadow.core;
+package fr.uge.chadow.core.readers;
 
+import fr.uge.chadow.core.packet.Message;
 import org.junit.Test;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
 
 public class GlobalReaderTest {
   @Test
