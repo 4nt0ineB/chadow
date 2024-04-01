@@ -1,7 +1,7 @@
-package fr.uge.chadow.core.readers;
+package fr.uge.chadow.core.reader;
 
-import fr.uge.chadow.core.packet.Message;
-import fr.uge.chadow.core.packet.TestPacket;
+import fr.uge.chadow.core.protocol.Message;
+import fr.uge.chadow.core.protocol.TestPacket;
 import org.junit.Test;
 
 import java.nio.ByteBuffer;

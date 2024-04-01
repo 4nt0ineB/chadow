@@ -1,6 +1,6 @@
-package fr.uge.chadow.core.readers;
+package fr.uge.chadow.core.reader;
 
-import fr.uge.chadow.core.packet.Message;
+import fr.uge.chadow.core.protocol.Message;
 
 import java.nio.ByteBuffer;
 

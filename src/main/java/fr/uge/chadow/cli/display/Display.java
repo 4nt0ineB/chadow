@@ -2,7 +2,7 @@ package fr.uge.chadow.cli.display;
 
 import fr.uge.chadow.cli.CLIColor;
 import fr.uge.chadow.cli.ClientConsoleController;
-import fr.uge.chadow.core.packet.Message;
+import fr.uge.chadow.core.protocol.Message;
 import fr.uge.chadow.cli.ClientConsoleController.Mode;
 
 import java.io.IOException;

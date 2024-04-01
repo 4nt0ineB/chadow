@@ -1,7 +1,4 @@
-package fr.uge.chadow.core.readers;
-
-import fr.uge.chadow.core.readers.IntReader;
-import fr.uge.chadow.core.readers.Reader;
+package fr.uge.chadow.core.reader;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;

@@ -1,8 +1,8 @@
 package fr.uge.chadow.client;
 
-import fr.uge.chadow.core.packet.Message;
-import fr.uge.chadow.core.readers.MessageReader;
-import fr.uge.chadow.core.readers.Reader;
+import fr.uge.chadow.core.protocol.Message;
+import fr.uge.chadow.core.reader.MessageReader;
+import fr.uge.chadow.core.reader.Reader;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
