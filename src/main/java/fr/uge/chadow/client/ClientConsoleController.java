@@ -3,7 +3,7 @@ package fr.uge.chadow.client;
 import fr.uge.chadow.cli.InputReader;
 import fr.uge.chadow.cli.display.Display;
 import fr.uge.chadow.cli.display.View;
-import fr.uge.chadow.core.reader.Message;
+import fr.uge.chadow.core.protocol.Message;
 
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
@@ -23,14 +23,14 @@ public class ClientConsoleController {
   private final HashMap<String, Codex> codexes = new HashMap<>();
   private Codex selectedCodexForDetails;
   private volatile boolean mustClose = false;
-  
+
   // we can't have reentrant locks because this thread runs inputReader that call display
   // that itself call this controller to get the messages and users.
   // Plus we have incoming messages from client, so can have concurrent modifications on the lists
   private final Object lock = new Object();
   private int lines;
   private int cols;
-  
+
   public ClientConsoleController(Client client, int lines, int cols) {
     Objects.requireNonNull(client);
     if (lines <= 0 || cols <= 0) {
@@ -43,62 +43,62 @@ public class ClientConsoleController {
     display = new Display(lines, cols, viewCanRefresh, this);
     inputReader = new InputReader(viewCanRefresh, this);
   }
-  
+
   public List<Message> messages() {
     synchronized (lock) {
       return Collections.unmodifiableList(publicMessages);
     }
   }
-  
+
   public List<String> users() {
     synchronized (lock) {
       return users.stream()
-                  .toList();
+              .toList();
     }
   }
-  
+
   public int totalUsers() {
     synchronized (lock) {
       return users.size();
     }
   }
-  
+
   public String clientLogin() {
     return client.login();
   }
-  
+
   public String clientServerHostName() {
     return client.serverHostName();
   }
-  
+
   public void start() throws IOException {
     //System.err.println("----------------------Running with " + lines + " lines and " + cols + " columns");
-    
+
     // client
     Thread.ofPlatform()
-          .daemon()
-          .start(() -> {
-            try {
-              client.launch();
-            } catch (IOException e) {
-              logger.severe(STR."Client was interrupted. \{e.getMessage()}");
-            } finally {
-              mustClose = true;
-            }
-          });
+            .daemon()
+            .start(() -> {
+              try {
+                client.launch();
+              } catch (IOException e) {
+                logger.severe(STR."Client was interrupted. \{e.getMessage()}");
+              } finally {
+                mustClose = true;
+              }
+            });
     display.draw();
     // thread that manages the display
     Thread.ofPlatform()
-          .daemon()
-          .start(() -> {
-            try {
-              display.startLoop();
-            } catch (IOException | InterruptedException e) {
-              logger.severe(STR."Display was interrupted. \{e.getMessage()}");
-            } finally {
-              mustClose = true;
-            }
-          });
+            .daemon()
+            .start(() -> {
+              try {
+                display.startLoop();
+              } catch (IOException | InterruptedException e) {
+                logger.severe(STR."Display was interrupted. \{e.getMessage()}");
+              } finally {
+                mustClose = true;
+              }
+            });
     // for dev: fake messages
     fillWithFakeData();
     client.subscribe(this::addMessage);
@@ -113,23 +113,23 @@ public class ClientConsoleController {
       // exitNicely();
     }
   }
-  
+
   public int numberofMessages() {
     synchronized (lock) {
       return publicMessages.size();
     }
   }
-  
+
   public void addMessage(Message message) {
     synchronized (lock) {
       publicMessages.add(message);
     }
   }
-  
+
   public Codex currentCodex() {
     return selectedCodexForDetails;
   }
-  
+
   /**
    * Process the message or the command
    *
@@ -170,7 +170,7 @@ public class ClientConsoleController {
       display.setMode(Mode.CODEX_DETAILS);
       return true;
     }
-    
+
     var patternRetrieve = Pattern.compile(":cdx:(.*)");
     var matcherRetrieve = patternRetrieve.matcher(input);
     if (matcherRetrieve.find()) {
@@ -186,8 +186,8 @@ public class ClientConsoleController {
       display.setMode(Mode.CODEX_DETAILS);
       return true;
     }
-    
-    
+
+
     return switch (input) {
       case ":d" -> {
         drawDisplay();
@@ -214,31 +214,31 @@ public class ClientConsoleController {
       };
     };
   }
-  
+
   public void drawDisplay() throws IOException {
     synchronized (lock) {
       display.clear();
       display.draw();
     }
   }
-  
+
   private boolean processInputModeCodexDetails(String input) {
     switch (input) {
       case ":share" -> {
-        if(currentCodex().isComplete()) {
-          if(currentCodex().isSharing()) {
+        if (currentCodex().isComplete()) {
+          if (currentCodex().isSharing()) {
             currentCodex().stopSharing();
-          }else {
+          } else {
             currentCodex().share();
           }
           display.setMode(Mode.CODEX_DETAILS);
         }
       }
       case ":download" -> {
-        if(!currentCodex().isComplete()) {
-          if(currentCodex().isDownloading()) {
+        if (!currentCodex().isComplete()) {
+          if (currentCodex().isDownloading()) {
             currentCodex().stopDownloading();
-          }else {
+          } else {
             currentCodex().download();
           }
           display.setMode(Mode.CODEX_DETAILS);
@@ -250,7 +250,7 @@ public class ClientConsoleController {
     }
     return true;
   }
-  
+
   private boolean processInputModeLiveRefresh(String input) throws InterruptedException {
     if (!input.startsWith(":") && !input.isBlank()) {
       client.sendMessage(input);
@@ -267,7 +267,7 @@ public class ClientConsoleController {
     }
     return false;
   }
-  
+
   private boolean processInputModeScroller(String input) {
     switch (input) {
       case "e" -> display.scrollerUp();
@@ -275,49 +275,49 @@ public class ClientConsoleController {
     }
     return true;
   }
-  
+
   public void clearDisplayAndMore(int numberOfLineBreak) {
     View.clearDisplayAndMore(lines, numberOfLineBreak);
   }
-  
+
   private void fillWithFakeData() {
     var users = new String[]{"test", "Morpheus", "Trinity", "Neo", "Flynn", "Alan", "Lora", "Gandalf", "Bilbo", "SKIDROW", "Antoine"};
     this.users.addAll(Arrays.asList(users));
     var messages = new Message[]{
-        new Message("test", "test", System.currentTimeMillis()),
-        new Message("test", "hello how are you", System.currentTimeMillis()),
-        new Message("Morpheus", "Wake up, Neo...", System.currentTimeMillis()),
-        new Message("Morpheus", "The Matrix has you...", System.currentTimeMillis()),
-        new Message("Neo", "what the hell is this", System.currentTimeMillis()),
-        new Message("Alan1", "Master CONTROL PROGRAM\nRELEASE TRON JA 307020...\nI HAVE PRIORITY ACCESS 7", System.currentTimeMillis()),
-        new Message("SKIDROW", "Here is the codex of the FOSS (.deb) : cdx:1eb49a28a0c02b47eed4d0b968bb9aec116a5a47", System.currentTimeMillis()),
-        new Message("Antoine", "Le lien vers le sujet : http://igm.univ-mlv.fr/coursprogreseau/tds/projet2024.html", System.currentTimeMillis())
+            new Message("test", "test", System.currentTimeMillis()),
+            new Message("test", "hello how are you", System.currentTimeMillis()),
+            new Message("Morpheus", "Wake up, Neo...", System.currentTimeMillis()),
+            new Message("Morpheus", "The Matrix has you...", System.currentTimeMillis()),
+            new Message("Neo", "what the hell is this", System.currentTimeMillis()),
+            new Message("Alan1", "Master CONTROL PROGRAM\nRELEASE TRON JA 307020...\nI HAVE PRIORITY ACCESS 7", System.currentTimeMillis()),
+            new Message("SKIDROW", "Here is the codex of the FOSS (.deb) : cdx:1eb49a28a0c02b47eed4d0b968bb9aec116a5a47", System.currentTimeMillis()),
+            new Message("Antoine", "Le lien vers le sujet : http://igm.univ-mlv.fr/coursprogreseau/tds/projet2024.html", System.currentTimeMillis())
     };
     this.publicMessages.addAll(splashLogo());
     this.publicMessages.addAll(Arrays.asList(messages));
   }
-  
+
   private void exitNicely() {
     // inputReader.stop();
     // display.stop();
     // client.shutdown();
-    
+
     // just for now
     System.exit(0);
   }
-  
+
   /**
    * Create a splash screen logo with a list of messages
    * showing le title "Chadow" in ascii art and the version
    */
   private List<Message> splashLogo() {
     return List.of(
-        new Message("", "┏┓┓    ┓", 0),
-        new Message("", "┃ ┣┓┏┓┏┫┏┓┓┏┏", 0),
-        new Message("", "┗┛┗┗┗┗┗┗┗┛┗┛┛ v1.0.0 - Bastos & Sebbah", 0)
+            new Message("", "┏┓┓    ┓", 0),
+            new Message("", "┃ ┣┓┏┓┏┫┏┓┓┏┏", 0),
+            new Message("", "┗┛┗┗┗┗┗┗┗┛┗┛┛ v1.0.0 - Bastos & Sebbah", 0)
     );
   }
-  
+
   public enum Mode {
     CHAT_LIVE_REFRESH,
     CHAT_SCROLLER,

@@ -1,45 +1,44 @@
 package fr.uge.chadow.cli.display;
 
 import fr.uge.chadow.cli.CLIColor;
-import fr.uge.chadow.client.Client;
-import fr.uge.chadow.client.Codex;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 public interface View {
   void setDimensions(int lines, int cols);
+
   void draw();
+
   void clear();
-  
+
   static void moveCursorToPosition(int x, int y) {
     System.out.print("\033[" + y + ";" + x + "H");
     System.out.flush();
   }
-  
+
   static String thematicBreak(int columns) {
     String sb = String.valueOf(CLIColor.CYAN) +
-        CLIColor.BOLD +
-        "—".repeat(columns) +
-        CLIColor.RESET +
-        "\n";
+            CLIColor.BOLD +
+            "—".repeat(columns) +
+            CLIColor.RESET +
+            "\n";
     return sb;
   }
-  
+
   static String inviteCharacter() {
-    return CLIColor.BOLD  + "\u00BB ";
+    return CLIColor.BOLD + "\u00BB ";
   }
-  
+
   /**
    * Clear the display, everything above the input field.
    */
   static void clearDisplayArea(int lines) {
     clearDisplayAndMore(lines, lines);
   }
-  
+
   /**
    * Clear the display + the other lines
    *
@@ -63,7 +62,7 @@ public interface View {
   static int maxLinesView(int lines) {
     return lines - 4;
   }
-  
+
   /**
    * Create a scrollable view from a string
    *
@@ -77,16 +76,16 @@ public interface View {
     var textLines = splitAndSanitize(help, cols);
     return new ScrollableView(title, lines, cols, textLines);
   }
-  
+
   /**
    * Colorize codex (cdx:SHA-1) links present in string
    */
   static String beautifyCodexLink(String txt) {
     var sb = new StringBuilder();
     return txt.replaceAll("cdx:([a-fA-F0-9]{40})",
-        CLIColor.BOLD + "" + CLIColor.GREEN + "cdx:$1" + CLIColor.RESET);
+            CLIColor.BOLD + "" + CLIColor.GREEN + "cdx:$1" + CLIColor.RESET);
   }
-  
+
   /**
    * Split the string into multiple lines if it exceeds the maxCharacters of the chat view
    * or if it contains a newline character.
@@ -124,7 +123,7 @@ public interface View {
     }
     return lines;
   }
-  
+
   static List<String> splitAndSanitize(List<String> txt, int maxCharacters) {
     var lines = new ArrayList<String>();
     for (var line : txt) {
@@ -132,7 +131,7 @@ public interface View {
     }
     return lines;
   }
-  
+
   /**
    * Move the cursor to the input field
    *
@@ -141,11 +140,11 @@ public interface View {
   static void moveToInputField(int lines) {
     View.moveCursorToPosition(3, lines);
   }
-  
+
   static String colorize(CLIColor color, String txt) {
     return (color + "%s" + CLIColor.RESET).formatted(txt);
   }
-  
+
   /**
    * Format the date to HH:mm:ss
    *
@@ -157,7 +156,7 @@ public interface View {
     var formatter = new SimpleDateFormat("HH:mm:ss");
     return formatter.format(date);
   }
-  
+
   static String bytesToHumanReadable(long bytes) {
     if (bytes < 0) {
       throw new IllegalArgumentException("bytes must be positive");
@@ -179,5 +178,5 @@ public interface View {
     }
     return "+inf (╯°□°)╯︵ ┻━┻";
   }
-  
+
 }
