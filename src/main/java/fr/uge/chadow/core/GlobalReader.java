@@ -31,7 +31,7 @@ public class GlobalReader<T extends Record> implements Reader<T> {
       } else if (type.equals(int.class)) {
         readerMap.put(int.class, new IntReader());
       } else if (type.equals(long.class)) {
-        // TODO: add LongReader
+        readerMap.put(long.class, new LongReader());
       } else {
         throw new IllegalArgumentException(STR."Unsupported type: \{type}");
       }
@@ -78,13 +78,5 @@ public class GlobalReader<T extends Record> implements Reader<T> {
     for (var reader : readerMap.values()) {
       reader.reset();
     }
-  }
-
-  public static void main(String[] args) throws InvocationTargetException, InstantiationException, IllegalAccessException {
-    GlobalReader<Message> reader = new GlobalReader<>(Message.class);
-    /*this.recordInstanceValues[0] = "login";
-    this.recordInstanceValues[1] = "txt";
-    this.recordInstanceValues[2] = 3;
-    System.out.println(recordClass.getConstructors()[0].newInstance(recordInstanceValues));*/
   }
 }
