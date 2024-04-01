@@ -43,18 +43,13 @@ public class GlobalReader<T extends Record> implements Reader<T> {
     if (state == State.DONE || state == State.ERROR) {
       throw new IllegalStateException();
     }
-    System.out.println("currentIndex: " + currentIndex);
     while (currentIndex != recordInstanceValues.length) {
-      System.out.println("recordComponents[currentIndex].getType(): " + recordComponents[currentIndex].getType());
       var reader = readerMap.get(recordComponents[currentIndex].getType());
-      System.out.println("reader: " + reader);
       var result = reader.process(bb);
-      System.out.println("result: " + result);
       if (result != ProcessStatus.DONE) {
         return result;
       }
       recordInstanceValues[currentIndex] = reader.get();
-      System.out.println("recordInstanceValues[currentIndex]: " + recordInstanceValues[currentIndex]);
       reader.reset();
       currentIndex++;
     }
