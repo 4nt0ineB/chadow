@@ -147,10 +147,6 @@ public class ClientConsoleController {
     return selectedCodexForDetails;
   }
   
-  public String IdAsHexa() {
-    return View.bytesToHexadecimal(selectedCodexForDetails.id());
-  }
-  
   public void startClient() {
     Thread.ofPlatform()
           .daemon()

@@ -25,26 +25,32 @@ In 'message mode' any input that is not a command is considered as message to be
 The user can type the following commands:
 
 ```shell
-'scrollable' elements:
+'scrollable':
   e - scroll one page up
   s - scroll one page down
   r - scroll one line up
   d - scroll one line down
   t - scroll to the top
   b - scroll to the bottom
-
+  
+'selectable' (is scrollable):
+  y - move selector up
+  h - move selector down
+  :s, :see - Select the item
+  
 [GLOBAL COMMANDS]
   :h, :help - Display this help (scrollable)
-  :c, :chat - Back to the chat in live reload
+  :c, :chat - Back to the [CHAT] in live reload
   :w, :whisper <username> - Display the private discussion with the other user (TODO)
   :d - Update and draw the display
   :r <lines> <columns> - Resize the view
   :new <codexName>, <path> - Create a codex from a file or directory
-  and display the details of new created codex (WIP). (mind the space between , and <path>)
+    and display the details of new created [CODEX] info (mind the space between , and <path>)
   
-  :mycdx - Display the list of your codex
-  :cdx:<SHA-1> - Retrieves and display the codex info with the given SHA-1          (TODO)
-  :exit - Exit the application                                                      (WIP)
+  :mycdx - Display the list of your codex (selectable)
+  :cdx:<SHA-1> - Retrieves and display the [CODEX] info with the given SHA-1
+    if the codex is not present locally, the server will be interrogated        (TODO)
+  :exit - Exit the application                                                  (WIP)
   
 [CHAT]
   when the live reload is disabled (indicated by the coloured input field)
@@ -57,7 +63,6 @@ The user can type the following commands:
 (scrollable)
 :share - Share/stop sharing the codex
 :download - Download/stop downloading the codex
-        
 ```
 
 ### Sources
