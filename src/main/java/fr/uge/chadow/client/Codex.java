@@ -1,5 +1,7 @@
 package fr.uge.chadow.client;
 
+import fr.uge.chadow.cli.display.View;
+
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -68,6 +70,8 @@ public class Codex{
     this.totalSize = files.stream().mapToLong(FileInfo::length).sum();
   }
   
+
+  
   public boolean isComplete() {
     return files.stream().allMatch(FileInfo::isComplete);
   }
@@ -77,7 +81,7 @@ public class Codex{
       throw new IllegalStateException("Codex is downloading, can't share it");
     }
     sharing = true;
-    loggin("is now sharing");
+    log("is now sharing");
   }
   
   public void download() {
@@ -85,21 +89,21 @@ public class Codex{
       throw new IllegalStateException("Codex is sharing, can't download it");
     }
     downloading = true;
-    loggin("is now downloading");
+    log("is now downloading");
   }
   
   public void stopSharing() {
     sharing = false;
-    loggin("stops sharing");
+    log("stops sharing");
   }
   
   public void stopDownloading() {
     downloading = false;
-    loggin("stops downloading");
+    log("stops downloading");
   }
   
-  private void loggin(String message) {
-    logger.info(STR."Codex \{name} with id: \{fingerprintAsString(id)} - \{message}");
+  private void log(String message) {
+    logger.info(STR."Codex \{name} with id: \{View.bytesToHexadecimal(id)} - \{message}");
   }
   
   public long totalSize() {
@@ -126,6 +130,10 @@ public class Codex{
     return id;
   }
   
+  public String idToHexadecimal() {
+    return View.bytesToHexadecimal(id);
+  }
+  
   /**
    * Create a codex from a file or a directory
    * @param codexName
@@ -137,7 +145,6 @@ public class Codex{
   static Codex fromPath(String codexName, String directory) throws IOException, NoSuchAlgorithmException {
     var rootPath = new File(directory);
     var fileInfo = new ArrayList<FileInfo>();
-    
     // get all files
     if(rootPath.isFile()){
       fileInfo.add(fileInfofromPath(rootPath.toPath()));
@@ -150,7 +157,6 @@ public class Codex{
       }
     }
     var id = computeId(codexName, fileInfo);
-    logger.info("Codex created with id: " + fingerprintAsString(id));
     return new Codex(id, codexName, fileInfo);
   }
   
@@ -194,18 +200,7 @@ public class Codex{
     return md.digest();
   }
   
-  /**
-   * Convert a fingerprint sha1 to a string
-   * @param fingerprint
-   * @return
-   */
-  public static String fingerprintAsString(byte[] fingerprint) {
-    StringBuilder sb = new StringBuilder();
-    for(byte b : fingerprint) {
-      sb.append(String.format("%02x", b));
-    }
-    return sb.toString();
-  }
+
   
   /**
    * Create a FileInfo from a file path

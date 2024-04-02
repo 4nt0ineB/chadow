@@ -1,17 +1,21 @@
 package fr.uge.chadow.client;
 
+import fr.uge.chadow.cli.CLIColor;
 import fr.uge.chadow.cli.InputReader;
-import fr.uge.chadow.cli.display.Display;
-import fr.uge.chadow.cli.display.View;
+import fr.uge.chadow.cli.display.*;
 import fr.uge.chadow.core.protocol.Message;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+import static fr.uge.chadow.cli.display.View.colorize;
 
 public class ClientConsoleController {
   public enum Mode {
@@ -23,23 +27,29 @@ public class ClientConsoleController {
     CODEX_DETAILS,     // :cdx:<fingerprint>
     CODEX_LIST,        // :mycdx
   }
+  //// app management
   private final static Logger logger = Logger.getLogger(ClientConsoleController.class.getName());
   private final Client client;
   private final InputReader inputReader;
+  private volatile boolean mustClose = false;
+  private final Object lock = new Object();
+  //// display management
   private final Display display;
+  private View currentView;
+  private Selector<?> currentSelector;
+  private MainView mainView;
+  private Mode mode;
+  // we can't have reentrant locks because this thread runs inputReader that call display
+  // that itself call this controller to get the messages and users.
+  // Plus we have incoming messages from client, so can have concurrent modifications on the lists
+  private int lines;
+  private int cols;
+  //// data management
   private final ArrayList<Message> publicMessages = new ArrayList<>();
   private final HashMap<String, List<Message>> privateMessages = new HashMap<>();
   private final SortedSet<String> users = new TreeSet<>();
   private final HashMap<String, Codex> codexes = new HashMap<>();
   private Codex selectedCodexForDetails;
-  private volatile boolean mustClose = false;
-  
-  // we can't have reentrant locks because this thread runs inputReader that call display
-  // that itself call this controller to get the messages and users.
-  // Plus we have incoming messages from client, so can have concurrent modifications on the lists
-  private final Object lock = new Object();
-  private int lines;
-  private int cols;
   
   public ClientConsoleController(Client client, int lines, int cols) {
     Objects.requireNonNull(client);
@@ -50,8 +60,11 @@ public class ClientConsoleController {
     this.lines = lines;
     this.cols = cols;
     AtomicBoolean viewCanRefresh = new AtomicBoolean(true);
+    mainView = new MainView(lines, cols, viewCanRefresh, this);
+    currentView = mainView;
     display = new Display(lines, cols, viewCanRefresh, this);
     inputReader = new InputReader(viewCanRefresh, this);
+    mode = Mode.CHAT_LIVE_REFRESH;
   }
   
   public List<Message> messages() {
@@ -65,6 +78,13 @@ public class ClientConsoleController {
       return codexes.values().stream().toList();
     }
   }
+  
+  public View currentView() {
+    synchronized (lock) {
+      return currentView;
+    }
+  }
+  
   
   public List<String> users() {
     synchronized (lock) {
@@ -95,7 +115,11 @@ public class ClientConsoleController {
     // thread that manages the display
     startDisplay();
     // for dev: fake messages
-    fillWithFakeData();
+    try {
+      fillWithFakeData();
+    } catch (NoSuchAlgorithmException e) {
+      throw new RuntimeException(e);
+    }
     client.subscribe(this::addMessage);
     // Thread that manages the user inputs
     try {
@@ -121,6 +145,10 @@ public class ClientConsoleController {
   
   public Codex currentCodex() {
     return selectedCodexForDetails;
+  }
+  
+  public String IdAsHexa() {
+    return View.bytesToHexadecimal(selectedCodexForDetails.id());
   }
   
   public void startClient() {
@@ -201,15 +229,32 @@ public class ClientConsoleController {
         yield true;
       }
       case ":c", ":chat" -> {
-        display.setMode(Mode.CHAT_LIVE_REFRESH);
+        mode = Mode.CHAT_LIVE_REFRESH;
+        mainView.setMode(mode);
+        currentView = mainView;
+        try {
+          drawDisplay();
+          logger.info(STR."Processing input: \{input} 2");
+        } catch (IOException e) {
+          logger.severe(STR."Error while drawing display.\{e.getMessage()}");
+          throw new UncheckedIOException(e);
+        }
         yield false;
+      }
+      case ":mycdx" -> {
+        mode = Mode.CODEX_LIST;
+        currentSelector = View.selectorFromList("My cdx", lines, cols, codexes(), View::codexShortDescription);
+        currentView = currentSelector;
+        yield true;
       }
       case ":exit" -> {
         exitNicely();
         yield false;
       }
       case ":h", ":help" -> {
-        display.setMode(Mode.HELP_SCROLLER);
+        currentView = helpView();
+        mode = Mode.HELP_SCROLLER;
+        currentView.scrollTop();
         yield true;
       }
       default -> processCommandInContext(input);
@@ -225,7 +270,9 @@ public class ClientConsoleController {
           }else {
             currentCodex().share();
           }
-          display.setMode(Mode.CODEX_DETAILS);
+          mode = Mode.CODEX_DETAILS;
+          currentView = codexView(currentCodex());
+          currentView.scrollTop();
         }
       }
       case ":download" -> {
@@ -235,7 +282,9 @@ public class ClientConsoleController {
           }else {
             currentCodex().download();
           }
-          display.setMode(Mode.CODEX_DETAILS);
+          mode = Mode.CODEX_DETAILS;
+          currentView = codexView(currentCodex());
+          currentView.scrollTop();
         }
       }
       default -> {
@@ -246,7 +295,7 @@ public class ClientConsoleController {
   }
   
   private boolean processCommandInContext(String input) {
-    return switch (display.getMode()) {
+    return switch (mode) {
       case CHAT_LIVE_REFRESH -> {
         try {
           yield processInputModeLiveRefresh(input);
@@ -263,27 +312,37 @@ public class ClientConsoleController {
   }
   
   private boolean processInputModeCodexList(String input) {
-    return switch(input) {
-      case  ":see" -> {
-        // select codex
-        yield true;
+    switch (input) {
+      case "y" -> currentSelector.selectorUp();
+      case "h" -> currentSelector.selectorDown();
+      case ":s", ":see" ->{
+        mode = Mode.CODEX_DETAILS;
+        selectedCodexForDetails = (Codex) currentSelector.get();
+        currentView = codexView(selectedCodexForDetails);
+        currentView.scrollTop();
+        logger.info(STR."see cdx: \{View.bytesToHexadecimal(selectedCodexForDetails.id())}");
       }
-      default -> false;
-    };
+      default -> {
+      }
+    }// select codex
+    return true;
   }
   
   private boolean processInputModeLiveRefresh(String input) throws InterruptedException {
     if (!input.startsWith(":") && !input.isBlank()) {
-      client.sendMessage(input);
       logger.info(STR."send message: \{input}");
+      client.sendMessage(input);
+      return false;
     }
     switch (input) {
       case ":u", ":users" -> {
-        display.setMode(Mode.USERS_SCROLLER);
+        logger.info("focusing users list");
+        mainView.setMode(Mode.USERS_SCROLLER);
         return true;
       }
       case ":m", ":msg" -> {
-        display.setMode(Mode.CHAT_SCROLLER);
+        logger.info("focusing messages list");
+        mainView.setMode(Mode.CHAT_SCROLLER);
         return true;
       }
     }
@@ -292,12 +351,12 @@ public class ClientConsoleController {
   
   private boolean processInputModeScroller(String input) {
     switch (input) {
-      case "e" -> display.scrollerPageUp();
-      case "s" -> display.scrollerPageDown();
-      case "t" -> display.scrollerTop();
-      case "b" -> display.scrollerBottom();
-      case "r" -> display.scrollerLineUp();
-      case "d" -> display.scrollerLineDown();
+      case "e" -> currentView.scrollPageUp();
+      case "s" -> currentView.scrollPageDown();
+      case "t" -> currentView.scrollTop();
+      case "b" -> currentView.scrollBottom();
+      case "r" -> currentView.scrollLineUp();
+      case "d" -> currentView.scrollLineDown();
     }
     return true;
   }
@@ -351,8 +410,11 @@ public class ClientConsoleController {
       logger.info(STR.":create \{path}\n");
       var codex = Codex.fromPath(codexName, path);
       selectedCodexForDetails = codex;
-      codexes.put(Codex.fingerprintAsString(codex.id()), codex);
-      display.setMode(Mode.CODEX_DETAILS);
+      codexes.put(codex.idToHexadecimal(), codex);
+      mode = Mode.CODEX_DETAILS;
+      currentView = codexView(codex);
+      currentView.scrollTop();
+      logger.info(STR."Codex created with id: \{codex.idToHexadecimal()}");
       return Optional.of(true);
     }
     return Optional.empty();
@@ -367,17 +429,20 @@ public class ClientConsoleController {
       var codex = codexes.get(fingerprint);
       if (codex == null) {
         logger.info("Codex not found");
+        // use a synchronous call to retrieve the codex (wait for the server response)
         // client.retrieveCodex(fingerprint);
         return Optional.of(false);
       }
       selectedCodexForDetails = codex;
-      display.setMode(Mode.CODEX_DETAILS);
+      mode = Mode.CODEX_DETAILS;
+      currentView = codexView(codex);
+      currentView.scrollTop();
       return Optional.of(true);
     }
     return Optional.empty();
   }
   
-  private void fillWithFakeData() {
+  private void fillWithFakeData() throws IOException, NoSuchAlgorithmException {
     var users = new String[]{"test", "Morpheus", "Trinity", "Neo", "Flynn", "Alan", "Lora", "Gandalf", "Bilbo", "SKIDROW", "Antoine"};
     this.users.addAll(Arrays.asList(users));
     var messages = new Message[]{
@@ -392,5 +457,118 @@ public class ClientConsoleController {
     };
     this.publicMessages.addAll(splashLogo());
     this.publicMessages.addAll(Arrays.asList(messages));
+    // test codex
+    var codex = Codex.fromPath("my codex", "/home/alan1/Pictures");
+    codexes.put(codex.idToHexadecimal(), codex);
+    codex = Codex.fromPath("my codex", "/home/alan1/Downloads/Great Teacher Onizuka (1999)/Great Teacher Onizuka - S01E01 - Lesson 1.mkv");
+    codexes.put(codex.idToHexadecimal(), codex);
+  }
+  
+  private Scrollable helpView() {
+    var txt = """
+        
+        ##  ┓┏  ┓
+        ##  ┣┫┏┓┃┏┓
+        ##  ┛┗┗━┗┣┛
+        ##       ┛
+        
+        'scrollable':
+          e - scroll one page up
+          s - scroll one page down
+          r - scroll one line up
+          d - scroll one line down
+          t - scroll to the top
+          b - scroll to the bottom
+          
+        'selectable' (is scrollable):
+          y - move selector up
+          h - move selector down
+          :s, :see - Select the item
+          
+        [GLOBAL COMMANDS]
+          :h, :help - Display this help (scrollable)
+          :c, :chat - Back to the [CHAT] in live reload
+          :w, :whisper <username> - Display the private discussion with the other user (TODO)
+          :d - Update and draw the display
+          :r <lines> <columns> - Resize the view
+          :new <codexName>, <path> - Create a codex from a file or directory
+          \tand display the details of new created [CODEX] info (mind the space between , and <path>)
+          
+          :mycdx - Display the list of your codex (selectable)
+          :cdx:<SHA-1> - Retrieves and display the [CODEX] info with the given SHA-1
+          \tif the codex is not present locally, the server will be interrogated        (TODO)
+          :exit - Exit the application                                                  (WIP)
+          
+        [CHAT]
+          when the live reload is disabled (indicated by the coloured input field)
+          any input not starting with ':' will be considered as a message to be sent
+          
+          :m, :msg - Focus on chat (scrollable)
+          :u, :users - Focus on the users list (scrollable)
+          
+        [CODEX]
+        (scrollable)
+        :share - Share/stop sharing the codex
+        :download - Download/stop downloading the codex
+        
+        """;
+    
+    return View.scrollableFromString("Help", lines, cols, txt);
+  }
+  
+  private Scrollable codexView(Codex codex) {
+    var sb = new StringBuilder();
+    
+    var splash = """
+        ## ┏┓   ┓
+        ## ┃ ┏┓┏┫┏┓┓┏
+        ## ┗┛┗┛┻┗┗━┛┗
+        
+        """;
+    sb.append(splash);
+    sb.append("cdx:")
+      .append(View.bytesToHexadecimal(codex.id()))
+      .append("\n");
+    if (codex.isComplete()) {
+      sb.append(CLIColor.BLUE)
+        .append("▓ Complete\n")
+        .append(CLIColor.RESET);
+    }
+    if (codex.isDownloading() || codex.isSharing()) {
+      sb.append(CLIColor.ITALIC)
+        .append(CLIColor.BOLD)
+        .append(CLIColor.ORANGE)
+        .append(codex.isDownloading() ? "▓ Downloading ..." : codex.isSharing() ? "▓ Sharing... " : "")
+        .append(CLIColor.RESET)
+        .append("\n\n");
+    }
+    
+    sb.append(colorize(CLIColor.BOLD, "Title: "))
+      .append(codex.name())
+      .append("\n");
+    var infoFiles = codex.files();
+    sb.append(colorize(CLIColor.BOLD, "Number of files:  "))
+      .append(codex.files()
+                   .size())
+      .append("\n");
+    sb.append(colorize(CLIColor.BOLD, "Total size:   "))
+      .append(View.bytesToHumanReadable(codex.totalSize()))
+      .append("\n\n");
+    sb.append(colorize(CLIColor.BOLD, "Files:  \n"));
+    infoFiles.stream()
+             .collect(Collectors.groupingBy(Codex.FileInfo::absolutePath))
+             .forEach((dir, files) -> {
+               sb.append(colorize(CLIColor.BOLD, STR."[\{dir}]\n"));
+               files.forEach(file -> sb.append("\t- ")
+                                       .append(CLIColor.BOLD)
+                                       .append("%10s".formatted(View.bytesToHumanReadable(file.length())))
+                                       .append("  ")
+                                       .append("%.2f%%".formatted(file.completionRate() * 100))
+                                       .append("  ")
+                                       .append(CLIColor.RESET)
+                                       .append(file.filename())
+                                       .append("\n"));
+             });
+    return View.scrollableFromString(STR."[Codex] \{codex.name()}", lines, cols, sb.toString());
   }
 }

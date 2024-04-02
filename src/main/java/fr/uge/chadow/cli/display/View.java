@@ -1,36 +1,40 @@
 package fr.uge.chadow.cli.display;
 
 import fr.uge.chadow.cli.CLIColor;
-import fr.uge.chadow.client.Client;
 import fr.uge.chadow.client.Codex;
 
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.Map;
+import java.util.function.Function;
 
 public interface View {
+  
   void setDimensions(int lines, int cols);
-  void draw();
+  void draw() throws IOException;
   void clear();
+  void scrollPageUp();
+  void scrollPageDown();
+  void scrollBottom();
+  void scrollTop();
+  void scrollLineDown();
+  void scrollLineUp();
   
   static void moveCursorToPosition(int x, int y) {
-    System.out.print("\033[" + y + ";" + x + "H");
+    System.out.print(STR."\033[\{y};\{x}H");
     System.out.flush();
   }
   
   static String thematicBreak(int columns) {
-    String sb = String.valueOf(CLIColor.CYAN) +
-        CLIColor.BOLD +
-        "—".repeat(columns) +
-        CLIColor.RESET +
-        "\n";
+    String sb = STR."\{String.valueOf(CLIColor.CYAN)}\{CLIColor.BOLD}\{"—".repeat(columns)}\{CLIColor.RESET}\n";
     return sb;
   }
   
   static String inviteCharacter() {
-    return CLIColor.BOLD  + "\u00BB ";
+    return STR."\{CLIColor.BOLD}\u00BB ";
   }
   
   /**
@@ -65,26 +69,12 @@ public interface View {
   }
   
   /**
-   * Create a scrollable view from a string
-   *
-   * @param title
-   * @param lines
-   * @param cols
-   * @param help
-   * @return
-   */
-  static ScrollableView scrollableViewFromString(String title, int lines, int cols, String help) {
-    var textLines = splitAndSanitize(help, cols);
-    return new ScrollableView(title, lines, cols, textLines);
-  }
-  
-  /**
    * Colorize codex (cdx:SHA-1) links present in string
    */
   static String beautifyCodexLink(String txt) {
     var sb = new StringBuilder();
     return txt.replaceAll("cdx:([a-fA-F0-9]{40})",
-        CLIColor.BOLD + "" + CLIColor.GREEN + "cdx:$1" + CLIColor.RESET);
+        STR."\{CLIColor.BOLD}\{CLIColor.GREEN}cdx:$1\{CLIColor.RESET}");
   }
   
   /**
@@ -143,7 +133,7 @@ public interface View {
   }
   
   static String colorize(CLIColor color, String txt) {
-    return (color + "%s" + CLIColor.RESET).formatted(txt);
+    return (STR."\{color}%s\{CLIColor.RESET}").formatted(txt);
   }
   
   /**
@@ -163,7 +153,7 @@ public interface View {
       throw new IllegalArgumentException("bytes must be positive");
     }
     if (bytes < 1024) {
-      return bytes + " B";
+      return STR."\{bytes} B";
     }
     if (bytes < 1024 * 1024) {
       return String.format("%.2f KB", (double) bytes / 1024);
@@ -180,4 +170,46 @@ public interface View {
     return "+inf (╯°□°)╯︵ ┻━┻";
   }
   
+  /**
+   * Convert a fingerprint sha1 to a hexadecimal formatted string
+   * @param bytes
+   * @return
+   */
+  static String bytesToHexadecimal(byte[] bytes) {
+    StringBuilder sb = new StringBuilder();
+    for(byte b : bytes) {
+      sb.append(String.format("%02x", b));
+    }
+    return sb.toString();
+  }
+  
+  /**
+   * Create a scrollable view from a string
+   *
+   * @param title
+   * @param lines
+   * @param cols
+   * @param help
+   * @return
+   */
+  static Scrollable scrollableFromString(String title, int lines, int cols, String help) {
+    var textLines = splitAndSanitize(help, cols);
+    return new Scrollable(title, lines, cols, textLines);
+  }
+  
+  static <T> Selector<T> selectorFromList(String title, int lines, int cols, List<T> list, Function<? super T, String> mapper) {
+    var linesByItem = new ArrayList<Map.Entry<T, List<String>>>();
+    var linesToDisplay = new ArrayList<String>();
+    for(var item : list){
+      var str = mapper.apply(item);
+      var formattedDescription = splitAndSanitize(str, cols);
+      linesToDisplay.addAll(formattedDescription);
+      linesByItem.add(Map.entry(item, formattedDescription));
+    }
+    return new Selector<>(title, lines, cols, linesByItem, new Scrollable(title, lines, cols, linesToDisplay), mapper);
+  }
+  
+  static String codexShortDescription(Codex cdx) {
+    return STR."\{cdx.name()} ─ \{cdx.files().size()} files \{bytesToHumanReadable(cdx.totalSize())}";
+  }
 }

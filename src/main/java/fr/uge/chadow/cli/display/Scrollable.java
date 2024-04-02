@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-public class ScrollableView implements View {
+public class Scrollable implements View {
   
   
   private final ArrayList<String> textLines;
@@ -15,7 +15,7 @@ public class ScrollableView implements View {
   private int lines;
   private int columns;
   
-  public ScrollableView(String title, int lines, int cols, List<String> textLines) {
+  public Scrollable(String title, int lines, int cols, List<String> textLines) {
     Objects.requireNonNull(title);
     Objects.requireNonNull(textLines);
     if (lines <= 0 || cols <= 0) {
@@ -39,11 +39,11 @@ public class ScrollableView implements View {
   
   @Override
   public void draw() {
-    System.out.print(chatHeader());
+    System.out.print(header());
     System.out.print(view());
   }
   
-  private String view() {
+  String view() {
     var sb = new StringBuilder();
     var lineIndex = 0;
     var maxLinesView = View.maxLinesView(lines);
@@ -65,10 +65,10 @@ public class ScrollableView implements View {
     View.moveCursorToPosition(1, 1); // Move cursor back to the top
   }
   
-  private String chatHeader() {
+  public String header() {
     var sb = new StringBuilder();
     var colsRemaining = columns;
-    var title = ("%-" + colsRemaining + "s").formatted("CHADOW CLIENT " + this.title);
+    var title = (STR."%-\{colsRemaining}s").formatted(STR."CHADOW CLIENT \{this.title}");
     sb.append(CLIColor.CYAN_BACKGROUND)
       .append(CLIColor.WHITE)
       .append("%s".formatted(title))
@@ -81,23 +81,35 @@ public class ScrollableView implements View {
     scroller.scrollPageUp();
   }
   
-  public void scrollUp(int lines) {
-    scroller.scrollUp(lines);
-  }
-  
-  public void scrollDown(int lines) {
-    scroller.scrollDown(lines);
-  }
-  
   public void moveToTop() {
     scroller.moveToTop();
   }
   
-  public void moveToBottom() {
+  public void scrollPageDown() {
+    scroller.scrollPageDown();
+  }
+  
+  @Override
+  public void scrollBottom() {
     scroller.moveToBottom();
   }
   
-  public void scrollPageDown() {
-    scroller.scrollPageDown();
+  @Override
+  public void scrollTop() {
+    scroller.moveToTop();
+  }
+  
+  @Override
+  public void scrollLineDown() {
+    scroller.scrollDown(1);
+  }
+  
+  @Override
+  public void scrollLineUp() {
+    scroller.scrollUp(1);
+  }
+  
+  public Scroller getScroller() {
+    return scroller;
   }
 }
