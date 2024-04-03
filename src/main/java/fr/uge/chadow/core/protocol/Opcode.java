@@ -1,7 +1,5 @@
 package fr.uge.chadow.core.protocol;
 
-import fr.uge.chadow.core.reader.Reader;
-
 public enum Opcode {
   ERROR,
   REGISTER,

@@ -171,7 +171,8 @@ encodé de la manière suivante :
         | (register) | username | 
         +-----------------------+
 
-    - le serveur accepte l'username et maintient la connexion
+    - le serveur accepte l'username et maintient la connexion :
+
         +------+
         | (ok) | 
         +------+

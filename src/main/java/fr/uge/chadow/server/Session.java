@@ -73,9 +73,8 @@ public class Session {
             logger.severe(STR."Error while processing opcode \{currentOpcode}");
             return;
           }
-          //server.broadcast(value);
           readers.get(currentOpcode).reset();
-          currentOpcode = null;
+          currentOpcode = null; // reset opcode
         }
         case REFILL -> {
           return;
@@ -142,7 +141,12 @@ public class Session {
       case REGISTER -> {
         var register = (Register) readers.get(currentOpcode).get();
         login = register.username();
+        server.addClient(login, sc);
         logger.info(STR."Client \{sc.getRemoteAddress()} has logged in as \{login}");
+      }
+      case YELL -> {
+        var message = (Message) readers.get(currentOpcode).get();
+        server.broadcast(message);
       }
       default -> {
         logger.warning(STR."No action for opcode \{currentOpcode}");
