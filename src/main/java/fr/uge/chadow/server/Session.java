@@ -25,7 +25,6 @@ public class Session {
   private final ByteBuffer bufferOut = ByteBuffer.allocate(BUFFER_SIZE);
   private final ByteBuffer processingMsg = ByteBuffer.allocate(2 * Integer.BYTES + 2 * BUFFER_SIZE);
   private final Map<Opcode, Reader<?>> readers = new HashMap<>();
-  private final MessageReader messageReader = new MessageReader();
   private final SelectionKey key;
   private final Server server;  // we could also have Context as an instance class, which would naturally
   // give access to ServerChatInt.this
@@ -42,6 +41,7 @@ public class Session {
     for (var opcode : Opcode.values()) {
       switch (opcode) {
         case REGISTER -> readers.put(opcode, new GlobalReader<>(Register.class));
+        case YELL -> readers.put(opcode, new GlobalReader<>(Message.class));
         default -> {
           logger.warning(STR."No reader for opcode \{opcode}");
           silentlyClose();
