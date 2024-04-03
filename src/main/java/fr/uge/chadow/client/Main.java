@@ -1,6 +1,6 @@
 package fr.uge.chadow.client;
 
-import fr.uge.chadow.server.ServerChaton;
+import fr.uge.chadow.server.Server;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -18,7 +18,7 @@ public class Main {
       usage();
       return;
     }
-    new ServerChaton(Integer.parseInt(args[1])).launch();
+    new Server(Integer.parseInt(args[1])).launch();
   }
   
   private static void client(String[] args) throws IOException, InterruptedException {

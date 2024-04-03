@@ -259,7 +259,7 @@ public class Client {
     private void doRead() throws IOException {
       if (sc.read(bufferIn) == -1) {
         closed = true;
-        logger.info("Client " + sc.getRemoteAddress() + " has closed the connection");
+        logger.info(STR."Client \{sc.getRemoteAddress()} has closed the connection");
       }
       processIn();
       updateInterestOps();

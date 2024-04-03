@@ -1,6 +1,9 @@
 package fr.uge.chadow.server;
 
 import fr.uge.chadow.core.protocol.Message;
+import fr.uge.chadow.core.protocol.Opcode;
+import fr.uge.chadow.core.protocol.Register;
+import fr.uge.chadow.core.reader.GlobalReader;
 import fr.uge.chadow.core.reader.MessageReader;
 import fr.uge.chadow.core.reader.Reader;
 
@@ -10,28 +13,41 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.logging.Logger;
 
 public class Session {
-  private static final Logger logger = Logger.getLogger(ServerChaton.class.getName());
+  private static final Logger logger = Logger.getLogger(Server.class.getName());
   private static final int BUFFER_SIZE = 1_024;
-  private final SelectionKey key;
-  private final SocketChannel sc;
+  private final ArrayDeque<Message> queue = new ArrayDeque<>();
   private final ByteBuffer bufferIn = ByteBuffer.allocate(BUFFER_SIZE);
   private final ByteBuffer bufferOut = ByteBuffer.allocate(BUFFER_SIZE);
   private final ByteBuffer processingMsg = ByteBuffer.allocate(2 * Integer.BYTES + 2 * BUFFER_SIZE);
-  private final ArrayDeque<Message> queue = new ArrayDeque<>();
-  private final ServerChaton server;  // we could also have Context as an instance class, which would naturally
-  // give access to ServerChatInt.this
-  private boolean closed = false;
+  private final Map<Opcode, Reader<?>> readers = new HashMap<>();
   private final MessageReader messageReader = new MessageReader();
-
+  private final SelectionKey key;
+  private final Server server;  // we could also have Context as an instance class, which would naturally
+  // give access to ServerChatInt.this
+  private final SocketChannel sc;
+  private boolean closed = false;
   private String login;
+  private Opcode currentOpcode;
 
-  Session(ServerChaton server, SelectionKey key) {
+  Session(Server server, SelectionKey key) {
     this.key = key;
     this.sc = (SocketChannel) key.channel();
     this.server = server;
+
+    for (var opcode : Opcode.values()) {
+      switch (opcode) {
+        case REGISTER -> readers.put(opcode, new GlobalReader<>(Register.class));
+        default -> {
+          logger.warning(STR."No reader for opcode \{opcode}");
+          silentlyClose();
+        }
+      }
+    }
   }
 
   /**
@@ -42,28 +58,102 @@ public class Session {
    */
   private void processIn() {
     for (; ; ) {
-      Reader.ProcessStatus status = Reader.ProcessStatus.ERROR;
-      if (!isAuthenticated()) {
-        // si c pas un opcode register on ferme la connexion
-        status = messageReader.process(bufferIn);
-      } else {
-        // to get it work for now
-        status = messageReader.process(bufferIn);
+      if (!validateClientOperation()) {
+        silentlyClose();
+        return;
       }
+
+      Reader.ProcessStatus status = readers.get(currentOpcode).process(bufferIn);
+
       switch (status) {
-        case DONE:
-          var value = messageReader.get();
-          server.broadcast(value);
-          System.err.println(value);
-          messageReader.reset();
-          break;
-        case REFILL:
+        case DONE -> {
+          try {
+            processCurrentOpcodeAction();
+          } catch (IOException e) {
+            logger.severe(STR."Error while processing opcode \{currentOpcode}");
+            return;
+          }
+          //server.broadcast(value);
+          readers.get(currentOpcode).reset();
+          currentOpcode = null;
+        }
+        case REFILL -> {
           return;
-        case ERROR:
+        }
+        case ERROR -> {
           silentlyClose();
           return;
+        }
       }
     }
+  }
+
+  /**
+   * Validates the current opcode and checks if the client is authenticated.
+   * If the current opcode has already been determined to be valid and the client is authenticated,
+   * returns true.
+   * Otherwise, reads the opcode from the input buffer, validates it, and checks if authentication is required.
+   *
+   * @return true if the current opcode is valid and, if required, the client is authenticated, otherwise false.
+   */
+  private boolean validateClientOperation() {
+    if (currentOpcode != null) {
+      return true;
+    }
+
+    bufferIn.flip();
+    if (bufferIn.remaining() < Byte.BYTES) {
+      logger.warning("Not enough bytes for opcode");
+      bufferIn.compact();
+      return false;
+    }
+
+    var byteOpCode = bufferIn.get();
+    bufferIn.compact();
+
+    try {
+      currentOpcode = Opcode.from(byteOpCode);
+    } catch (IllegalArgumentException e) {
+      logger.warning("Invalid opcode");
+      return false;
+    }
+
+    if (Opcode.REGISTER != currentOpcode && !isAuthenticated()) {
+      logger.warning("Client not authenticated");
+      return false;
+    }
+
+    if (Opcode.REGISTER == currentOpcode && isAuthenticated()) {
+      logger.warning("Client already authenticated");
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Processes the current opcode received from the client and performs the corresponding action.
+   * The action performed depends on the value of the current opcode.
+   *
+   * @throws IOException if an I/O error occurs while processing the opcode.
+   */
+  private void processCurrentOpcodeAction() throws IOException {
+    switch (currentOpcode) {
+      case REGISTER -> {
+        var register = (Register) readers.get(currentOpcode).get();
+        login = register.username();
+        logger.info(STR."Client \{sc.getRemoteAddress()} has logged in as \{login}");
+      }
+      default -> {
+        logger.warning(STR."No action for opcode \{currentOpcode}");
+        silentlyClose();
+      }
+    }
+  }
+
+
+  private boolean isAuthenticated() {
+    return login != null;
   }
 
   /**
@@ -132,10 +222,6 @@ public class Session {
     }
   }
 
-  public boolean isAuthenticated() {
-    return login != null;
-  }
-
   /**
    * Performs the read action on sc
    * <p>
@@ -163,10 +249,9 @@ public class Session {
    */
 
   void doWrite() throws IOException {
-    bufferOut.flip();
-    sc.write(bufferOut);
+    sc.write(bufferOut.flip());
     bufferOut.compact();
-    processIn();
+    processOut();
     updateInterestOps();
   }
 
