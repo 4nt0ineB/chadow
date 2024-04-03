@@ -93,7 +93,7 @@ public class Client {
     Objects.requireNonNull(subscriber);
     uniqueContext.messageConsumer = subscriber;
   }
-  
+
   public void launch() throws IOException {
     sc.configureBlocking(false);
     var key = sc.register(selector, SelectionKey.OP_CONNECT);
@@ -170,7 +170,7 @@ public class Client {
             }else {
               messageConsumer.accept(msg);
               messageReader.reset();
-              
+
             }
             break;
           case REFILL:
@@ -259,7 +259,7 @@ public class Client {
     private void doRead() throws IOException {
       if (sc.read(bufferIn) == -1) {
         closed = true;
-        logger.info("Client " + sc.getRemoteAddress() + " has closed the connection");
+        logger.info(STR."Client \{sc.getRemoteAddress()} has closed the connection");
       }
       processIn();
       updateInterestOps();

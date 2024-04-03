@@ -7,8 +7,8 @@ import java.util.Random;
  * Provides ANSI colors
  */
 public enum CLIColor {
- 
-  
+
+
   ITALIC("\u001B[3m"),
   BOLD("\u001B[1m"),
   RESET("\u001B[0m"),
@@ -34,45 +34,47 @@ public enum CLIColor {
   WHITE_BACKGROUND("\u001B[47m"),
   CLEAR("\033[H\033[2J"),
   CLEAR_LINE("\033[2K");
-  
+
   private final String str;
-  
+
   CLIColor(String str) {
-      this.str = str;
+    this.str = str;
   }
-  
+
   @Override
   public String toString() {
-      return str;
+    return str;
   }
-  
+
   /**
-   * Make a 8-bit color ANSI escape sequence for 
+   * Make a 8-bit color ANSI escape sequence for
    * given rgb values
+   *
    * @param r red
-   * @param g green 
+   * @param g green
    * @param b blue
    * @return an ansi escape sequence
    */
   public static String rgb(int r, int g, int b) {
-    return "\033[38;2;"+ (r & 0xFF) +";"+ (g & 0xFF) +";"+ (b & 0xFF) +"m";
+    return "\033[38;2;" + (r & 0xFF) + ";" + (g & 0xFF) + ";" + (b & 0xFF) + "m";
   }
-  
+
   /**
    * Generate a fancy random ansi color
    * based on the hashcode of a string
+   *
    * @param input
    * @return
    */
   public static String stringToColor(String input) {
     Objects.requireNonNull(input);
-    if(input.isEmpty()) return "";
+    if (input.isEmpty()) return "";
     int hash = input.hashCode();
     Random random = new Random(hash);
     int r = random.nextInt(146) + 110;
     int g = random.nextInt(100) + 110;
     int b = random.nextInt(100) + 110;
-    return rgb(r,g,b);
+    return rgb(r, g, b);
   }
-  
+
 }
