@@ -115,6 +115,10 @@ public class Server {
     return true;
   }
 
+  public void removeClient(String login) {
+    clients.remove(login);
+  }
+
   public static void main(String[] args) {
     if (args.length != 1) {
       usage();
