@@ -1,6 +1,7 @@
 package fr.uge.chadow.server;
 
 import fr.uge.chadow.core.protocol.*;
+import fr.uge.chadow.core.reader.ByteReader;
 import fr.uge.chadow.core.reader.GlobalReader;
 import fr.uge.chadow.core.reader.Reader;
 
@@ -20,6 +21,7 @@ public class Session {
   private final ArrayDeque<Frame> queue = new ArrayDeque<>();
   private final ByteBuffer bufferIn = ByteBuffer.allocate(BUFFER_SIZE);
   private final ByteBuffer bufferOut = ByteBuffer.allocate(BUFFER_SIZE);
+  private final ByteReader byteReader = new ByteReader();
   private final Map<Opcode, Reader<?>> readers = new HashMap<>();
   private final SelectionKey key;
   private final Server server;  // we could also have Context as an instance class, which would naturally give access
@@ -42,7 +44,7 @@ public class Session {
         case YELL -> readers.put(opcode, new GlobalReader<>(YellMessage.class));
         case WHISPER -> readers.put(opcode, new GlobalReader<>(WhisperMessage.class));
         default -> {
-          logger.warning(STR."No reader for opcode \{opcode}");
+          //logger.warning(STR."No reader for opcode \{opcode}");
           //silentlyClose();
         }
       }
@@ -57,9 +59,33 @@ public class Session {
    */
   private void processIn() {
     for (; ; ) {
-      if (!validateClientOperation()) {
-        silentlyClose();
-        return;
+      if (currentOpcode == null) {
+        Reader.ProcessStatus opcodeStatus = byteReader.process(bufferIn);
+        switch (opcodeStatus) {
+          case DONE -> {
+            currentOpcode = Opcode.from(byteReader.get());
+            byteReader.reset();
+
+            if (Opcode.REGISTER != currentOpcode && !isAuthenticated()) {
+              logger.warning("Client not authenticated");
+              silentlyClose();
+              return;
+            }
+
+            if (Opcode.REGISTER == currentOpcode && isAuthenticated()) {
+              logger.warning("Client already authenticated");
+              silentlyClose();
+              return;
+            }
+          }
+          case REFILL -> {
+            return;
+          }
+          case ERROR -> {
+            silentlyClose();
+            return;
+          }
+        }
       }
 
       Reader.ProcessStatus status = readers.get(currentOpcode).process(bufferIn);
@@ -73,9 +99,7 @@ public class Session {
             return;
           }
           readers.get(currentOpcode).reset();
-          //logger.info(STR."1) Processed opcode \{currentOpcode}");
           currentOpcode = null; // reset opcode
-          //logger.info(STR."2) Processed opcode \{currentOpcode}");
         }
         case REFILL -> {
           return;
@@ -86,55 +110,6 @@ public class Session {
         }
       }
     }
-  }
-
-  /**
-   * Validates the current opcode and checks if the client is authenticated.
-   * If the current opcode has already been determined to be valid and the client is authenticated,
-   * returns true.
-   * Otherwise, reads the opcode from the input buffer, validates it, and checks if authentication is required.
-   *
-   * @return true if the current opcode is valid and, if required, the client is authenticated, otherwise false.
-   */
-  private boolean validateClientOperation() {
-    System.out.println("validateClientOperation");
-    System.out.println("currentOpcode: " + currentOpcode);
-    System.out.println("bufferIn: " + bufferIn);
-    if (currentOpcode != null) {
-      return true;
-    }
-
-    bufferIn.flip();
-    System.out.println("bufferIn: " + bufferIn);
-    if (bufferIn.remaining() < Byte.BYTES) {
-      logger.warning("Not enough bytes for opcode");
-      bufferIn.compact();
-      return false;
-    }
-
-    var byteOpCode = bufferIn.get();
-    bufferIn.compact();
-
-    try {
-      currentOpcode = Opcode.from(byteOpCode);
-    } catch (IllegalArgumentException e) {
-      logger.warning("Invalid opcode");
-      return false;
-    }
-
-    if (Opcode.REGISTER != currentOpcode && !isAuthenticated()) {
-      logger.warning("Client not authenticated");
-      return false;
-    }
-    
-    if (Opcode.REGISTER == currentOpcode && isAuthenticated()) {
-      logger.warning("Client already authenticated");
-      return false;
-    }
-
-    System.out.println("FINAL opcode: " + currentOpcode);
-
-    return true;
   }
 
   /**
@@ -154,8 +129,8 @@ public class Session {
           return;
         }
         logger.info(STR."Client \{sc.getRemoteAddress()} has logged in as \{login}");
-        
-        // Send OK message to client
+
+        // Send an OK message to the client
         queueFrame(new OK());
       }
       case YELL -> {
@@ -189,6 +164,7 @@ public class Session {
   public void queueFrame(Frame frame) {
     queue.addFirst(frame);
     processOut();
+    System.out.println("queueFrame : Update interest ops");
     updateInterestOps();
   }
 
@@ -196,10 +172,16 @@ public class Session {
    * Try to fill bufferOut from the message queue
    */
   private void processOut() {
+    System.out.println("processOut");
+    System.out.println("bufferOut: " + bufferOut);
+    System.out.println("queue: " + queue);
+    System.out.println("processingFrame: " + processingFrame);
     if (processingFrame == null && !queue.isEmpty()) {
       while (!queue.isEmpty()) {
         processingFrame = queue.pollLast().toByteBuffer();
         processingFrame.flip();
+        System.out.println("processingFrame: " + processingFrame);
+        System.out.println("bufferOut remaning: " + bufferOut.remaining());
         if (processingFrame.remaining() <= bufferOut.remaining()) {
           // If enough space in bufferOut, add the frame
           bufferOut.put(processingFrame);
@@ -232,7 +214,8 @@ public class Session {
       // If the current frame does not contain any data, reset processingFrame to null
       processingFrame = null;
     }
-    updateInterestOps();
+
+    System.out.println("bufferOut: " + bufferOut);
   }
 
   /**
@@ -248,10 +231,11 @@ public class Session {
     int ops = 0;
     if (bufferIn.hasRemaining() && !closed) {
       System.out.println("JE READ");
+      System.out.println("bufferIn: " + bufferIn);
       ops |= SelectionKey.OP_READ;
     }
     if (bufferOut.position() > 0) {
-        System.out.println("JE WRITE");
+      System.out.println("JE WRITE");
       ops |= SelectionKey.OP_WRITE;
     }
     if (ops != 0) {
@@ -265,6 +249,7 @@ public class Session {
     try {
       sc.close();
       server.removeClient(login);
+      closed = true;
     } catch (IOException e) {
       // ignore exception
     }
@@ -283,7 +268,9 @@ public class Session {
       closed = true;
       logger.info(STR."Client \{sc.getRemoteAddress()} has closed the connection");
     }
+    System.out.println("Le client " + sc.getRemoteAddress() + " a envoyé: " + bufferIn);
     processIn();
+    System.out.println("doRead : Update interest ops");
     updateInterestOps();
   }
 
@@ -300,6 +287,7 @@ public class Session {
     sc.write(bufferOut.flip());
     bufferOut.compact();
     processOut();
+    System.out.println("doWrite : Update interest ops");
     updateInterestOps();
   }
 

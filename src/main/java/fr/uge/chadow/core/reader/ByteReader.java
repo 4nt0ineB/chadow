@@ -2,47 +2,44 @@ package fr.uge.chadow.core.reader;
 
 import java.nio.ByteBuffer;
 
-public class IntReader implements Reader<Integer> {
-
+public class ByteReader implements Reader<Byte> {
   private enum State {
     DONE, WAITING, ERROR
   }
 
-  ;
-
   private State state = State.WAITING;
-  private final ByteBuffer internalBuffer = ByteBuffer.allocate(Integer.BYTES); // write-mode
-  private int value;
+  private final ByteBuffer internalBuffer = ByteBuffer.allocate(Byte.BYTES); // write-mode
+  private byte value;
 
   @Override
-  public ProcessStatus process(ByteBuffer buffer) {
+  public ProcessStatus process(ByteBuffer bb) {
     if (state == State.DONE || state == State.ERROR) {
       throw new IllegalStateException();
     }
-    buffer.flip();
+    bb.flip();
     try {
-      if (buffer.remaining() <= internalBuffer.remaining()) {
-        internalBuffer.put(buffer);
+      if (bb.remaining() <= internalBuffer.remaining()) {
+        internalBuffer.put(bb);
       } else {
-        var oldLimit = buffer.limit();
-        buffer.limit(internalBuffer.remaining());
-        internalBuffer.put(buffer);
-        buffer.limit(oldLimit);
+        var oldLimit = bb.limit();
+        bb.limit(internalBuffer.remaining());
+        internalBuffer.put(bb);
+        bb.limit(oldLimit);
       }
     } finally {
-      buffer.compact();
+      bb.compact();
     }
     if (internalBuffer.hasRemaining()) {
       return ProcessStatus.REFILL;
     }
     state = State.DONE;
     internalBuffer.flip();
-    value = internalBuffer.getInt();
+    value = internalBuffer.get();
     return ProcessStatus.DONE;
   }
 
   @Override
-  public Integer get() {
+  public Byte get() {
     if (state != State.DONE) {
       throw new IllegalStateException();
     }
