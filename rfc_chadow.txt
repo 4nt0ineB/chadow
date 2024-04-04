@@ -98,23 +98,25 @@ SOMMAIRE
   +-----------------------+-----------------------+
   | 6  | propose          | 7  | request          |
   +-----------------------+-----------------------+
-  | 8  | announce         | 9  | search           |
+  | 8  | announce         | 9  | update           |
   +-----------------------+-----------------------+
   | 10 | request          | 11 | handshake        |
   +-----------------------+-----------------------+
-  | 18 | needchunk        | 19 | cancel           |
+  | 12 | keepalive        | 13 | choke            |
   +-----------------------+-----------------------+
-  | 20 | herechunk        | 21 | denied           |
+  | 14 | unchoke          | 15 | interested       |
   +-----------------------+-----------------------+
-  | 22 | proxy            | 23 | proxyopen        |
+  | 16 | notinterested    | 17 | have             |
   +-----------------------+-----------------------+
-  | 24 | proxyok          | 24 | hidden           |
+  | 18 | needblock        | 19 | cancel           |
   +-----------------------+-----------------------+
-  | 26 | sharing          | 27 |  stopsharing     |
+  | 20 | herechunk        | 21 | newchunk         |
   +-----------------------+-----------------------+
-  | 28 | ok               |                       |
+  | 22 | proxyopen        | 23 | anonymize        | 
   +-----------------------+-----------------------+
-
+  | 24 | disconnect       | 24 | ok               |
+  +-----------------------+-----------------------+
+                                                                
   - un int représente 4 octets
   - un long représente 8 octets
   - une string est toujours précédée par sa taille en int (4 octets) 
@@ -166,6 +168,12 @@ encodé de la manière suivante :
   disponible ou non :
     - Si le nom d'utilisateur est disponible, le serveur envoie une 
     validation au client :
+
+        +-----------------------+
+        | (register) | username | 
+        +-----------------------+
+
+    - le serveur accepte l'username et maintient la connexion
 
         +------+
         | (ok) | 
@@ -225,14 +233,13 @@ encodé de la manière suivante :
 
   Le client envoie une trame de publication de message global.
 
-  +-------------------------------------------------------------+
-  | (yell) | username_sender | creation_date | message (string) |
-  +-------------------------------------------------------------+
+    +-------------------------------------------------------------+
+    | (yell) | username_sender | creation_date | message (string) |
+    +-------------------------------------------------------------+
 
   Le serveur retransmet la même trame à tous les clients même le 
   client d'origine, avec la date de réception du message
-  et l'username de l'envoyeur. La taille du message ne doit pas
-  dépasser 1024 octets.
+  et l'username de l'envoyeur.
 
 4.4 Echange de messages entre utilisateurs
 
@@ -240,7 +247,7 @@ encodé de la manière suivante :
   à un username spécifique. 
 
   +------------------------------------------------------------------+
-  | (whisper) | username_receiver | message (string) | creation_date |
+  | (whisper) | username_receiver | creation_date | message (string) |
   +------------------------------------------------------------------+
 
   - message: le message à envoyer qui ne pourra pas dépasser 1024 octets.  
@@ -249,7 +256,7 @@ encodé de la manière suivante :
   ("username_receiver") :
 
   +----------------------------------------------------------------+
-  | (whisper) | username_sender | message (string) | creation_date |
+  | (whisper) | username_sender | creation_date | message (string) |
   +----------------------------------------------------------------+
 
 
@@ -373,90 +380,81 @@ encodé de la manière suivante :
 
 
 7. Téléchargement des fichiers du codex
-8.1 Demande de téléchargement
+7.1 Demande de téléchargement
 
-  +-------------------------------------+
-  | (announce) | codex_id | parameters |
-  +-------------------------------------+
+  Lorsque le client souhaite télécharger un codex, il peut spécifier 
+  s'il souhaite télécharger en mode ouvert ou en mode fermé, en 
+  fonction de ses besoins de confidentialité et de partage.
 
-  +------------------------+
-  | (sharing) | codex_id   |
-  +------------------------+
-stopsharing
+  Le client envoie une trame de demande de téléchargement au serveur 
+  avec les informations suivantes :
 
+  +---------------------------------------------+
+  | (request_download) | codex_id | mode (byte) |
+  +---------------------------------------------+
 
+  - codex_id : Le hachage (SHA1) du codex à télécharger.
+  - mode : Un byte indiquant le mode de téléchargement :
+    - 0 pour le mode ouvert.
+    - 1 pour le mode fermé.
 
-  +------------------------+
-  | (sharing) | codex_id   |
-  +------------------------+
+  Le serveur répond ensuite avec une trame contenant les informations 
+  nécessaires pour effectuer le téléchargement :
 
+  +-----------------------------------------------------+
+  | (request_download) | mode | sharers_count | sockets |
+  +-----------------------------------------------------+
 
-  codex_id: (SHA1) hash du dictionnaire de données associé au partage
-  paramètres: une liste comprenant :
-    event: (byte)
-      - 0 : indique que le client est en train de télécharger le 
-            codex.
-      - 1 : signifie que le client a cessé de partager le codex.
-      - 2 : indique que le client a complètement téléchargé le codex.
-      Ce paramètre spécifie l'état actuel du codex.
-    privacy: (byte)
-      - 0 : signifie que le partage est en mode caché.
-      - 1 : indique que le partage est en mode ouvert.
-      Ce paramètre détermine la visibilité du partage.
-    sharers: 
-      (int) le nombre de sharers que le client souhaite recevoir 
-      du serveur pour garantir le téléchargement du codex.
+  - mode : Le mode de téléchargement, en l'occurence 0 pour 
+           le mode ouvert (byte).
+  - sharers_count : Le nombre de sharers actifs disponibles pour le 
+                    téléchargement (int).
+  - sockets : Une liste de sockets (définie dans la section "Encodage") 
+              permettant d'établir la connexion avec chaque sharer 
+              actif.
 
-  Le serveur répond avec une trame pour répondre à la requête :
+  Si le téléchargement est en mode fermé, le serveur revoie cette 
+  trame:
 
-  +------------------------------------------------------------+
-  | (announce) | codex_id | seeders | wait | sharers | proxies |
-  +------------------------------------------------------------+
+  +-----------------------------------------------------------------------------------------+
+  | (request_download) | mode | proxies_count | socket | chain_id | socket | chain_id | ... |
+  +-----------------------------------------------------------------------------------------+
 
-  seeders: le nombre de sharers ayant les codex complet (int)
-  wait: l'intervalle minimum que le client doit attendre avant de
-        refaire une annonce (int)
-  sharers: une liste de sharers actifs au partage du codex, chaque
-           sharer étant représenté par une série de 6 octets 
-           d'informations:
-
-    +-------------------------+
-    | sharers_count | sockets |
-    +-------------------------+
-
-    - sharers_count: le nombre de sharers actifs (int)
-    - sockets: une liste de socket (défini dans la section "Encodage")
-               pour chaque sharer actif.
-
-  proxies: présent lorsque le client télécharge en mode fermé. 
-    Liste des clients disponibles pour agir en tant que proxy :
-
-    +-------------------------------------------------------------+
-    | proxies_count | socket | chain_id | socket | chain_id | ... |
-    +-------------------------------------------------------------+
-
-    - proxies_count: le nombre de clients disponibles pour agir en tant 
-                     que proxy (int)
-    - une list de socket/chain_id:
-      - socket (défini dans la section "Encodage") du premier maillon de 
-      chainage de proxys.
-      - chain_id: l'id associé avec le téléchargement et le chaînage 
-        (pour le routage)
+  - mode: Le mode de téléchargement, en l'occurence 1 pour 
+          le mode fermé (byte).
+  - proxies_count: Le nombre de clients disponibles pour agir en tant 
+                   que proxy (int).
+  - Une list de socket/chain_id:
+    - socket : Le socket (défini dans la section "Encodage") du premier 
+               maillon de la chaîne de proxies.
+    - chain_id: L'identifiant associé au téléchargement et au 
+                chaînage (pour le routage).
                
-
-
   En cas d'erreur, le serveur répond avec la trame suivante : 
 
   +----------------------------------+
   | (error) | error_message (string) |
   +----------------------------------+
 
-  error_message: message human-readable
+  - error_message : message human-readable.
   Le client pourra alors renvoyer une annonce
 
 7.2 Mise à jour des informations
 
-trame qui informe
+  Une fois qu'un client a terminé le téléchargement d'un codex, il 
+  informe le serveur de cette mise à jour. Cette action permet au 
+  serveur de maintenir à jour les données concernant l'état des 
+  téléchargements ainsi que les associations entre les clients et les 
+  codex qu'ils possèdent.
+
+  Le client envoie une trame de mise à jour au serveur pour indiquer la fin du téléchargement du codex spécifié.
+
+  +---------------------+
+  | (update) | codex_id | 
+  +---------------------+
+
+  - codex_id : Le hachage (SHA1) du codex qui a été téléchargé.
+
 
 8.2 Mode ouvert
 
