@@ -429,6 +429,7 @@ public class Client {
      */
     
     private void doWrite() throws IOException {
+      logger.info("JE WRITE");
       bufferOut.flip();
       sc.write(bufferOut);
       bufferOut.compact();

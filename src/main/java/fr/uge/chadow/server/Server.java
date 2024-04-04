@@ -118,7 +118,7 @@ public class Server {
 
   public void removeClient(String login) {
     logger.info(STR."Client \{login} has disconnected");
-    clients.remove(login);
+    //clients.remove(login);
   }
 
   public static void main(String[] args) {

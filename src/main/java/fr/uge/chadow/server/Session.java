@@ -58,7 +58,7 @@ public class Session {
   private void processIn() {
     for (; ; ) {
       if (!validateClientOperation()) {
-        //silentlyClose();
+        silentlyClose();
         return;
       }
 
@@ -97,11 +97,15 @@ public class Session {
    * @return true if the current opcode is valid and, if required, the client is authenticated, otherwise false.
    */
   private boolean validateClientOperation() {
+    System.out.println("validateClientOperation");
+    System.out.println("currentOpcode: " + currentOpcode);
+    System.out.println("bufferIn: " + bufferIn);
     if (currentOpcode != null) {
       return true;
     }
 
     bufferIn.flip();
+    System.out.println("bufferIn: " + bufferIn);
     if (bufferIn.remaining() < Byte.BYTES) {
       logger.warning("Not enough bytes for opcode");
       bufferIn.compact();
@@ -122,13 +126,13 @@ public class Session {
       logger.warning("Client not authenticated");
       return false;
     }
-  
-    logger.info(STR."Received opcode \{currentOpcode}");
     
     if (Opcode.REGISTER == currentOpcode && isAuthenticated()) {
       logger.warning("Client already authenticated");
       return false;
     }
+
+    System.out.println("FINAL opcode: " + currentOpcode);
 
     return true;
   }
@@ -243,9 +247,11 @@ public class Session {
   private void updateInterestOps() {
     int ops = 0;
     if (bufferIn.hasRemaining() && !closed) {
+      System.out.println("JE READ");
       ops |= SelectionKey.OP_READ;
     }
     if (bufferOut.position() > 0) {
+        System.out.println("JE WRITE");
       ops |= SelectionKey.OP_WRITE;
     }
     if (ops != 0) {
