@@ -38,6 +38,7 @@ public class Client {
   private final ArrayList<Message> publicMessages = new ArrayList<>();
   private final HashMap<String, List<Message>> privateMessages = new HashMap<>();
   private final SortedSet<String> users = new TreeSet<>();
+  private final ReentrantLock lock = new ReentrantLock();
   
   
   public Client(String login, InetSocketAddress serverAddress) throws IOException {
@@ -46,7 +47,7 @@ public class Client {
     this.sc = SocketChannel.open();
     this.selector = Selector.open();
   }
-
+  
   public static void main(String[] args) throws NumberFormatException, IOException {
     if (args.length != 3) {
       usage();
@@ -119,24 +120,17 @@ public class Client {
   }
   
   
-    ////////////// CLIENT API //////////////////////////
-   /// API to interact on session with the server /////
+  ////////////// CLIENT API //////////////////////////
+  /// API to interact on session with the server /////
   ////////////////////////////////////////////////////
   
   public List<Message> getPublicMessages() {
-    return Collections.unmodifiableList(publicMessages);
-  }
-  
-  /**
-   * Add a codex to the client
-   * @param codex
-   * @throws IllegalArgumentException if the codex already exists
-   */
-  public void addCodex(Codex codex) {
-    if(codexes.containsKey(codex.name())) {
-      throw new IllegalArgumentException("Codex already exists");
+    lock.lock();
+    try {
+      return Collections.unmodifiableList(publicMessages);
+    } finally {
+      lock.unlock();
     }
-    codexes.put(codex.idToHexadecimal(), codex);
   }
   
   /**
@@ -149,6 +143,38 @@ public class Client {
     commandsQueue.put(msg);
     selector.wakeup();
   }
+  
+  
+  public List<String> getUsers() {
+    lock.lock();
+    try {
+      return Collections.unmodifiableList(new ArrayList<>(users));
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  /**
+   * Add a codex to the client
+   *
+   * @param codex
+   * @throws IllegalArgumentException if the codex already exists
+   */
+  public void addCodex(Codex codex) {
+    if (codexes.containsKey(codex.name())) {
+      throw new IllegalArgumentException("Codex already exists");
+    }
+    codexes.put(codex.idToHexadecimal(), codex);
+  }
+  
+  public List<Codex> codexes() {
+    return new ArrayList<>(codexes.values());
+  }
+  
+  public Optional<Codex> getCodex(String id) {
+    return Optional.ofNullable(codexes.get(id));
+  }
+ 
   
   private void silentlyClose(SelectionKey key) {
     Channel sc = key.channel();
@@ -168,14 +194,18 @@ public class Client {
     return clientContext.isConnected;
   }
   
-  public List<Codex> codexes() {
-    return new ArrayList<>(codexes.values());
+  /////////// For the session only
+  
+  private void addMessage(Message msg) {
+    lock.lock();
+    try {
+      publicMessages.add(msg);
+    } finally {
+      lock.unlock();
+    }
   }
   
-  public Optional<Codex> getCodex(String id) {
-    return Optional.ofNullable(codexes.get(id));
-  }
-  
+
   private class Context {
     private final SelectionKey key;
     private final SocketChannel sc;
@@ -213,11 +243,12 @@ public class Client {
      * and after the call
      */
     private void processIn() {
-      for (;;) {
-        if(!validateClientOperation()){
+      for (; ; ) {
+        if (!validateClientOperation()) {
           return;
         }
-        Reader.ProcessStatus status = readers.get(currentOpcode).process(bufferIn);
+        Reader.ProcessStatus status = readers.get(currentOpcode)
+                                             .process(bufferIn);
         switch (status) {
           case DONE:
             try {
@@ -226,7 +257,8 @@ public class Client {
               logger.severe(STR."Error while processing opcode \{currentOpcode}");
               return;
             }
-            readers.get(currentOpcode).reset();
+            readers.get(currentOpcode)
+                   .reset();
             currentOpcode = null;
             break;
           case REFILL:
@@ -281,8 +313,9 @@ public class Client {
       switch (currentOpcode) {
         case OK -> isConnected = true;
         case YELL -> {
-          var message = (Message) readers.get(currentOpcode).get();
-          publicMessages.add(message);
+          var message = (Message) readers.get(currentOpcode)
+                                         .get();
+          addMessage(message);
         }
         default -> {
           logger.warning(STR."No action for opcode \{currentOpcode}");
@@ -304,23 +337,35 @@ public class Client {
      * Try to fill bufferOut from the message queue
      */
     private void processOut() {
-      
-      if(processingFrame == null && !queue.isEmpty()){
-        processingFrame = queue.pollLast().toByteBuffer();
-      } else if(processingFrame == null) {
+      if (processingFrame == null && !queue.isEmpty()) {
+        while (!queue.isEmpty()) {
+          processingFrame = queue.pollLast()
+                                 .toByteBuffer();
+          processingFrame.flip();
+          if (processingFrame.remaining() <= bufferOut.remaining()) { // tant que place on met dedans
+            bufferOut.put(processingFrame);
+          } else { // plus de place
+            processingFrame.compact();
+            break;
+          }
+        }
+      } else if (processingFrame == null) {
         return;
       }
-      
+      // mode frame trop longue
       processingFrame.flip();
       if (processingFrame.hasRemaining()) {
         var oldlimit = processingFrame.limit();
         processingFrame.limit(bufferOut.remaining());
         bufferOut.put(processingFrame);
         processingFrame.limit(oldlimit);
-        processingFrame.compact();
-        if(!processingFrame.hasRemaining()){
+        if (!processingFrame.hasRemaining()) {
           processingFrame = null;
+        } else {
+          processingFrame.compact();
         }
+      } else {
+        processingFrame = null;
       }
       updateInterestOps();
     }

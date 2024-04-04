@@ -46,7 +46,6 @@ public class ClientConsoleController {
   private int cols;
   //// data management
   
-  private final SortedSet<String> users = new TreeSet<>();
   private Codex selectedCodexForDetails;
   
   public ClientConsoleController(Client client, int lines, int cols) {
@@ -86,14 +85,13 @@ public class ClientConsoleController {
   
   public List<String> users() {
     synchronized (lock) {
-      return users.stream()
-                  .toList();
+      return client.getUsers();
     }
   }
   
   public int totalUsers() {
     synchronized (lock) {
-      return users.size();
+      return users().size();
     }
   }
   
