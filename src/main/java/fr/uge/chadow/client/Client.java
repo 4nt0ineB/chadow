@@ -1,8 +1,7 @@
 package fr.uge.chadow.client;
 
-import fr.uge.chadow.core.protocol.Message;
-import fr.uge.chadow.core.protocol.Opcode;
-import fr.uge.chadow.core.protocol.Register;
+import fr.uge.chadow.core.protocol.*;
+import fr.uge.chadow.core.protocol.YellMessage;
 import fr.uge.chadow.core.reader.GlobalReader;
 import fr.uge.chadow.core.reader.MessageReader;
 import fr.uge.chadow.core.reader.Reader;
@@ -35,8 +34,8 @@ public class Client {
   private final ArrayBlockingQueue<String> commandsQueue = new ArrayBlockingQueue<>(1);
   private Context clientContext;
   private final HashMap<String, Codex> codexes = new HashMap<>();
-  private final ArrayList<Message> publicMessages = new ArrayList<>();
-  private final HashMap<String, List<Message>> privateMessages = new HashMap<>();
+  private final ArrayList<YellMessage> publicMessages = new ArrayList<>();
+  private final HashMap<String, List<YellMessage>> privateMessages = new HashMap<>();
   private final SortedSet<String> users = new TreeSet<>();
   private final ReentrantLock lock = new ReentrantLock();
   
@@ -75,7 +74,7 @@ public class Client {
   private void processCommands() {
     var command = commandsQueue.poll();
     if (command != null) {
-      clientContext.queueMessage(new Message(login, command, 0L));
+      clientContext.queueMessage(new YellMessage(login, command, 0L));
     }
   }
   
@@ -124,7 +123,7 @@ public class Client {
   /// API to interact on session with the server /////
   ////////////////////////////////////////////////////
   
-  public List<Message> getPublicMessages() {
+  public List<YellMessage> getPublicMessages() {
     lock.lock();
     try {
       return Collections.unmodifiableList(publicMessages);
@@ -196,7 +195,7 @@ public class Client {
   
   /////////// For the session only
   
-  private void addMessage(Message msg) {
+  private void addMessage(YellMessage msg) {
     lock.lock();
     try {
       publicMessages.add(msg);
@@ -226,7 +225,7 @@ public class Client {
       for (var opcode : Opcode.values()) {
         switch (opcode) {
           case REGISTER -> readers.put(opcode, new GlobalReader<>(Register.class));
-          case YELL -> readers.put(opcode, new GlobalReader<>(Message.class));
+          case YELL -> readers.put(opcode, new GlobalReader<>(YellMessage.class));
           default -> {
             logger.warning(STR."No reader for opcode \{opcode}");
             silentlyClose();
@@ -313,8 +312,8 @@ public class Client {
       switch (currentOpcode) {
         case OK -> isConnected = true;
         case YELL -> {
-          var message = (Message) readers.get(currentOpcode)
-                                         .get();
+          var message = (YellMessage) readers.get(currentOpcode)
+                                             .get();
           addMessage(message);
         }
         default -> {
@@ -327,7 +326,7 @@ public class Client {
     /**
      * Add a message to the message queue, tries to fill bufferOut and updateInterestOps
      */
-    private void queueMessage(Message msg) {
+    private void queueMessage(YellMessage msg) {
       queue.addFirst(msg);
       processOut();
       updateInterestOps();
@@ -449,15 +448,15 @@ public class Client {
   private void fillWithFakeData() throws IOException, NoSuchAlgorithmException {
     var users = new String[]{"test", "Morpheus", "Trinity", "Neo", "Flynn", "Alan", "Lora", "Gandalf", "Bilbo", "SKIDROW", "Antoine"};
     this.users.addAll(Arrays.asList(users));
-    var messages = new Message[]{
-        new Message("test", "test", System.currentTimeMillis()),
-        new Message("test", "hello how are you", System.currentTimeMillis()),
-        new Message("Morpheus", "Wake up, Neo...", System.currentTimeMillis()),
-        new Message("Morpheus", "The Matrix has you...", System.currentTimeMillis()),
-        new Message("Neo", "what the hell is this", System.currentTimeMillis()),
-        new Message("Alan1", "Master CONTROL PROGRAM\nRELEASE TRON JA 307020...\nI HAVE PRIORITY ACCESS 7", System.currentTimeMillis()),
-        new Message("SKIDROW", "Here is the codex of the FOSS (.deb) : cdx:1eb49a28a0c02b47eed4d0b968bb9aec116a5a47", System.currentTimeMillis()),
-        new Message("Antoine", "Le lien vers le sujet : http://igm.univ-mlv.fr/coursprogreseau/tds/projet2024.html", System.currentTimeMillis())
+    var messages = new YellMessage[]{
+        new YellMessage("test", "test", System.currentTimeMillis()),
+        new YellMessage("test", "hello how are you", System.currentTimeMillis()),
+        new YellMessage("Morpheus", "Wake up, Neo...", System.currentTimeMillis()),
+        new YellMessage("Morpheus", "The Matrix has you...", System.currentTimeMillis()),
+        new YellMessage("Neo", "what the hell is this", System.currentTimeMillis()),
+        new YellMessage("Alan1", "Master CONTROL PROGRAM\nRELEASE TRON JA 307020...\nI HAVE PRIORITY ACCESS 7", System.currentTimeMillis()),
+        new YellMessage("SKIDROW", "Here is the codex of the FOSS (.deb) : cdx:1eb49a28a0c02b47eed4d0b968bb9aec116a5a47", System.currentTimeMillis()),
+        new YellMessage("Antoine", "Le lien vers le sujet : http://igm.univ-mlv.fr/coursprogreseau/tds/projet2024.html", System.currentTimeMillis())
     };
     this.publicMessages.addAll(ClientConsoleController.splashLogo());
     this.publicMessages.addAll(Arrays.asList(messages));

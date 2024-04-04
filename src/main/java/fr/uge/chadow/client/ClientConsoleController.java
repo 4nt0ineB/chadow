@@ -3,7 +3,8 @@ package fr.uge.chadow.client;
 import fr.uge.chadow.cli.CLIColor;
 import fr.uge.chadow.cli.InputReader;
 import fr.uge.chadow.cli.display.*;
-import fr.uge.chadow.core.protocol.Message;
+import fr.uge.chadow.core.protocol.YellMessage;
+import fr.uge.chadow.core.protocol.YellMessage;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -64,7 +65,7 @@ public class ClientConsoleController {
     mode = Mode.CHAT_LIVE_REFRESH;
   }
   
-  public List<Message> messages() {
+  public List<YellMessage> messages() {
     synchronized (lock) {
       return Collections.unmodifiableList(client.getPublicMessages());
     }
@@ -182,11 +183,11 @@ public class ClientConsoleController {
    * Create a splash screen logo with a list of messages
    * showing le title "Chadow" in ascii art and the version
    */
-  public static List<Message> splashLogo() {
+  public static Collection<? extends YellMessage> splashLogo() {
     return List.of(
-        new Message("", "┏┓┓    ┓", 0),
-        new Message("", "┃ ┣┓┏┓┏┫┏┓┓┏┏", 0),
-        new Message("", "┗┛┗┗┗┗┗┗┗┛┗┛┛ v1.0.0 - Bastos & Sebbah", 0)
+        new YellMessage("", "┏┓┓    ┓", 0),
+        new YellMessage("", "┃ ┣┓┏┓┏┫┏┓┓┏┏", 0),
+        new YellMessage("", "┗┛┗┗┗┗┗┗┗┛┗┛┛ v1.0.0 - Bastos & Sebbah", 0)
     );
   }
   
