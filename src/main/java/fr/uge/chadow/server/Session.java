@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.Map;
@@ -180,15 +179,40 @@ public class Session {
    * Try to fill bufferOut from the message queue
    */
   private void processOut() {
-    while (!queue.isEmpty()) {
-      var frame = queue.pollLast();
-      var bb = frame.toByteBuffer();
-      if (bb.remaining() <= bufferOut.remaining()) {
-        bufferOut.put(bb);
-      } else {
-        queue.addLast(frame);
-        break;
+    if (processingFrame == null && !queue.isEmpty()) {
+      while (!queue.isEmpty()) {
+        processingFrame = queue.pollLast().toByteBuffer();
+        processingFrame.flip();
+        if (processingFrame.remaining() <= bufferOut.remaining()) {
+          // If enough space in bufferOut, add the frame
+          bufferOut.put(processingFrame);
+        } else { // plus de place
+          processingFrame.compact();
+          break;
+        }
       }
+    } else if (processingFrame == null) {
+      // No frame currently being processed or in the queue, exit the method
+      return;
+    }
+
+    // Processing the current frame being handled
+    processingFrame.flip();
+    if (processingFrame.hasRemaining()) {
+      var oldlimit = processingFrame.limit();
+      processingFrame.limit(bufferOut.remaining());
+      bufferOut.put(processingFrame);
+      processingFrame.limit(oldlimit);
+      if (!processingFrame.hasRemaining()) {
+        // If the frame has been fully processed, reset processingFrame to null
+        processingFrame = null;
+      } else {
+        // If the frame has not been fully processed, compact it to keep the remaining data
+        processingFrame.compact();
+      }
+    } else {
+      // If the current frame does not contain any data, reset processingFrame to null
+      processingFrame = null;
     }
     updateInterestOps();
   }
@@ -232,7 +256,7 @@ public class Session {
    * The convention is that both buffers are in write-mode before the call to
    * doRead and after the call
    *
-   * @throws IOException
+   * @throws IOException if an I/O error occurs while reading from the socket channel
    */
   void doRead() throws IOException {
     if (sc.read(bufferIn) == -1) {
@@ -249,7 +273,7 @@ public class Session {
    * The convention is that both buffers are in write-mode before the call to
    * doWrite and after the call
    *
-   * @throws IOException
+   * @throws IOException if an I/O error occurs while writing to the socket channel
    */
 
   void doWrite() throws IOException {
