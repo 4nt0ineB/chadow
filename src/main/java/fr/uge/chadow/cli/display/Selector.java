@@ -38,7 +38,7 @@ public class Selector<T> implements Selectable<T>, View{
   @Override
   public T get() {
     @SuppressWarnings("unchecked")
-    T item = (T) linesByItem.get(itemPointerIndex).getKey();
+    T item = linesByItem.get(itemPointerIndex).getKey();
     return item;
   }
   

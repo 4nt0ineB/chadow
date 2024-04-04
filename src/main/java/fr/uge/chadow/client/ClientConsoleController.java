@@ -425,7 +425,6 @@ public class ClientConsoleController {
   
   private Scrollable helpView() {
     var txt = """
-        
         ##  ┓┏  ┓
         ##  ┣┫┏┓┃┏┓
         ##  ┛┗┗━┗┣┛

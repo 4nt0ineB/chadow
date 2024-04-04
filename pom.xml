@@ -26,7 +26,7 @@
         </developer>
     </developers>
     <properties>
-        <mainClass>fr.uge.chadow.client.Main</mainClass>
+        <mainClass>fr.uge.chadow.Main</mainClass>
         <project.name.fatjar>chadow</project.name.fatjar>
 
         <!-- some project config variables -->
@@ -36,12 +36,14 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <!-- plugin versions -->
         <version.plugin.compiler>3.11.0</version.plugin.compiler>
+        <version.plugin.junit>4.13.2</version.plugin.junit>
+        <version.plugin.surefire>3.1.2</version.plugin.surefire>
     </properties>
     <dependencies>
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
-            <version>RELEASE</version>
+            <version>${version.plugin.junit}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -52,7 +54,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.1.2</version>
+                <version>${version.plugin.surefire}</version>
                 <configuration>
                     <argLine>--enable-preview</argLine>
                 </configuration>
@@ -66,6 +68,7 @@
                     <compilerArgs>
                         <compilerArg>--enable-preview</compilerArg>
                         <compilerArg>-Xlint:all</compilerArg>
+                        <compilerArg>-Xlint:preview</compilerArg>
                     </compilerArgs>
                 </configuration>
             </plugin>

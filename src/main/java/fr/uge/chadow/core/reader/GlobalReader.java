@@ -55,7 +55,9 @@ public class GlobalReader<T extends Record> implements Reader<T> {
     }
     state = State.DONE;
     try {
-      value = (T) recordClass.getConstructors()[0].newInstance(recordInstanceValues);
+      @SuppressWarnings("unchecked")
+      T instance = (T) recordClass.getConstructors()[0].newInstance(recordInstanceValues);
+      value = instance;
     } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
       // TODO a little logger here ?
       throw new IllegalStateException(e);

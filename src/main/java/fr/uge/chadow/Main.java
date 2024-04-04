@@ -1,5 +1,7 @@
-package fr.uge.chadow.client;
+package fr.uge.chadow;
 
+import fr.uge.chadow.client.Client;
+import fr.uge.chadow.client.ClientConsoleController;
 import fr.uge.chadow.server.Server;
 
 import java.io.IOException;
@@ -9,9 +11,9 @@ import java.util.Random;
 public class Main {
   private static void usage() {
     System.out.println("Usage: " +
-        "--server <port>" +
+        "--server <port>\n" +
         "otherwise default is client : "+
-        "<hostname> <port> <lines> <columns>");
+        "<login> <hostname> <port> <lines> <columns>");
   }
   
   private static void server(String[] args) throws IOException {
@@ -23,16 +25,15 @@ public class Main {
   }
   
   private static void client(String[] args) throws IOException, InterruptedException {
-    if (args.length < 4) {
+    if (args.length < 5) {
       usage();
       return;
     }
-    var socket = new InetSocketAddress(args[0], Integer.parseInt(args[1]));
-    var lines = Integer.parseInt(args[2]);
-    var columns = Integer.parseInt(args[3]);
+    var socket = new InetSocketAddress(args[1], Integer.parseInt(args[2]));
+    var lines = Integer.parseInt(args[3]);
+    var columns = Integer.parseInt(args[4]);
     var random = new Random();
-    
-    new ClientConsoleController(new Client("Flynn" + random.nextInt(), socket), lines, columns).start();
+    new ClientConsoleController(new Client(args[0] + random.nextInt(), socket), lines, columns).start();
   }
   
   public static void main(String[] args) throws IOException, InterruptedException {
