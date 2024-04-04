@@ -43,7 +43,7 @@ public class Session {
         case WHISPER -> readers.put(opcode, new GlobalReader<>(WhisperMessage.class));
         default -> {
           logger.warning(STR."No reader for opcode \{opcode}");
-          silentlyClose();
+          //silentlyClose();
         }
       }
     }
@@ -146,9 +146,14 @@ public class Session {
           return;
         }
         logger.info(STR."Client \{sc.getRemoteAddress()} has logged in as \{login}");
+        
+        // Send OK message to client
+        queueFrame(new OK());
       }
       case YELL -> {
+        logger.info(STR."Yell message received");
         var message = (YellMessage) readers.get(currentOpcode).get();
+        logger.info(STR."Message from \{message.login()}: \{message.txt()}");
         var newMessage = new YellMessage(message.login(), message.txt(), System.currentTimeMillis());
         server.broadcast(newMessage);
       }
@@ -204,7 +209,7 @@ public class Session {
     processingFrame.flip();
     if (processingFrame.hasRemaining()) {
       var oldlimit = processingFrame.limit();
-      processingFrame.limit(bufferOut.remaining());
+      processingFrame.limit(Math.min(oldlimit, bufferOut.remaining()));
       bufferOut.put(processingFrame);
       processingFrame.limit(oldlimit);
       if (!processingFrame.hasRemaining()) {

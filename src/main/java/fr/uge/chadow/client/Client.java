@@ -25,13 +25,12 @@ import java.util.logging.Logger;
 
 public class Client {
   
-  private static final int BUFFER_SIZE = 10_000;
+  private static final int BUFFER_SIZE = 1024;
   private static final Logger logger = Logger.getLogger(Client.class.getName());
   private final SocketChannel sc;
   private final Selector selector;
   private final InetSocketAddress serverAddress;
   private final String login;
-  private final ArrayBlockingQueue<String> commandsQueue = new ArrayBlockingQueue<>(1);
   private Context clientContext;
   private final HashMap<String, Codex> codexes = new HashMap<>();
   private final ArrayList<YellMessage> publicMessages = new ArrayList<>();
@@ -68,16 +67,6 @@ public class Client {
     return login;
   }
   
-  /**
-   * Processes the command from the BlockingQueue
-   */
-  private void processCommands() {
-    var command = commandsQueue.poll();
-    if (command != null) {
-      clientContext.queueMessage(new YellMessage(login, command, 0L));
-    }
-  }
-  
   public void launch() throws IOException {
     // for dev: fake messages
     try {
@@ -94,7 +83,6 @@ public class Client {
     while (!Thread.interrupted()) {
       try {
         selector.select(this::treatKey);
-        processCommands();
       } catch (UncheckedIOException tunneled) {
         throw tunneled.getCause();
       }
@@ -139,7 +127,7 @@ public class Client {
    * @throws InterruptedException
    */
   public void sendMessage(String msg) throws InterruptedException {
-    commandsQueue.put(msg);
+    clientContext.queueMessage(new YellMessage(login, msg, 0L));
     selector.wakeup();
   }
   
@@ -213,7 +201,7 @@ public class Client {
     private ByteBuffer processingFrame;
     private final ArrayDeque<Frame> queue = new ArrayDeque<>();
     private boolean closed = false;
-    private Opcode currentOpcode;
+    private Opcode currentOpcode = null;
     private boolean isConnected = false;
     
     private final Map<Opcode, Reader<?>> readers = new HashMap<>();
@@ -226,13 +214,14 @@ public class Client {
         switch (opcode) {
           case REGISTER -> readers.put(opcode, new GlobalReader<>(Register.class));
           case YELL -> readers.put(opcode, new GlobalReader<>(YellMessage.class));
+          case OK -> readers.put(opcode, new GlobalReader<>(OK.class));
           default -> {
-            logger.warning(STR."No reader for opcode \{opcode}");
-            silentlyClose();
+            //logger.warning(STR."No reader for opcode \{opcode}");
+            //silentlyClose();
           }
         }
       }
-      processingFrame = new Register(login).toByteBuffer();
+      queue.addFirst(new Register(login));
     }
     
     /**
@@ -282,6 +271,9 @@ public class Client {
         return true;
       }
       
+      logger.info("Opcode " + currentOpcode);
+      logger.info("BufferIn " + bufferIn.remaining() + " / " + bufferIn.position() + " / " + bufferIn.limit());
+      
       bufferIn.flip();
       if (bufferIn.remaining() < Byte.BYTES) {
         logger.warning("Not enough bytes for opcode");
@@ -310,7 +302,10 @@ public class Client {
      */
     private void processCurrentOpcodeAction() throws IOException {
       switch (currentOpcode) {
-        case OK -> isConnected = true;
+        case OK -> {
+          isConnected = true;
+          logger.info(STR."Connected to the server");
+        }
         case YELL -> {
           var message = (YellMessage) readers.get(currentOpcode)
                                              .get();
@@ -328,6 +323,7 @@ public class Client {
      */
     private void queueMessage(YellMessage msg) {
       queue.addFirst(msg);
+      logger.info(STR."sending message \{msg}");
       processOut();
       updateInterestOps();
     }
@@ -336,11 +332,15 @@ public class Client {
      * Try to fill bufferOut from the message queue
      */
     private void processOut() {
+      logger.info("JE PASSE ICI " + queue.size()  + " / "+ processingFrame  );
       if (processingFrame == null && !queue.isEmpty()) {
+        
         while (!queue.isEmpty()) {
+          
           processingFrame = queue.pollLast()
                                  .toByteBuffer();
           processingFrame.flip();
+          logger.info(STR."Frame of size \{processingFrame.remaining()}");
           if (processingFrame.remaining() <= bufferOut.remaining()) { // tant que place on met dedans
             bufferOut.put(processingFrame);
           } else { // plus de place
@@ -355,7 +355,7 @@ public class Client {
       processingFrame.flip();
       if (processingFrame.hasRemaining()) {
         var oldlimit = processingFrame.limit();
-        processingFrame.limit(bufferOut.remaining());
+        processingFrame.limit(Math.min(oldlimit, bufferOut.remaining()));
         bufferOut.put(processingFrame);
         processingFrame.limit(oldlimit);
         if (!processingFrame.hasRemaining()) {
@@ -380,7 +380,7 @@ public class Client {
     
     private void updateInterestOps() {
       int ops = 0;
-      if (bufferIn.hasRemaining() && !closed && isConnected) {
+      if (bufferIn.hasRemaining() && !closed) {
         ops |= SelectionKey.OP_READ;
       }
       if (bufferOut.position() > 0) {
