@@ -32,6 +32,8 @@ public class GlobalReader<T extends Record> implements Reader<T> {
         readerMap.put(int.class, new IntReader());
       } else if (type.equals(long.class)) {
         readerMap.put(long.class, new LongReader());
+      } else if (type.equals(byte.class)) {
+        readerMap.put(byte.class, new ByteReader());
       } else {
         throw new IllegalArgumentException(STR."Unsupported type: \{type}");
       }
