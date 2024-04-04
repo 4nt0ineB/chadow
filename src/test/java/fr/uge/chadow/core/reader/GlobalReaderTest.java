@@ -1,6 +1,6 @@
 package fr.uge.chadow.core.reader;
 
-import fr.uge.chadow.core.protocol.Message;
+import fr.uge.chadow.core.protocol.YellMessage;
 import fr.uge.chadow.core.protocol.TestPacket;
 import org.junit.Test;
 
@@ -14,8 +14,8 @@ public class GlobalReaderTest {
   @Test
   public void simple() {
     var bb = ByteBuffer.allocate(100);
-    var reader = new GlobalReader<>(Message.class);
-    var login = "login";
+    var reader = new GlobalReader<>(YellMessage.class);
+    var login = "username";
     var txt = "First test of the GlobalReader";
     long messageTime = System.currentTimeMillis();
     var loginBuffer = StandardCharsets.UTF_8.encode(login);
@@ -26,14 +26,14 @@ public class GlobalReaderTest {
     bb.put(txtBuffer);
     bb.putLong(messageTime);
     assertEquals(Reader.ProcessStatus.DONE, reader.process(bb));
-    assertEquals(new Message(login, txt, messageTime), reader.get());
+    assertEquals(new YellMessage(login, txt, messageTime), reader.get());
   }
 
   @Test
   public void smallBuffer() {
     var bb = ByteBuffer.allocate(1024);
-    var reader = new GlobalReader<>(Message.class);
-    var login = "login";
+    var reader = new GlobalReader<>(YellMessage.class);
+    var login = "username";
     var txt = "First test of the GlobalReader";
     long messageTime = System.currentTimeMillis();
     var loginBuffer = StandardCharsets.UTF_8.encode(login);
@@ -55,12 +55,12 @@ public class GlobalReaderTest {
         assertEquals(Reader.ProcessStatus.DONE, reader.process(smallBuffer));
       }
     }
-    assertEquals(new Message(login, txt, messageTime), reader.get());
+    assertEquals(new YellMessage(login, txt, messageTime), reader.get());
   }
 
   @Test
   public void errorGet() {
-    var reader = new GlobalReader<>(Message.class);
+    var reader = new GlobalReader<>(YellMessage.class);
     assertThrows(IllegalStateException.class, () -> {
       var res = reader.get();
     });
@@ -69,8 +69,8 @@ public class GlobalReaderTest {
   @Test
   public void errorNeg() {
     var bb = ByteBuffer.allocate(100);
-    var reader = new GlobalReader<>(Message.class);
-    var login = "login";
+    var reader = new GlobalReader<>(YellMessage.class);
+    var login = "username";
     var txt = "First test of the GlobalReader";
     long messageTime = System.currentTimeMillis();
     var loginBuffer = StandardCharsets.UTF_8.encode(login);

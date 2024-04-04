@@ -167,12 +167,6 @@ encodé de la manière suivante :
     - Si le nom d'utilisateur est disponible, le serveur envoie une 
     validation au client :
 
-        +-----------------------+
-        | (register) | username | 
-        +-----------------------+
-
-    - le serveur accepte l'username et maintient la connexion :
-
         +------+
         | (ok) | 
         +------+
@@ -231,17 +225,14 @@ encodé de la manière suivante :
 
   Le client envoie une trame de publication de message global.
 
-  +---------------------------+
-  | (yell) | message (string) |
-  +---------------------------+
-
-  Le serveur retransmet la même trame à tous les clients même le 
-  client d'origine, avec la date de réception du message
-  et l'username de l'envoyeur. La taille 
-
   +-------------------------------------------------------------+
   | (yell) | username_sender | creation_date | message (string) |
   +-------------------------------------------------------------+
+
+  Le serveur retransmet la même trame à tous les clients même le 
+  client d'origine, avec la date de réception du message
+  et l'username de l'envoyeur. La taille du message ne doit pas
+  dépasser 1024 octets.
 
 4.4 Echange de messages entre utilisateurs
 
@@ -249,7 +240,7 @@ encodé de la manière suivante :
   à un username spécifique. 
 
   +------------------------------------------------------------------+
-  | (whisper) | username_receiver | creation_date | message (string) |
+  | (whisper) | username_receiver | message (string) | creation_date |
   +------------------------------------------------------------------+
 
   - message: le message à envoyer qui ne pourra pas dépasser 1024 octets.  
@@ -258,7 +249,7 @@ encodé de la manière suivante :
   ("username_receiver") :
 
   +----------------------------------------------------------------+
-  | (whisper) | username_sender | creation_date | message (string) |
+  | (whisper) | username_sender | message (string) | creation_date |
   +----------------------------------------------------------------+
 
 

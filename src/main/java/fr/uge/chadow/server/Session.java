@@ -1,8 +1,6 @@
 package fr.uge.chadow.server;
 
-import fr.uge.chadow.core.protocol.Message;
-import fr.uge.chadow.core.protocol.Opcode;
-import fr.uge.chadow.core.protocol.Register;
+import fr.uge.chadow.core.protocol.*;
 import fr.uge.chadow.core.reader.GlobalReader;
 import fr.uge.chadow.core.reader.Reader;
 
@@ -10,7 +8,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.Map;
@@ -19,16 +16,18 @@ import java.util.logging.Logger;
 public class Session {
   private static final Logger logger = Logger.getLogger(Server.class.getName());
   private static final int BUFFER_SIZE = 1_024;
-  private final ArrayDeque<Message> queue = new ArrayDeque<>();
+
+  private final ArrayDeque<Frame> queue = new ArrayDeque<>();
   private final ByteBuffer bufferIn = ByteBuffer.allocate(BUFFER_SIZE);
   private final ByteBuffer bufferOut = ByteBuffer.allocate(BUFFER_SIZE);
-  private final ByteBuffer processingMsg = ByteBuffer.allocate(2 * Integer.BYTES + 2 * BUFFER_SIZE);
   private final Map<Opcode, Reader<?>> readers = new HashMap<>();
   private final SelectionKey key;
-  private final Server server;  // we could also have Context as an instance class, which would naturally
-  // give access to ServerChatInt.this
+  private final Server server;  // we could also have Context as an instance class, which would naturally give access
+  // to ServerChatInt.this
+
   private final SocketChannel sc;
   private boolean closed = false;
+  private ByteBuffer processingFrame;
   private String login;
   private Opcode currentOpcode;
 
@@ -40,7 +39,8 @@ public class Session {
     for (var opcode : Opcode.values()) {
       switch (opcode) {
         case REGISTER -> readers.put(opcode, new GlobalReader<>(Register.class));
-        case YELL -> readers.put(opcode, new GlobalReader<>(Message.class));
+        case YELL -> readers.put(opcode, new GlobalReader<>(YellMessage.class));
+        case WHISPER -> readers.put(opcode, new GlobalReader<>(WhisperMessage.class));
         default -> {
           logger.warning(STR."No reader for opcode \{opcode}");
           silentlyClose();
@@ -140,12 +140,22 @@ public class Session {
       case REGISTER -> {
         var register = (Register) readers.get(currentOpcode).get();
         login = register.username();
-        server.addClient(login, sc);
+        if (!server.addClient(login, sc)) {
+          logger.warning(STR."Login \{login} already in use");
+          silentlyClose();
+          return;
+        }
         logger.info(STR."Client \{sc.getRemoteAddress()} has logged in as \{login}");
       }
       case YELL -> {
-        var message = (Message) readers.get(currentOpcode).get();
-        server.broadcast(message);
+        var message = (YellMessage) readers.get(currentOpcode).get();
+        var newMessage = new YellMessage(message.login(), message.txt(), System.currentTimeMillis());
+        server.broadcast(newMessage);
+      }
+      case WHISPER -> {
+        var message = (WhisperMessage) readers.get(currentOpcode).get();
+        var newMessage = new WhisperMessage(message.username(), message.txt(), System.currentTimeMillis());
+        server.whisper(newMessage);
       }
       default -> {
         logger.warning(STR."No action for opcode \{currentOpcode}");
@@ -153,18 +163,18 @@ public class Session {
       }
     }
   }
-  
+
   private boolean isAuthenticated() {
     return login != null;
   }
 
   /**
-   * Add a message to the message queue, tries to fill bufferOut and updateInterestOps
+   * Add a frame to the message queue, tries to fill bufferOut and updateInterestOps
    *
-   * @param msg
+   * @param frame the frame to add to the queue
    */
-  public void queueMessage(Message msg) {
-    queue.addFirst(msg);
+  public void queueFrame(Frame frame) {
+    queue.addFirst(frame);
     processOut();
     updateInterestOps();
   }
@@ -173,21 +183,40 @@ public class Session {
    * Try to fill bufferOut from the message queue
    */
   private void processOut() {
-    processingMsg.flip();
-    if (processingMsg.hasRemaining()) {
-      var oldlimit = processingMsg.limit();
-      processingMsg.limit(bufferOut.remaining());
-      bufferOut.put(processingMsg);
-      processingMsg.limit(oldlimit);
-      processingMsg.compact();
+    if (processingFrame == null && !queue.isEmpty()) {
+      while (!queue.isEmpty()) {
+        processingFrame = queue.pollLast().toByteBuffer();
+        processingFrame.flip();
+        if (processingFrame.remaining() <= bufferOut.remaining()) {
+          // If enough space in bufferOut, add the frame
+          bufferOut.put(processingFrame);
+        } else { // plus de place
+          processingFrame.compact();
+          break;
+        }
+      }
+    } else if (processingFrame == null) {
+      // No frame currently being processed or in the queue, exit the method
+      return;
+    }
+
+    // Processing the current frame being handled
+    processingFrame.flip();
+    if (processingFrame.hasRemaining()) {
+      var oldlimit = processingFrame.limit();
+      processingFrame.limit(bufferOut.remaining());
+      bufferOut.put(processingFrame);
+      processingFrame.limit(oldlimit);
+      if (!processingFrame.hasRemaining()) {
+        // If the frame has been fully processed, reset processingFrame to null
+        processingFrame = null;
+      } else {
+        // If the frame has not been fully processed, compact it to keep the remaining data
+        processingFrame.compact();
+      }
     } else {
-      processingMsg.clear();
-      var msg = queue.pollLast();
-      var login = StandardCharsets.UTF_8.encode(msg.login());
-      var txt = StandardCharsets.UTF_8.encode(msg.txt());
-      bufferOut
-              .putInt(login.remaining()).put(login)
-              .putInt(txt.remaining()).put(txt);
+      // If the current frame does not contain any data, reset processingFrame to null
+      processingFrame = null;
     }
     updateInterestOps();
   }
@@ -219,7 +248,7 @@ public class Session {
   private void silentlyClose() {
     try {
       sc.close();
-      // TODO: remove client from server
+      server.removeClient(login);
     } catch (IOException e) {
       // ignore exception
     }
@@ -231,7 +260,7 @@ public class Session {
    * The convention is that both buffers are in write-mode before the call to
    * doRead and after the call
    *
-   * @throws IOException
+   * @throws IOException if an I/O error occurs while reading from the socket channel
    */
   void doRead() throws IOException {
     if (sc.read(bufferIn) == -1) {
@@ -248,7 +277,7 @@ public class Session {
    * The convention is that both buffers are in write-mode before the call to
    * doWrite and after the call
    *
-   * @throws IOException
+   * @throws IOException if an I/O error occurs while writing to the socket channel
    */
 
   void doWrite() throws IOException {

@@ -1,10 +1,10 @@
 package fr.uge.chadow.core.reader;
 
-import fr.uge.chadow.core.protocol.Message;
+import fr.uge.chadow.core.protocol.YellMessage;
 
 import java.nio.ByteBuffer;
 
-public class MessageReader implements Reader<Message> {
+public class MessageReader implements Reader<YellMessage> {
   private enum State {
     DONE, WAITING, ERROR
   }
@@ -13,7 +13,7 @@ public class MessageReader implements Reader<Message> {
   private final StringReader stringReader = new StringReader();
   private String login;
   private String txt;
-  private Message value;
+  private YellMessage value;
 
   @Override
   public ProcessStatus process(ByteBuffer buffer) {
@@ -36,12 +36,12 @@ public class MessageReader implements Reader<Message> {
       txt = stringReader.get();
     }
     state = State.DONE;
-    value = new Message(login, txt, System.currentTimeMillis());
+    value = new YellMessage(login, txt, System.currentTimeMillis());
     return ProcessStatus.DONE;
   }
 
   @Override
-  public Message get() {
+  public YellMessage get() {
     if (state != State.DONE) {
       throw new IllegalStateException();
     }
