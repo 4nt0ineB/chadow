@@ -6,6 +6,8 @@ import fr.uge.chadow.core.protocol.Opcode;
 
 import java.io.*;
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -20,6 +22,7 @@ import java.util.logging.Logger;
  * on the client machine
  */
 public class Codex implements Frame {
+  private static final Charset UTF8 = StandardCharsets.UTF_8;
   
   public static int CHUNK_SIZE = 1024;
   
@@ -62,34 +65,46 @@ public class Codex implements Frame {
   private final String name;
   private final List<FileInfo> files;
   private final long totalSize;
+  private final String root;
   
   private boolean downloading = false;
   private boolean sharing = false;
   
-  private Codex(byte[] id, String name, List<FileInfo> files) {
+  private Codex(byte[] id, String name, String root, List<FileInfo> files) {
     this.id = id;
     this.name = name;
     this.files = files;
+    this.root = root;
     this.totalSize = files.stream().mapToLong(FileInfo::length).sum();
   }
   
   @Override
   public ByteBuffer toByteBuffer() {
     var op = Opcode.PROPOSE;
-    var bbName = ByteBuffer.wrap(name.getBytes());
-    var bbId = ByteBuffer.wrap(id);
+    var idHexa = UTF8.encode(idToHexadecimal());
+    var bbName = UTF8.encode(name);
+    var bbNumberFiles = files.size();
     var bbFiles = ByteBuffer.allocate(files.size() * 2 * Integer.BYTES + files.size() * bbName.remaining());
     files.forEach(file -> {
-      var bbFilename = ByteBuffer.wrap(file.filename().getBytes());
-      bbFiles.putInt(bbFilename.remaining()).put(bbFilename);
-      bbFiles.putInt(file.chunks().size());
+      var bbFilename = UTF8.encode(file.filename());
+      bbFiles
+          .put(file.fingerprint)
+          .putInt(bbFilename.remaining())
+          .put(bbFilename)
+          .putInt(file.chunks().size());
     });
-    return ByteBuffer.allocate(Byte.BYTES + bbName.remaining() + bbId.remaining() + bbFiles.remaining())
-        .put((byte) op.ordinal()) // @Todo op.getByte()
-        .put(bbName)
-        .put(bbId)
-        .put(bbFiles)
-        .flip();
+    bbFiles.flip();
+    // opcode, id, name size, name, number of files, files
+    var bufferSize = Byte.BYTES + 20 +  Integer.BYTES + bbName.remaining() + Integer.BYTES + bbFiles.remaining();
+    return ByteBuffer.allocate(bufferSize)
+                     .put((byte) op.ordinal()) // @Todo op.getByte()
+                     .putInt(idHexa.remaining())
+                     .put(idHexa)
+                     //.put(id())
+                     .putInt(bbName.remaining())
+                     .put(bbName)
+                     .putInt(bbNumberFiles)
+                     .put(bbFiles);
   }
   
   public boolean isComplete() {
@@ -130,6 +145,10 @@ public class Codex implements Frame {
     return totalSize;
   }
   
+  public String root() {
+    return root;
+  }
+  
   public boolean isDownloading() {
     return downloading;
   }
@@ -165,19 +184,20 @@ public class Codex implements Frame {
   static Codex fromPath(String codexName, String directory) throws IOException, NoSuchAlgorithmException {
     var rootPath = new File(directory);
     var fileInfo = new ArrayList<FileInfo>();
+    logger.info(STR."Creating codex from \{rootPath}");
     // get all files
     if(rootPath.isFile()){
-      fileInfo.add(fileInfofromPath(rootPath.toPath()));
+      fileInfo.add(fileInfofromPath(rootPath.getPath(), rootPath.toPath()));
     } else if(rootPath.isDirectory()) {
       Path start = Paths.get(rootPath.getAbsolutePath());
       var it = Files.walk(start).filter(Files::isRegularFile).sorted(Comparator.comparing(Path::toString)).iterator();
       while(it.hasNext()){
         var path = it.next();
-        fileInfo.add(fileInfofromPath(path));
+        fileInfo.add(fileInfofromPath(rootPath.getPath(), path));
       }
     }
     var id = computeId(codexName, fileInfo);
-    return new Codex(id, codexName, fileInfo);
+    return new Codex(id, codexName, rootPath.toString(), fileInfo);
   }
   
   /**
@@ -227,13 +247,14 @@ public class Codex implements Frame {
    * @throws NoSuchAlgorithmException
    * @throws IOException
    */
-  private static FileInfo fileInfofromPath(Path path) throws NoSuchAlgorithmException, IOException {
+  private static FileInfo fileInfofromPath(String root, Path path) throws NoSuchAlgorithmException, IOException {
     var file = path.toFile();
     var fingerprint = fingerprint(file);
     var bitSet = new BitSet((int) Math.ceil(file.length() / CHUNK_SIZE));
     // creation of codex from local file, then all chunks are available
     bitSet.flip(0, bitSet.size());
-    return new FileInfo(fingerprint, file.getName(), file.length(), file.getParent(), bitSet);
+    // logger.info(STR."Creating FileInfo for \{file.getName()} with parent \{file.getParent()} with removed root \{root} : \{file.getParent().replace(root, "")}");
+    return new FileInfo(fingerprint, file.getName(), file.length(), file.getParent().substring(root.length()), bitSet);
   }
   
 }
