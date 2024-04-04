@@ -1,8 +1,10 @@
 package fr.uge.chadow.client;
 
 import fr.uge.chadow.cli.display.View;
+import fr.uge.chadow.core.protocol.Opcode;
 
 import java.io.*;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -16,7 +18,7 @@ import java.util.logging.Logger;
  * creation / download / upload
  * on the client machine
  */
-public class Codex{
+public class Codex implements Frame {
   
   public static int CHUNK_SIZE = 1024;
   
@@ -70,7 +72,24 @@ public class Codex{
     this.totalSize = files.stream().mapToLong(FileInfo::length).sum();
   }
   
-
+  @Override
+  public ByteBuffer toByteBuffer() {
+    var op = Opcode.PROPOSE;
+    var bbName = ByteBuffer.wrap(name.getBytes());
+    var bbId = ByteBuffer.wrap(id);
+    var bbFiles = ByteBuffer.allocate(files.size() * 2 * Integer.BYTES + files.size() * bbName.remaining());
+    files.forEach(file -> {
+      var bbFilename = ByteBuffer.wrap(file.filename().getBytes());
+      bbFiles.putInt(bbFilename.remaining()).put(bbFilename);
+      bbFiles.putInt(file.chunks().size());
+    });
+    return ByteBuffer.allocate(Byte.BYTES + bbName.remaining() + bbId.remaining() + bbFiles.remaining())
+        .put((byte) op.ordinal()) // @Todo op.getByte()
+        .put(bbName)
+        .put(bbId)
+        .put(bbFiles)
+        .flip();
+  }
   
   public boolean isComplete() {
     return files.stream().allMatch(FileInfo::isComplete);
@@ -199,8 +218,6 @@ public class Codex{
     }
     return md.digest();
   }
-  
-
   
   /**
    * Create a FileInfo from a file path

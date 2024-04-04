@@ -153,8 +153,7 @@ public class Session {
       }
     }
   }
-
-
+  
   private boolean isAuthenticated() {
     return login != null;
   }

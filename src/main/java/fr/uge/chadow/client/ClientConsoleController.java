@@ -45,10 +45,8 @@ public class ClientConsoleController {
   private int lines;
   private int cols;
   //// data management
-  private final ArrayList<Message> publicMessages = new ArrayList<>();
-  private final HashMap<String, List<Message>> privateMessages = new HashMap<>();
+  
   private final SortedSet<String> users = new TreeSet<>();
-  private final HashMap<String, Codex> codexes = new HashMap<>();
   private Codex selectedCodexForDetails;
   
   public ClientConsoleController(Client client, int lines, int cols) {
@@ -69,13 +67,13 @@ public class ClientConsoleController {
   
   public List<Message> messages() {
     synchronized (lock) {
-      return Collections.unmodifiableList(publicMessages);
+      return Collections.unmodifiableList(client.getPublicMessages());
     }
   }
   
   public List<Codex> codexes() {
     synchronized (lock) {
-      return codexes.values().stream().toList();
+      return Collections.unmodifiableList(client.codexes());
     }
   }
   
@@ -114,13 +112,7 @@ public class ClientConsoleController {
     display.draw();
     // thread that manages the display
     startDisplay();
-    // for dev: fake messages
-    try {
-      fillWithFakeData();
-    } catch (NoSuchAlgorithmException e) {
-      throw new RuntimeException(e);
-    }
-    client.subscribe(this::addMessage);
+    
     // Thread that manages the user inputs
     try {
       inputReader.start();
@@ -133,13 +125,7 @@ public class ClientConsoleController {
   
   public int numberOfMessages() {
     synchronized (lock) {
-      return publicMessages.size();
-    }
-  }
-  
-  public void addMessage(Message message) {
-    synchronized (lock) {
-      publicMessages.add(message);
+      return client.getPublicMessages().size();
     }
   }
   
@@ -198,7 +184,7 @@ public class ClientConsoleController {
    * Create a splash screen logo with a list of messages
    * showing le title "Chadow" in ascii art and the version
    */
-  private List<Message> splashLogo() {
+  public static List<Message> splashLogo() {
     return List.of(
         new Message("", "┏┓┓    ┓", 0),
         new Message("", "┃ ┣┓┏┓┏┫┏┓┓┏┏", 0),
@@ -406,7 +392,7 @@ public class ClientConsoleController {
       logger.info(STR.":create \{path}\n");
       var codex = Codex.fromPath(codexName, path);
       selectedCodexForDetails = codex;
-      codexes.put(codex.idToHexadecimal(), codex);
+      client.addCodex(codex);
       mode = Mode.CODEX_DETAILS;
       currentView = codexView(codex);
       currentView.scrollTop();
@@ -422,42 +408,20 @@ public class ClientConsoleController {
     if (matcherRetrieve.find()) {
       var fingerprint = matcherRetrieve.group(1);
       logger.info(STR.":cdx: \{fingerprint}\n");
-      var codex = codexes.get(fingerprint);
+      var codex = client.getCodex(fingerprint);
       if (codex == null) {
         logger.info("Codex not found");
         // use a synchronous call to retrieve the codex (wait for the server response)
         // client.retrieveCodex(fingerprint);
         return Optional.of(false);
       }
-      selectedCodexForDetails = codex;
+      selectedCodexForDetails = codex.orElseThrow();
       mode = Mode.CODEX_DETAILS;
-      currentView = codexView(codex);
+      currentView = codexView(selectedCodexForDetails);
       currentView.scrollTop();
       return Optional.of(true);
     }
     return Optional.empty();
-  }
-  
-  private void fillWithFakeData() throws IOException, NoSuchAlgorithmException {
-    var users = new String[]{"test", "Morpheus", "Trinity", "Neo", "Flynn", "Alan", "Lora", "Gandalf", "Bilbo", "SKIDROW", "Antoine"};
-    this.users.addAll(Arrays.asList(users));
-    var messages = new Message[]{
-        new Message("test", "test", System.currentTimeMillis()),
-        new Message("test", "hello how are you", System.currentTimeMillis()),
-        new Message("Morpheus", "Wake up, Neo...", System.currentTimeMillis()),
-        new Message("Morpheus", "The Matrix has you...", System.currentTimeMillis()),
-        new Message("Neo", "what the hell is this", System.currentTimeMillis()),
-        new Message("Alan1", "Master CONTROL PROGRAM\nRELEASE TRON JA 307020...\nI HAVE PRIORITY ACCESS 7", System.currentTimeMillis()),
-        new Message("SKIDROW", "Here is the codex of the FOSS (.deb) : cdx:1eb49a28a0c02b47eed4d0b968bb9aec116a5a47", System.currentTimeMillis()),
-        new Message("Antoine", "Le lien vers le sujet : http://igm.univ-mlv.fr/coursprogreseau/tds/projet2024.html", System.currentTimeMillis())
-    };
-    this.publicMessages.addAll(splashLogo());
-    this.publicMessages.addAll(Arrays.asList(messages));
-    // test codex
-    var codex = Codex.fromPath("my codex", "/home/alan1/Pictures");
-    codexes.put(codex.idToHexadecimal(), codex);
-    codex = Codex.fromPath("my codex", "/home/alan1/Downloads/Great Teacher Onizuka (1999)/Great Teacher Onizuka - S01E01 - Lesson 1.mkv");
-    codexes.put(codex.idToHexadecimal(), codex);
   }
   
   private Scrollable helpView() {

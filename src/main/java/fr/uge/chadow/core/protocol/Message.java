@@ -1,13 +1,17 @@
 package fr.uge.chadow.core.protocol;
 
+import fr.uge.chadow.client.Frame;
+
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
-public record Message(String login, String txt, long epoch) {
+public record Message(String login, String txt, long epoch) implements Frame {
   private static final Charset UTF_8 = StandardCharsets.UTF_8;
 
+  @Override
   public ByteBuffer toByteBuffer() {
+    var op = Opcode.YELL;
     var bbLogin = UTF_8.encode(login);
     var bbTxt = UTF_8.encode(txt);
     var bbMsg = ByteBuffer.allocate(bbLogin.remaining() + bbTxt.remaining() + 2 * Integer.BYTES + Long.BYTES);
