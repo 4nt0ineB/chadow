@@ -140,7 +140,11 @@ public class Session {
       case REGISTER -> {
         var register = (Register) readers.get(currentOpcode).get();
         login = register.username();
-        server.addClient(login, sc);
+        if (!server.addClient(login, sc)) {
+          logger.warning(STR."Login \{login} already in use");
+          silentlyClose();
+          return;
+        }
         logger.info(STR."Client \{sc.getRemoteAddress()} has logged in as \{login}");
       }
       case YELL -> {
@@ -244,7 +248,7 @@ public class Session {
   private void silentlyClose() {
     try {
       sc.close();
-      // TODO: remove client from server
+      server.removeClient(login);
     } catch (IOException e) {
       // ignore exception
     }
