@@ -4,7 +4,6 @@ import fr.uge.chadow.cli.CLIColor;
 import fr.uge.chadow.cli.InputReader;
 import fr.uge.chadow.cli.display.*;
 import fr.uge.chadow.core.protocol.YellMessage;
-import fr.uge.chadow.core.protocol.YellMessage;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -250,6 +249,7 @@ public class ClientConsoleController {
             currentCodex().stopSharing();
           }else {
             currentCodex().share();
+            client.propose(currentCodex());
           }
           mode = Mode.CODEX_DETAILS;
           currentView = codexView(currentCodex());
@@ -259,9 +259,9 @@ public class ClientConsoleController {
       case ":download" -> {
         if(!currentCodex().isComplete()) {
           if(currentCodex().isDownloading()) {
-            currentCodex().stopDownloading();
+            client.stopDownloading(currentCodex().idToHexadecimal());
           }else {
-            currentCodex().download();
+            client.download(currentCodex().idToHexadecimal());
           }
           mode = Mode.CODEX_DETAILS;
           currentView = codexView(currentCodex());
@@ -356,7 +356,13 @@ public class ClientConsoleController {
             mustClose = true;
           }
         })
-        .or(() -> commandCdxDetails(input)) ;
+        .or(() -> {
+          try {
+            return commandCdxDetails(input);
+          } catch (InterruptedException e) {
+            throw new RuntimeException(e); // @Todo
+          }
+        }) ;
   }
   
   private Optional<Boolean> commandResize(String input) throws IOException {
@@ -401,19 +407,13 @@ public class ClientConsoleController {
     return Optional.empty();
   }
   
-  private Optional<Boolean> commandCdxDetails(String input) {
+  private Optional<Boolean> commandCdxDetails(String input) throws InterruptedException {
     var patternRetrieve = Pattern.compile(":cdx:(.*)");
     var matcherRetrieve = patternRetrieve.matcher(input);
     if (matcherRetrieve.find()) {
       var fingerprint = matcherRetrieve.group(1);
       logger.info(STR.":cdx: \{fingerprint}\n");
       var codex = client.getCodex(fingerprint);
-      if (codex == null) {
-        logger.info("Codex not found");
-        // use a synchronous call to retrieve the codex (wait for the server response)
-        // client.retrieveCodex(fingerprint);
-        return Optional.of(false);
-      }
       selectedCodexForDetails = codex.orElseThrow();
       mode = Mode.CODEX_DETAILS;
       currentView = codexView(selectedCodexForDetails);
@@ -511,7 +511,8 @@ public class ClientConsoleController {
       .append("\n");
     sb.append(colorize(CLIColor.BOLD, "Total size:   "))
       .append(View.bytesToHumanReadable(codex.totalSize()))
-      .append("\n\n");
+      .append("\n");
+    sb.append("Local Path: ").append(codex.root()).append("\n\n");
     sb.append(colorize(CLIColor.BOLD, "Files:  \n"));
     infoFiles.stream()
              .collect(Collectors.groupingBy(Codex.FileInfo::absolutePath))

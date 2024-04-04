@@ -22,7 +22,8 @@ public enum Opcode {
   HIDDEN,
   SHARING,
   STOPSHARING,
-  OK;
+  OK,
+  REQUEST_RESPONSE;
 
   public static Opcode from(byte value) {
     return switch (value) {
@@ -48,6 +49,7 @@ public enum Opcode {
       case 19 -> SHARING;
       case 20 -> STOPSHARING;
       case 21 -> OK;
+      case 22 -> REQUEST_RESPONSE;
       default -> throw new IllegalArgumentException("Invalid value for Opcode");
     };
   }

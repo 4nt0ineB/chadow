@@ -16,6 +16,7 @@ import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
@@ -33,6 +34,7 @@ public class Client {
   private final HashMap<String, List<YellMessage>> privateMessages = new HashMap<>();
   private final SortedSet<String> users = new TreeSet<>();
   private final ReentrantLock lock = new ReentrantLock();
+  private final ArrayBlockingQueue<Optional<String>> requestCodexResponseQueue = new ArrayBlockingQueue<>(1);
 
 
   public Client(String login, InetSocketAddress serverAddress) throws IOException {
@@ -123,11 +125,15 @@ public class Client {
    * @throws InterruptedException
    */
   public void sendMessage(String msg) throws InterruptedException {
-    clientContext.queueMessage(new YellMessage(login, msg, 0L));
+    clientContext.queueFrame(new YellMessage(login, msg, 0L));
     selector.wakeup();
   }
-
-
+  
+  public void propose(Codex codex) {
+    clientContext.queue.addFirst(codex);
+    selector.wakeup();
+  }
+  
   public List<String> getUsers() {
     lock.lock();
     try {
@@ -154,11 +160,22 @@ public class Client {
     return new ArrayList<>(codexes.values());
   }
 
-  public Optional<Codex> getCodex(String id) {
-    return Optional.ofNullable(codexes.get(id));
+  public Optional<Codex> getCodex(String id) throws InterruptedException {
+    var codex = codexes.get(id);
+    if(codex != null) {
+      return Optional.of(codex);
+    }
+    requestCodexResponseQueue.clear();
+    clientContext.queueFrame(new Request(id));
+    var fetchedCodexId = requestCodexResponseQueue.poll(5, java.util.concurrent.TimeUnit.SECONDS);
+    if(fetchedCodexId == null) {
+      return Optional.empty();
+    }
+    return fetchedCodexId.map(codexes::get);
+    
+    
   }
-
-
+  
   private void silentlyClose(SelectionKey key) {
     Channel sc = key.channel();
     try {
@@ -187,8 +204,26 @@ public class Client {
       lock.unlock();
     }
   }
-
-
+  
+  public void stopDownloading(String id) {
+    var codex = codexes.get(id);
+    if(codex == null) {
+      return;
+    }
+    codex.stopDownloading();
+    // clientContext.queueFrame(new Cancel(id));
+  }
+  
+  public void download(String id) {
+    var codex = codexes.get(id);
+    if(codex == null) {
+      return;
+    }
+    codex.download();
+    clientContext.queueFrame(new RequestDownload(id, (byte) 0));
+  }
+  
+  
   private class Context {
     private final SelectionKey key;
     private final SocketChannel sc;
@@ -212,6 +247,12 @@ public class Client {
           case REGISTER -> readers.put(opcode, new GlobalReader<>(Register.class));
           case YELL -> readers.put(opcode, new GlobalReader<>(YellMessage.class));
           case OK -> readers.put(opcode, new GlobalReader<>(OK.class));
+          /*
+          case REQUEST -> {
+            throw new Error("Request opcode not supported");
+              readers.put(opcode, new GlobalReader<>(PROPOSE.class));
+          }
+           */
           default -> {
             //logger.warning(STR."No reader for opcode \{opcode}");
             //silentlyClose();
@@ -293,12 +334,9 @@ public class Client {
         }
       }
     }
-
-    /**
-     * Add a message to the message queue, tries to fill bufferOut and updateInterestOps
-     */
-    private void queueMessage(YellMessage msg) {
-      queue.addFirst(msg);
+    
+    private void queueFrame(Frame frame) {
+      queue.addFirst(frame);
       processOut();
       updateInterestOps();
     }
