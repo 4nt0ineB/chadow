@@ -33,7 +33,7 @@ public class Main {
     var lines = Integer.parseInt(args[3]);
     var columns = Integer.parseInt(args[4]);
     var random = new Random();
-    new ClientConsoleController(new Client(args[0] + random.nextInt(), socket), lines, columns).start();
+    new ClientConsoleController(new Client(args[0], socket), lines, columns).start();
   }
   
   public static void main(String[] args) throws IOException, InterruptedException {
