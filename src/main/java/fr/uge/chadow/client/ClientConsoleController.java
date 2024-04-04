@@ -3,7 +3,7 @@ package fr.uge.chadow.client;
 import fr.uge.chadow.cli.InputReader;
 import fr.uge.chadow.cli.display.Display;
 import fr.uge.chadow.cli.display.View;
-import fr.uge.chadow.core.protocol.Message;
+import fr.uge.chadow.core.protocol.YellMessage;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -27,8 +27,8 @@ public class ClientConsoleController {
   private final Client client;
   private final InputReader inputReader;
   private final Display display;
-  private final ArrayList<Message> publicMessages = new ArrayList<>();
-  private final HashMap<String, List<Message>> privateMessages = new HashMap<>();
+  private final ArrayList<YellMessage> publicMessages = new ArrayList<>();
+  private final HashMap<String, List<YellMessage>> privateMessages = new HashMap<>();
   private final SortedSet<String> users = new TreeSet<>();
   private final HashMap<String, Codex> codexes = new HashMap<>();
   private Codex selectedCodexForDetails;
@@ -54,7 +54,7 @@ public class ClientConsoleController {
     inputReader = new InputReader(viewCanRefresh, this);
   }
   
-  public List<Message> messages() {
+  public List<YellMessage> messages() {
     synchronized (lock) {
       return Collections.unmodifiableList(publicMessages);
     }
@@ -113,7 +113,7 @@ public class ClientConsoleController {
     }
   }
   
-  public void addMessage(Message message) {
+  public void addMessage(YellMessage message) {
     synchronized (lock) {
       publicMessages.add(message);
     }
@@ -174,11 +174,11 @@ public class ClientConsoleController {
    * Create a splash screen logo with a list of messages
    * showing le title "Chadow" in ascii art and the version
    */
-  private List<Message> splashLogo() {
+  private List<YellMessage> splashLogo() {
     return List.of(
-        new Message("", "┏┓┓    ┓", 0),
-        new Message("", "┃ ┣┓┏┓┏┫┏┓┓┏┏", 0),
-        new Message("", "┗┛┗┗┗┗┗┗┗┛┗┛┛ v1.0.0 - Bastos & Sebbah", 0)
+        new YellMessage("", "┏┓┓    ┓", 0),
+        new YellMessage("", "┃ ┣┓┏┓┏┫┏┓┓┏┏", 0),
+        new YellMessage("", "┗┛┗┗┗┗┗┗┗┛┗┛┛ v1.0.0 - Bastos & Sebbah", 0)
     );
   }
   
@@ -380,15 +380,15 @@ public class ClientConsoleController {
   private void fillWithFakeData() {
     var users = new String[]{"test", "Morpheus", "Trinity", "Neo", "Flynn", "Alan", "Lora", "Gandalf", "Bilbo", "SKIDROW", "Antoine"};
     this.users.addAll(Arrays.asList(users));
-    var messages = new Message[]{
-        new Message("test", "test", System.currentTimeMillis()),
-        new Message("test", "hello how are you", System.currentTimeMillis()),
-        new Message("Morpheus", "Wake up, Neo...", System.currentTimeMillis()),
-        new Message("Morpheus", "The Matrix has you...", System.currentTimeMillis()),
-        new Message("Neo", "what the hell is this", System.currentTimeMillis()),
-        new Message("Alan1", "Master CONTROL PROGRAM\nRELEASE TRON JA 307020...\nI HAVE PRIORITY ACCESS 7", System.currentTimeMillis()),
-        new Message("SKIDROW", "Here is the codex of the FOSS (.deb) : cdx:1eb49a28a0c02b47eed4d0b968bb9aec116a5a47", System.currentTimeMillis()),
-        new Message("Antoine", "Le lien vers le sujet : http://igm.univ-mlv.fr/coursprogreseau/tds/projet2024.html", System.currentTimeMillis())
+    var messages = new YellMessage[]{
+        new YellMessage("test", "test", System.currentTimeMillis()),
+        new YellMessage("test", "hello how are you", System.currentTimeMillis()),
+        new YellMessage("Morpheus", "Wake up, Neo...", System.currentTimeMillis()),
+        new YellMessage("Morpheus", "The Matrix has you...", System.currentTimeMillis()),
+        new YellMessage("Neo", "what the hell is this", System.currentTimeMillis()),
+        new YellMessage("Alan1", "Master CONTROL PROGRAM\nRELEASE TRON JA 307020...\nI HAVE PRIORITY ACCESS 7", System.currentTimeMillis()),
+        new YellMessage("SKIDROW", "Here is the codex of the FOSS (.deb) : cdx:1eb49a28a0c02b47eed4d0b968bb9aec116a5a47", System.currentTimeMillis()),
+        new YellMessage("Antoine", "Le lien vers le sujet : http://igm.univ-mlv.fr/coursprogreseau/tds/projet2024.html", System.currentTimeMillis())
     };
     this.publicMessages.addAll(splashLogo());
     this.publicMessages.addAll(Arrays.asList(messages));

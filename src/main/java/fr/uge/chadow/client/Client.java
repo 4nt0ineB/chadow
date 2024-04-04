@@ -1,6 +1,6 @@
 package fr.uge.chadow.client;
 
-import fr.uge.chadow.core.protocol.Message;
+import fr.uge.chadow.core.protocol.YellMessage;
 import fr.uge.chadow.core.reader.MessageReader;
 import fr.uge.chadow.core.reader.Reader;
 
@@ -12,7 +12,6 @@ import java.nio.channels.Channel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Objects;
@@ -33,7 +32,7 @@ public class Client {
   private final ArrayBlockingQueue<String> commandsQueue = new ArrayBlockingQueue<>(1);
   private Context uniqueContext;
 
-  private final LinkedBlockingQueue<Message> receivedMessages = new LinkedBlockingQueue<>();
+  private final LinkedBlockingQueue<YellMessage> receivedMessages = new LinkedBlockingQueue<>();
 
   public Client(String login, InetSocketAddress serverAddress) throws IOException {
     this.serverAddress = serverAddress;
@@ -51,7 +50,7 @@ public class Client {
   }
 
   private static void usage() {
-    System.out.println("Usage : ClientChat login hostname port");
+    System.out.println("Usage : ClientChat username hostname port");
   }
 
   public String serverHostName() {
@@ -73,8 +72,8 @@ public class Client {
     selector.wakeup();
   }
 
-  public List<Message> getLastMessages(int n) {
-    var messages = new ArrayList<Message>();
+  public List<YellMessage> getLastMessages(int n) {
+    var messages = new ArrayList<YellMessage>();
     receivedMessages.drainTo(messages, n);
     return messages;
   }
@@ -85,11 +84,11 @@ public class Client {
   private void processCommands() {
     var command = commandsQueue.poll();
     if (command != null) {
-      uniqueContext.queueMessage(new Message(login, command, System.currentTimeMillis()));
+      uniqueContext.queueMessage(new YellMessage(login, command, System.currentTimeMillis()));
     }
   }
 
-  public void subscribe(Consumer<Message> subscriber) {
+  public void subscribe(Consumer<YellMessage> subscriber) {
     Objects.requireNonNull(subscriber);
     uniqueContext.messageConsumer = subscriber;
   }
@@ -143,10 +142,10 @@ public class Client {
     private final ByteBuffer bufferIn = ByteBuffer.allocate(BUFFER_SIZE);
     private final ByteBuffer bufferOut = ByteBuffer.allocate(BUFFER_SIZE);
     private final ByteBuffer processingMsg = ByteBuffer.allocate(2 * Integer.BYTES + 2 * BUFFER_SIZE);
-    private final ArrayDeque<Message> queue = new ArrayDeque<>();
+    private final ArrayDeque<YellMessage> queue = new ArrayDeque<>();
     private final MessageReader messageReader = new MessageReader();
     private boolean closed = false;
-    private Consumer<Message> messageConsumer = null;
+    private Consumer<YellMessage> messageConsumer = null;
 
     private Context(SelectionKey key) {
       this.key = key;
@@ -185,7 +184,7 @@ public class Client {
     /**
      * Add a message to the message queue, tries to fill bufferOut and updateInterestOps
      */
-    private void queueMessage(Message msg) {
+    private void queueMessage(YellMessage msg) {
       queue.addFirst(msg);
       processOut();
       updateInterestOps();
@@ -212,8 +211,8 @@ public class Client {
      * closed and of both ByteBuffers.
      * <p>
      * The convention is that both buffers are in write-mode before the call to
-     * updateInterestOps and after the call. Also it is assumed that process has
-     * been be called just before updateInterestOps.
+     * updateInterestOps and after the call. Also, it is assumed that process has
+     * been called just before updateInterestOps.
      */
 
     private void updateInterestOps() {

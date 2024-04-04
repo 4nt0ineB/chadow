@@ -4,7 +4,7 @@ import fr.uge.chadow.cli.CLIColor;
 import fr.uge.chadow.client.ClientConsoleController;
 import fr.uge.chadow.client.ClientConsoleController.Mode;
 import fr.uge.chadow.client.Codex;
-import fr.uge.chadow.core.protocol.Message;
+import fr.uge.chadow.core.protocol.YellMessage;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -250,7 +250,7 @@ public class Display {
    *
    * @return
    */
-  private List<Message> getFormattedMessages() {
+  private List<YellMessage> getFormattedMessages() {
     
     var subList = getMessagesToDisplay();
     var list = subList.stream()
@@ -261,7 +261,7 @@ public class Display {
   }
   
   
-  private List<Message> getMessagesToDisplay() {
+  private List<YellMessage> getMessagesToDisplay() {
     
     var messages = controller.messages();
     
@@ -296,18 +296,18 @@ public class Display {
   /**
    * Sanitize and format the message to display.
    * If the message is too long, it will be split into multiple lines.
-   * the first line will contain the user login and date, the following lines will only contain the message.
+   * the first line will contain the user username and date, the following lines will only contain the message.
    * This allows to display the message in a more readable way.
    *
    * @param message
    * @param lineLength
    * @return
    */
-  private Stream<Message> formatMessage(Message message, int lineLength) {
+  private Stream<YellMessage> formatMessage(YellMessage message, int lineLength) {
     
     var sanitizedLines = splitAndSanitize(message.txt(), lineLength);
     return IntStream.range(0, sanitizedLines.size())
-                    .mapToObj(index -> new Message(index == 0 ? message.login() : "", sanitizedLines.get(index), message.epoch()));
+                    .mapToObj(index -> new YellMessage(index == 0 ? message.login() : "", sanitizedLines.get(index), message.epoch()));
     
   }
   

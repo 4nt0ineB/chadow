@@ -1,8 +1,6 @@
 package fr.uge.chadow.server;
 
-import fr.uge.chadow.core.protocol.Message;
-import fr.uge.chadow.core.protocol.Opcode;
-import fr.uge.chadow.core.protocol.Register;
+import fr.uge.chadow.core.protocol.*;
 import fr.uge.chadow.core.reader.GlobalReader;
 import fr.uge.chadow.core.reader.Reader;
 
@@ -19,16 +17,18 @@ import java.util.logging.Logger;
 public class Session {
   private static final Logger logger = Logger.getLogger(Server.class.getName());
   private static final int BUFFER_SIZE = 1_024;
-  private final ArrayDeque<Message> queue = new ArrayDeque<>();
+
+  private final ArrayDeque<Frame> queue = new ArrayDeque<>();
   private final ByteBuffer bufferIn = ByteBuffer.allocate(BUFFER_SIZE);
   private final ByteBuffer bufferOut = ByteBuffer.allocate(BUFFER_SIZE);
-  private final ByteBuffer processingMsg = ByteBuffer.allocate(2 * Integer.BYTES + 2 * BUFFER_SIZE);
   private final Map<Opcode, Reader<?>> readers = new HashMap<>();
   private final SelectionKey key;
-  private final Server server;  // we could also have Context as an instance class, which would naturally
-  // give access to ServerChatInt.this
+  private final Server server;  // we could also have Context as an instance class, which would naturally give access
+  // to ServerChatInt.this
+
   private final SocketChannel sc;
   private boolean closed = false;
+  private ByteBuffer processingFrame;
   private String login;
   private Opcode currentOpcode;
 
@@ -40,7 +40,8 @@ public class Session {
     for (var opcode : Opcode.values()) {
       switch (opcode) {
         case REGISTER -> readers.put(opcode, new GlobalReader<>(Register.class));
-        case YELL -> readers.put(opcode, new GlobalReader<>(Message.class));
+        case YELL -> readers.put(opcode, new GlobalReader<>(YellMessage.class));
+        case WHISPER -> readers.put(opcode, new GlobalReader<>(WhisperMessage.class));
         default -> {
           logger.warning(STR."No reader for opcode \{opcode}");
           silentlyClose();
@@ -144,8 +145,14 @@ public class Session {
         logger.info(STR."Client \{sc.getRemoteAddress()} has logged in as \{login}");
       }
       case YELL -> {
-        var message = (Message) readers.get(currentOpcode).get();
-        server.broadcast(message);
+        var message = (YellMessage) readers.get(currentOpcode).get();
+        var newMessage = new YellMessage(message.login(), message.txt(), System.currentTimeMillis());
+        server.broadcast(newMessage);
+      }
+      case WHISPER -> {
+        var message = (WhisperMessage) readers.get(currentOpcode).get();
+        var newMessage = new WhisperMessage(message.username(), message.txt(), System.currentTimeMillis());
+        server.whisper(newMessage);
       }
       default -> {
         logger.warning(STR."No action for opcode \{currentOpcode}");
@@ -154,18 +161,17 @@ public class Session {
     }
   }
 
-
   private boolean isAuthenticated() {
     return login != null;
   }
 
   /**
-   * Add a message to the message queue, tries to fill bufferOut and updateInterestOps
+   * Add a frame to the message queue, tries to fill bufferOut and updateInterestOps
    *
-   * @param msg
+   * @param frame the frame to add to the queue
    */
-  public void queueMessage(Message msg) {
-    queue.addFirst(msg);
+  public void queueFrame(Frame frame) {
+    queue.addFirst(frame);
     processOut();
     updateInterestOps();
   }
@@ -174,21 +180,15 @@ public class Session {
    * Try to fill bufferOut from the message queue
    */
   private void processOut() {
-    processingMsg.flip();
-    if (processingMsg.hasRemaining()) {
-      var oldlimit = processingMsg.limit();
-      processingMsg.limit(bufferOut.remaining());
-      bufferOut.put(processingMsg);
-      processingMsg.limit(oldlimit);
-      processingMsg.compact();
-    } else {
-      processingMsg.clear();
-      var msg = queue.pollLast();
-      var login = StandardCharsets.UTF_8.encode(msg.login());
-      var txt = StandardCharsets.UTF_8.encode(msg.txt());
-      bufferOut
-              .putInt(login.remaining()).put(login)
-              .putInt(txt.remaining()).put(txt);
+    while (!queue.isEmpty()) {
+      var frame = queue.pollLast();
+      var bb = frame.toByteBuffer();
+      if (bb.remaining() <= bufferOut.remaining()) {
+        bufferOut.put(bb);
+      } else {
+        queue.addLast(frame);
+        break;
+      }
     }
     updateInterestOps();
   }

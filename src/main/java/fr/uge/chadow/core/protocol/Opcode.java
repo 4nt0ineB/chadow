@@ -51,4 +51,8 @@ public enum Opcode {
       default -> throw new IllegalArgumentException("Invalid value for Opcode");
     };
   }
+
+  public byte toByte() {
+    return (byte) this.ordinal();
+  }
 }

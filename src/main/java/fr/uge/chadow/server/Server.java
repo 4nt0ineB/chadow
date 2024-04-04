@@ -9,7 +9,8 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import fr.uge.chadow.core.protocol.Message;
+import fr.uge.chadow.core.protocol.WhisperMessage;
+import fr.uge.chadow.core.protocol.YellMessage;
 
 public class Server {
   private static final Logger logger = Logger.getLogger(Server.class.getName());
@@ -85,15 +86,25 @@ public class Server {
   /**
    * Add a message to all connected clients queue
    *
-   * @param msg
+   * @param msg the message to broadcast
    */
-  void broadcast(Message msg) {
+  void broadcast(YellMessage msg) {
     for (var key : selector.keys()) {
-      var context = ((Session) key.attachment());
-      if (context != null) {
-        context.queueMessage(msg);
+      var session = ((Session) key.attachment());
+      if (session != null) {
+        session.queueFrame(msg);
       }
     }
+  }
+
+  public void whisper(WhisperMessage message) {
+    var sc = clients.get(message.username());
+    if (sc == null) {
+      logger.warning(STR."Client not found for login \{message.username()}");
+      return;
+    }
+    var session = (Session) sc.keyFor(selector).attachment();
+    session.queueFrame(message);
   }
 
   public boolean addClient(String login, SocketChannel sc) {
