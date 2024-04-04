@@ -299,7 +299,6 @@ public class Client {
      */
     private void queueMessage(YellMessage msg) {
       queue.addFirst(msg);
-      logger.info(STR."sending message \{msg}");
       processOut();
       updateInterestOps();
     }
@@ -308,7 +307,6 @@ public class Client {
      * Try to fill bufferOut from the message queue
      */
     private void processOut() {
-      logger.info("JE PASSE ICI " + queue.size() + " / " + processingFrame);
       if (processingFrame == null && !queue.isEmpty()) {
 
         while (!queue.isEmpty()) {
@@ -316,7 +314,6 @@ public class Client {
           processingFrame = queue.pollLast()
                   .toByteBuffer();
           processingFrame.flip();
-          logger.info(STR."Frame of size \{processingFrame.remaining()}");
           if (processingFrame.remaining() <= bufferOut.remaining()) { // tant que place on met dedans
             bufferOut.put(processingFrame);
             processingFrame.compact();
@@ -405,7 +402,6 @@ public class Client {
      */
 
     private void doWrite() throws IOException {
-      logger.info("JE WRITE");
       bufferOut.flip();
       sc.write(bufferOut);
       bufferOut.compact();

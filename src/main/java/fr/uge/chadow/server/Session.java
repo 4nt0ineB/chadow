@@ -134,9 +134,7 @@ public class Session {
         queueFrame(new OK());
       }
       case YELL -> {
-        logger.info(STR."Yell message received");
         var message = (YellMessage) readers.get(currentOpcode).get();
-        logger.info(STR."Message from \{message.login()}: \{message.txt()}");
         var newMessage = new YellMessage(message.login(), message.txt(), System.currentTimeMillis());
         server.broadcast(newMessage);
       }
@@ -164,7 +162,6 @@ public class Session {
   public void queueFrame(Frame frame) {
     queue.addFirst(frame);
     processOut();
-    System.out.println("queueFrame : Update interest ops");
     updateInterestOps();
   }
 
@@ -172,21 +169,15 @@ public class Session {
    * Try to fill bufferOut from the message queue
    */
   private void processOut() {
-    System.out.println("processOut");
-    System.out.println("bufferOut: " + bufferOut);
-    System.out.println("queue: " + queue);
-    System.out.println("processingFrame: " + processingFrame);
     if (processingFrame == null && !queue.isEmpty()) {
       while (!queue.isEmpty()) {
         processingFrame = queue.pollLast().toByteBuffer();
         processingFrame.flip();
-        System.out.println("processingFrame: " + processingFrame);
-        System.out.println("bufferOut remaning: " + bufferOut.remaining());
         if (processingFrame.remaining() <= bufferOut.remaining()) {
           // If enough space in bufferOut, add the frame
           bufferOut.put(processingFrame);
           processingFrame.compact();
-        } else { // plus de place
+        } else {
           processingFrame.compact();
           break;
         }
@@ -214,8 +205,6 @@ public class Session {
       // If the current frame does not contain any data, reset processingFrame to null
       processingFrame = null;
     }
-
-    System.out.println("bufferOut: " + bufferOut);
   }
 
   /**
@@ -230,12 +219,9 @@ public class Session {
   private void updateInterestOps() {
     int ops = 0;
     if (bufferIn.hasRemaining() && !closed) {
-      System.out.println("JE READ");
-      System.out.println("bufferIn: " + bufferIn);
       ops |= SelectionKey.OP_READ;
     }
     if (bufferOut.position() > 0) {
-      System.out.println("JE WRITE");
       ops |= SelectionKey.OP_WRITE;
     }
     if (ops != 0) {
@@ -268,9 +254,7 @@ public class Session {
       closed = true;
       logger.info(STR."Client \{sc.getRemoteAddress()} has closed the connection");
     }
-    System.out.println("Le client " + sc.getRemoteAddress() + " a envoyé: " + bufferIn);
     processIn();
-    System.out.println("doRead : Update interest ops");
     updateInterestOps();
   }
 
@@ -287,7 +271,6 @@ public class Session {
     sc.write(bufferOut.flip());
     bufferOut.compact();
     processOut();
-    System.out.println("doWrite : Update interest ops");
     updateInterestOps();
   }
 
