@@ -4,6 +4,7 @@ import fr.uge.chadow.server.Server;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.Random;
 
 public class Main {
   private static void usage() {
@@ -29,7 +30,9 @@ public class Main {
     var socket = new InetSocketAddress(args[0], Integer.parseInt(args[1]));
     var lines = Integer.parseInt(args[2]);
     var columns = Integer.parseInt(args[3]);
-    new ClientConsoleController(new Client("Flynn", socket), lines, columns).start();
+    var random = new Random();
+    
+    new ClientConsoleController(new Client("Flynn" + random.nextInt(), socket), lines, columns).start();
   }
   
   public static void main(String[] args) throws IOException, InterruptedException {

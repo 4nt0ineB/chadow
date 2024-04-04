@@ -221,7 +221,6 @@ public class Client {
           }
         }
       }
-      queue.addFirst(new Register(login));
     }
     
     /**
@@ -309,6 +308,7 @@ public class Client {
         case YELL -> {
           var message = (YellMessage) readers.get(currentOpcode)
                                              .get();
+          logger.info(STR."Received message from \{message.login()} : \{message.txt()}");
           addMessage(message);
         }
         default -> {
@@ -343,6 +343,7 @@ public class Client {
           logger.info(STR."Frame of size \{processingFrame.remaining()}");
           if (processingFrame.remaining() <= bufferOut.remaining()) { // tant que place on met dedans
             bufferOut.put(processingFrame);
+            processingFrame.compact();
           } else { // plus de place
             processingFrame.compact();
             break;
@@ -440,8 +441,12 @@ public class Client {
         logger.warning("the selector gave a bad hint");
         return;
       }
+      queue.addFirst(new Register(login));
       key.interestOps(SelectionKey.OP_WRITE);
+      processOut();
+      
       logger.info("** Ready to chat now **");
+      
     }
   }
   

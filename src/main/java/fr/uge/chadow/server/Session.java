@@ -58,7 +58,7 @@ public class Session {
   private void processIn() {
     for (; ; ) {
       if (!validateClientOperation()) {
-        silentlyClose();
+        //silentlyClose();
         return;
       }
 
@@ -73,7 +73,9 @@ public class Session {
             return;
           }
           readers.get(currentOpcode).reset();
+          //logger.info(STR."1) Processed opcode \{currentOpcode}");
           currentOpcode = null; // reset opcode
+          //logger.info(STR."2) Processed opcode \{currentOpcode}");
         }
         case REFILL -> {
           return;
@@ -120,7 +122,9 @@ public class Session {
       logger.warning("Client not authenticated");
       return false;
     }
-
+  
+    logger.info(STR."Received opcode \{currentOpcode}");
+    
     if (Opcode.REGISTER == currentOpcode && isAuthenticated()) {
       logger.warning("Client already authenticated");
       return false;
@@ -195,6 +199,7 @@ public class Session {
         if (processingFrame.remaining() <= bufferOut.remaining()) {
           // If enough space in bufferOut, add the frame
           bufferOut.put(processingFrame);
+          processingFrame.compact();
         } else { // plus de place
           processingFrame.compact();
           break;

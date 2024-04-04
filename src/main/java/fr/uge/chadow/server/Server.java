@@ -93,6 +93,7 @@ public class Server {
       var session = ((Session) key.attachment());
       if (session != null) {
         session.queueFrame(msg);
+        logger.info(STR."Broadcasting message \{msg.txt()}");
       }
     }
   }
@@ -116,6 +117,7 @@ public class Server {
   }
 
   public void removeClient(String login) {
+    logger.info(STR."Client \{login} has disconnected");
     clients.remove(login);
   }
 
