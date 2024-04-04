@@ -23,7 +23,7 @@ import java.util.logging.Logger;
 import java.util.List;
 
 public class Client {
-  
+
   private static final int BUFFER_SIZE = 10_000;
   private static final Logger logger = Logger.getLogger(Client.class.getName());
   private final SocketChannel sc;
@@ -32,9 +32,9 @@ public class Client {
   private final String login;
   private final ArrayBlockingQueue<String> commandsQueue = new ArrayBlockingQueue<>(1);
   private Context uniqueContext;
-  
+
   private final LinkedBlockingQueue<Message> receivedMessages = new LinkedBlockingQueue<>();
-  
+
   public Client(String login, InetSocketAddress serverAddress) throws IOException {
     this.serverAddress = serverAddress;
     this.login = login;
@@ -49,19 +49,19 @@ public class Client {
     }
     new Client(args[0], new InetSocketAddress(args[1], Integer.parseInt(args[2]))).launch();
   }
-  
+
   private static void usage() {
     System.out.println("Usage : ClientChat login hostname port");
   }
-  
+
   public String serverHostName() {
     return serverAddress.getHostName();
   }
-  
+
   public String login() {
     return login;
   }
-  
+
   /**
    * Send instructions to the selector via a BlockingQueue and wake it up
    *
@@ -72,13 +72,13 @@ public class Client {
     commandsQueue.put(msg);
     selector.wakeup();
   }
-  
+
   public List<Message> getLastMessages(int n) {
     var messages = new ArrayList<Message>();
     receivedMessages.drainTo(messages, n);
     return messages;
   }
-  
+
   /**
    * Processes the command from the BlockingQueue
    */
@@ -88,7 +88,7 @@ public class Client {
       uniqueContext.queueMessage(new Message(login, command, System.currentTimeMillis()));
     }
   }
-  
+
   public void subscribe(Consumer<Message> subscriber) {
     Objects.requireNonNull(subscriber);
     uniqueContext.messageConsumer = subscriber;
@@ -100,7 +100,7 @@ public class Client {
     uniqueContext = new Context(key);
     key.attach(uniqueContext);
     sc.connect(serverAddress);
-    
+
     while (!Thread.interrupted()) {
       try {
         selector.select(this::treatKey);
@@ -110,7 +110,7 @@ public class Client {
       }
     }
   }
-  
+
   private void treatKey(SelectionKey key) {
     try {
       if (key.isValid() && key.isConnectable()) {
@@ -127,7 +127,7 @@ public class Client {
       throw new UncheckedIOException(ioe);
     }
   }
-  
+
   private void silentlyClose(SelectionKey key) {
     Channel sc = key.channel();
     try {
@@ -136,7 +136,7 @@ public class Client {
       // ignore exception
     }
   }
-  
+
   static private class Context {
     private final SelectionKey key;
     private final SocketChannel sc;
@@ -147,12 +147,12 @@ public class Client {
     private final MessageReader messageReader = new MessageReader();
     private boolean closed = false;
     private Consumer<Message> messageConsumer = null;
-    
+
     private Context(SelectionKey key) {
       this.key = key;
       this.sc = (SocketChannel) key.channel();
     }
-    
+
     /**
      * Process the content of bufferIn
      * <p>
@@ -165,9 +165,9 @@ public class Client {
         switch (status) {
           case DONE:
             var msg = messageReader.get();
-            if(messageConsumer == null){
+            if (messageConsumer == null) {
               logger.info("C'est null");
-            }else {
+            } else {
               messageConsumer.accept(msg);
               messageReader.reset();
 
@@ -181,7 +181,7 @@ public class Client {
         }
       }
     }
-    
+
     /**
      * Add a message to the message queue, tries to fill bufferOut and updateInterestOps
      */
@@ -190,32 +190,23 @@ public class Client {
       processOut();
       updateInterestOps();
     }
-    
+
     /**
      * Try to fill bufferOut from the message queue
      */
     private void processOut() {
-      processingMsg.flip();
-      if (processingMsg.hasRemaining()) {
-        var oldlimit = processingMsg.limit();
-        processingMsg.limit(bufferOut.remaining());
-        bufferOut.put(processingMsg);
-        processingMsg.limit(oldlimit);
-        processingMsg.compact();
-      } else {
-        processingMsg.clear();
-        var msg = queue.pollLast();
-        var login = StandardCharsets.UTF_8.encode(msg.login());
-        var txt = StandardCharsets.UTF_8.encode(msg.txt());
-        bufferOut
-            .putInt(login.remaining())
-            .put(login)
-            .putInt(txt.remaining())
-            .put(txt);
+      while (!queue.isEmpty()) {
+        var msg = queue.peek();
+        var bbMsg = msg.toByteBuffer().flip();
+        if (bbMsg.remaining() <= bufferOut.remaining()) {
+          queue.remove();
+          bufferOut.put(bbMsg);
+        } else {
+          break;
+        }
       }
-      updateInterestOps();
     }
-    
+
     /**
      * Update the interestOps of the key looking only at values of the boolean
      * closed and of both ByteBuffers.
@@ -224,7 +215,7 @@ public class Client {
      * updateInterestOps and after the call. Also it is assumed that process has
      * been be called just before updateInterestOps.
      */
-    
+
     private void updateInterestOps() {
       int ops = 0;
       if (bufferIn.hasRemaining() && !closed) {
@@ -239,7 +230,7 @@ public class Client {
         silentlyClose();
       }
     }
-    
+
     private void silentlyClose() {
       try {
         sc.close();
@@ -247,7 +238,7 @@ public class Client {
         // ignore exception
       }
     }
-    
+
     /**
      * Performs the read action on sc
      * <p>
@@ -264,7 +255,7 @@ public class Client {
       processIn();
       updateInterestOps();
     }
-    
+
     /**
      * Performs the write action on sc
      * <p>
@@ -273,15 +264,15 @@ public class Client {
      *
      * @throws IOException
      */
-    
+
     private void doWrite() throws IOException {
       bufferOut.flip();
       sc.write(bufferOut);
       bufferOut.compact();
-      processIn();
+      processOut();
       updateInterestOps();
     }
-    
+
     public void doConnect() throws IOException {
       if (!sc.finishConnect()) {
         logger.warning("the selector gave a bad hint");

@@ -4,7 +4,6 @@ import fr.uge.chadow.core.protocol.Message;
 import fr.uge.chadow.core.protocol.Opcode;
 import fr.uge.chadow.core.protocol.Register;
 import fr.uge.chadow.core.reader.GlobalReader;
-import fr.uge.chadow.core.reader.MessageReader;
 import fr.uge.chadow.core.reader.Reader;
 
 import java.io.IOException;
@@ -221,6 +220,7 @@ public class Session {
   private void silentlyClose() {
     try {
       sc.close();
+      // TODO: remove client from server
     } catch (IOException e) {
       // ignore exception
     }
