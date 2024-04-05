@@ -21,7 +21,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
 public class Client {
-
+  
   private static final int BUFFER_SIZE = 1024;
   private static final Logger logger = Logger.getLogger(Client.class.getName());
   private final SocketChannel sc;
@@ -31,7 +31,7 @@ public class Client {
   private Context clientContext;
   private final HashMap<String, Codex> codexes = new HashMap<>();
   private final ArrayList<YellMessage> publicMessages = new ArrayList<>();
-  private final HashMap<String, List<YellMessage>> privateMessages = new HashMap<>();
+  private final HashMap<UUID, Recipient> privateMessages = new HashMap<>();
   private final SortedSet<String> users = new TreeSet<>();
   private final ReentrantLock lock = new ReentrantLock();
   private final ArrayBlockingQueue<Optional<String>> requestCodexResponseQueue = new ArrayBlockingQueue<>(1);
@@ -112,7 +112,7 @@ public class Client {
   public List<YellMessage> getPublicMessages() {
     lock.lock();
     try {
-      return Collections.unmodifiableList(publicMessages);
+      return List.copyOf(publicMessages);
     } finally {
       lock.unlock();
     }
@@ -122,14 +122,15 @@ public class Client {
    * Send instructions to the selector via a BlockingQueue and wake it up
    *
    * @param msg
-   * @throws InterruptedException
    */
-  public void sendMessage(String msg) throws InterruptedException {
+  public void yell(String msg) {
+    logger.info(STR."(yell) message queued of length \{msg.length()}");
     clientContext.queueFrame(new YellMessage(login, msg, 0L));
     selector.wakeup();
   }
   
   public void propose(Codex codex) {
+    logger.info(STR."(propose) codex \{codex.name()} (id: \{codex.idToHexadecimal()}) queued");
     clientContext.queue.addFirst(codex);
     selector.wakeup();
   }
@@ -157,7 +158,7 @@ public class Client {
   }
 
   public List<Codex> codexes() {
-    return new ArrayList<>(codexes.values());
+    return List.copyOf(codexes.values());
   }
 
   public Optional<Codex> getCodex(String id) throws InterruptedException {
@@ -172,8 +173,47 @@ public class Client {
       return Optional.empty();
     }
     return fetchedCodexId.map(codexes::get);
-    
-    
+  }
+  
+  public void whisper(UUID recipientId, String message){
+    var recipient = getRecipientbyId(recipientId);
+    if(recipient.isEmpty()) {
+      logger.warning(STR."(whisper) whispering to id \{recipientId}, but was not found");
+      return;
+    }
+    var recipientUsername = recipient.orElseThrow().username();
+    clientContext.queueFrame(new WhisperMessage(recipientUsername, message, 0L));
+    logger.info(STR."(whisper) message to \{recipientUsername} of length \{message.length()} queued");
+    selector.wakeup();
+    recipient.orElseThrow().addMessage(new WhisperMessage(login, message, System.currentTimeMillis()));
+  }
+  
+  public Optional<Recipient> getRecipientbyId(UUID userId) {
+    lock.lock();
+    try {
+      var recipient = privateMessages.get(userId);
+      if(recipient == null) {
+        return Optional.empty();
+      }
+      return Optional.of(recipient);
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  public Optional<Recipient> getRecipient(String username) {
+    lock.lock();
+    try {
+      var recipient = privateMessages.values().stream().filter(u -> u.username().equals(username)).findFirst();
+      recipient.ifPresent(r -> {
+        if(!r.hasMessages()) {
+          r.addMessage(new WhisperMessage("(info)", STR."This is the beginning of your private message history with \{username}", System.currentTimeMillis()));
+        }
+      });
+      return recipient;
+    } finally {
+      lock.unlock();
+    }
   }
   
   private void silentlyClose(SelectionKey key) {
@@ -184,26 +224,7 @@ public class Client {
       // ignore exception
     }
   }
-
-  /**
-   * Check if the client is connected to the server
-   *
-   * @return true if the client is connected to the server, false otherwise
-   */
-  public boolean isConnected() {
-    return clientContext.isConnected;
-  }
-
-  /////////// For the session only
-
-  private void addMessage(YellMessage msg) {
-    lock.lock();
-    try {
-      publicMessages.add(msg);
-    } finally {
-      lock.unlock();
-    }
-  }
+  
   
   public void stopDownloading(String id) {
     var codex = codexes.get(id);
@@ -223,6 +244,41 @@ public class Client {
     clientContext.queueFrame(new RequestDownload(id, (byte) 0));
   }
   
+
+  
+  
+  /**
+   * Check if the client is connected to the server
+   *
+   * @return true if the client is connected to the server, false otherwise
+   */
+  public boolean isConnected() {
+    return clientContext.isConnected;
+  }
+
+  /////////// For the session only
+
+  private void addMessage(YellMessage msg) {
+    lock.lock();
+    try {
+      publicMessages.add(msg);
+      logger.info(STR."Received message from \{msg.login()} : \{msg.txt()}");
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private void addWhisper(WhisperMessage msg) {
+    var Recipient = getRecipient(msg.username());
+    Recipient.ifPresentOrElse(r -> r.addMessage(msg), () -> {
+      var newRecipient = new Recipient(UUID.randomUUID(), msg.username());
+      var startMessage = new WhisperMessage("", STR."This is the beginning of your private message history with \{msg.username()}", System.currentTimeMillis());
+      newRecipient.addMessage(startMessage);
+      newRecipient.addMessage(msg);
+      privateMessages.put(newRecipient.id(), newRecipient);
+    });
+    logger.info(STR."\{msg.username()} is whispering a message of length \{msg.txt().length()}");
+  }
   
   private class Context {
     private final SelectionKey key;
@@ -247,6 +303,7 @@ public class Client {
           case REGISTER -> readers.put(opcode, new GlobalReader<>(Register.class));
           case YELL -> readers.put(opcode, new GlobalReader<>(YellMessage.class));
           case OK -> readers.put(opcode, new GlobalReader<>(OK.class));
+          case WHISPER -> readers.put(opcode, new GlobalReader<>(WhisperMessage.class));
           /*
           case REQUEST -> {
             throw new Error("Request opcode not supported");
@@ -322,12 +379,8 @@ public class Client {
           isConnected = true;
           logger.info(STR."Connected to the server");
         }
-        case YELL -> {
-          var message = (YellMessage) readers.get(currentOpcode)
-                  .get();
-          logger.info(STR."Received message from \{message.login()} : \{message.txt()}");
-          addMessage(message);
-        }
+        case YELL -> addMessage((YellMessage) readers.get(currentOpcode).get());
+        case WHISPER -> addWhisper((WhisperMessage) readers.get(currentOpcode).get());
         default -> {
           logger.warning(STR."No action for opcode \{currentOpcode}");
           silentlyClose();
@@ -346,12 +399,10 @@ public class Client {
      */
     private void processOut() {
       if (processingFrame == null && !queue.isEmpty()) {
-
         while (!queue.isEmpty()) {
-
-          processingFrame = queue.pollLast()
-                  .toByteBuffer();
+          processingFrame = queue.pollLast().toByteBuffer();
           processingFrame.flip();
+          logger.info(STR."Processing frame of length \{processingFrame.remaining()}");
           if (processingFrame.remaining() <= bufferOut.remaining()) { // tant que place on met dedans
             bufferOut.put(processingFrame);
             processingFrame.compact();
@@ -474,12 +525,26 @@ public class Client {
             new YellMessage("SKIDROW", "Here is the codex of the FOSS (.deb) : cdx:1eb49a28a0c02b47eed4d0b968bb9aec116a5a47", System.currentTimeMillis()),
             new YellMessage("Antoine", "Le lien vers le sujet : http://igm.univ-mlv.fr/coursprogreseau/tds/projet2024.html", System.currentTimeMillis())
     };
-    this.publicMessages.addAll(ClientConsoleController.splashLogo());
+    this.publicMessages.addAll(splashLogo());
     this.publicMessages.addAll(Arrays.asList(messages));
+    var userId = UUID.randomUUID();
+    this.privateMessages.put(userId, new Recipient(userId, "Alan1"));
     // test codex
     var codex = Codex.fromPath("my codex", "/home/alan1/Pictures");
     codexes.put(codex.idToHexadecimal(), codex);
     codex = Codex.fromPath("my codex", "/home/alan1/Downloads/Great Teacher Onizuka (1999)/Great Teacher Onizuka - S01E01 - Lesson 1.mkv");
     codexes.put(codex.idToHexadecimal(), codex);
+  }
+  
+  /**
+   * Create a splash screen logo with a list of messages
+   * showing le title "Chadow" in ascii art and the version
+   */
+  public static Collection<YellMessage> splashLogo() {
+    return List.of(
+        new YellMessage("", "┏┓┓    ┓", 0),
+        new YellMessage("", "┃ ┣┓┏┓┏┫┏┓┓┏┏", 0),
+        new YellMessage("", "┗┛┗┗┗┗┗┗┗┛┗┛┛ v1.0.0 - Bastos & Sebbah", 0)
+    );
   }
 }

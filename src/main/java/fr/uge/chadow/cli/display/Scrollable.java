@@ -81,10 +81,6 @@ public class Scrollable implements View {
     scroller.scrollPageUp();
   }
   
-  public void moveToTop() {
-    scroller.moveToTop();
-  }
-  
   public void scrollPageDown() {
     scroller.scrollPageDown();
   }

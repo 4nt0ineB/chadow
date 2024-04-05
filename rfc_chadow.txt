@@ -234,7 +234,7 @@ encodé de la manière suivante :
   Le client envoie une trame de publication de message global.
 
     +-------------------------------------------------------------+
-    | (yell) | username_sender | creation_date | message (string) |
+    | (yell) | username_sender | message (string) | creation_date |
     +-------------------------------------------------------------+
 
   Le serveur retransmet la même trame à tous les clients même le 
@@ -247,7 +247,7 @@ encodé de la manière suivante :
   à un username spécifique. 
 
   +------------------------------------------------------------------+
-  | (whisper) | username_receiver | creation_date | message (string) |
+  | (whisper) | username_receiver | message (string) | creation_date |
   +------------------------------------------------------------------+
 
   - message: le message à envoyer qui ne pourra pas dépasser 1024 octets.  
@@ -256,7 +256,7 @@ encodé de la manière suivante :
   ("username_receiver") :
 
   +----------------------------------------------------------------+
-  | (whisper) | username_sender | creation_date | message (string) |
+  | (whisper) | username_sender | message (string) | creation_date |
   +----------------------------------------------------------------+
 
 

@@ -2,7 +2,8 @@ package fr.uge.chadow.cli.display;
 
 import fr.uge.chadow.cli.CLIColor;
 import fr.uge.chadow.client.ClientConsoleController;
-import fr.uge.chadow.core.protocol.YellMessage;
+import fr.uge.chadow.client.Recipient;
+import fr.uge.chadow.core.protocol.WhisperMessage;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -16,18 +17,19 @@ import java.util.stream.Stream;
 
 import static fr.uge.chadow.cli.display.View.splitAndSanitize;
 
-public class MainView implements View {
+public class PrivateMessageView implements View {
   private final ClientConsoleController controller;
   private final Scroller messageScroller;
-  private final Scroller userScroller;
   
   private final AtomicBoolean viewCanRefresh;
   private final ReentrantLock lock = new ReentrantLock();
   private int lines;
   private int cols;
-  private ClientConsoleController.Mode mode = ClientConsoleController.Mode.CHAT_LIVE_REFRESH;
+  private ClientConsoleController.Mode mode = ClientConsoleController.Mode.PRIVATE_MESSAGE_LIVE;
+  private Recipient recipient;
+  private List<WhisperMessage> messages = new ArrayList<>();
   
-  public MainView(int lines, int cols, AtomicBoolean viewCanRefresh, ClientConsoleController controller) {
+  public PrivateMessageView(int lines, int cols, AtomicBoolean viewCanRefresh, ClientConsoleController controller) {
     Objects.requireNonNull(viewCanRefresh);
     Objects.requireNonNull(controller);
     if (lines <= 0 || cols <= 0) {
@@ -38,7 +40,17 @@ public class MainView implements View {
     this.cols = cols;
     this.viewCanRefresh = viewCanRefresh;
     this.messageScroller = new Scroller(0, View.maxLinesView(lines));
-    this.userScroller = new Scroller(0, View.maxLinesView(lines));
+  }
+  
+  public void setReceiver(Recipient recipient) {
+    Objects.requireNonNull(recipient);
+    this.recipient = recipient;
+    updateMessages();
+  }
+  
+  private void updateMessages(){
+    messages = recipient.messages();
+    messageScroller.setLines(messages.size());
   }
   
   /**
@@ -75,8 +87,8 @@ public class MainView implements View {
     clear();
     System.out.print(chatHeader());
     System.out.print(chatDisplay());
-    if (mode == ClientConsoleController.Mode.CHAT_LIVE_REFRESH) {
-      messageScroller.setLines(controller.numberOfMessages());
+    if (mode == ClientConsoleController.Mode.PRIVATE_MESSAGE_LIVE) {
+      updateMessages();
     }
   }
   
@@ -87,11 +99,7 @@ public class MainView implements View {
    * @return
    */
   private int getMaxUserLength() {
-    return Math.max(controller.users()
-                              .stream()
-                              .mapToInt(String::length)
-                              .max()
-                              .orElse(0), 15);
+    return Math.max(5, Math.max(recipient.username().length(), controller.clientLogin().length()));
   }
   
   /**
@@ -109,42 +117,30 @@ public class MainView implements View {
     var maxLinesView = View.maxLinesView(lines);
     var colsRemaining = cols - getMaxUserLength() - 2;
     // chat | presence
-    var users = getUsersToDisplay();
     var iterator = getFormattedMessages().iterator();
     var loginColor = "";
     while (iterator.hasNext() && lineIndex < maxLinesView) {
       var message = iterator.next();
-      if (!message.login()
+      if (!message.username()
                   .isBlank()) {
-        loginColor = CLIColor.stringToColor(message.login());
+        loginColor = CLIColor.stringToColor(message.username());
       }
       colsRemaining = cols;
-      var date = message.login()
+      var date = message.username()
                         .isBlank() ? " ".repeat(10) : STR."\{View.formatDate(message.epoch())}  ";
       colsRemaining -= date.length();
-      var user = (STR."%\{maxUserLength}s").formatted(message.login());
+      var user = (STR."%\{maxUserLength}s").formatted(message.username());
       colsRemaining -= user.length();
       colsRemaining -= maxUserLength + 5; // right side pannel of users + margin ( | ) and (│ )
       var who = (STR."%s\{loginColor}\{CLIColor.BOLD}%s\{CLIColor.RESET}").formatted(date, user);
-      var separator = message.login()
+      var separator = message.username()
                              .isBlank() ? STR."\{CLIColor.BOLD} │ \{CLIColor.RESET}" : " ▒ ";
       var messageLine = (STR."\{loginColor}\{separator}\{CLIColor.RESET}%-\{colsRemaining}s").formatted(message.txt());
       messageLine = View.beautifyCodexLink(messageLine);
-      var formatedLine = String.format(STR."%s%s\{CLIColor.CYAN}│ ",
+      var formatedLine = String.format(STR."%s%s\{CLIColor.CYAN}",
           who,
           messageLine);
       sb.append(formatedLine);
-      // display (or not) the user presence. Paginate if necessary
-      if (lineIndex < users.size()) {
-        if (lineIndex < maxLinesView - 1) {
-          sb.append(CLIColor.CYAN);
-          sb.append(users.get(lineIndex));
-        } else {
-          sb.append(CLIColor.BOLD)
-            .append(CLIColor.ORANGE)
-            .append(STR."++ (\{users.size() - lineIndex} more)");
-        }
-      }
       sb.append(CLIColor.RESET)
         .append("\n");
       who = " ".repeat(maxUserLength + 7);
@@ -153,10 +149,7 @@ public class MainView implements View {
     }
     // Draw empty remaining lines on screen and display side panel of users
     for (; lineIndex < maxLinesView; lineIndex++) {
-      sb.append(String.format(STR."%-\{cols - maxUserLength - 2}s\{CLIColor.CYAN}│ ", " "));
-      if (users.size() > lineIndex) {
-        sb.append(String.format(STR."%-\{maxUserLength}s", users.get(lineIndex)));
-      }
+      sb.append(String.format(STR."%-\{cols - 1}s\{CLIColor.CYAN}", " "));
       sb.append("\n");
     }
     return sb.toString();
@@ -164,32 +157,13 @@ public class MainView implements View {
   
   private String chatHeader() {
     var sb = new StringBuilder();
-    var colsRemaining = cols - getMaxUserLength() - 2;
     sb.append(CLIColor.CYAN_BACKGROUND);
     sb.append(CLIColor.WHITE);
-    var title = (STR."%-\{colsRemaining}s ").formatted(STR."CHADOW CLIENT on \{controller.clientServerHostName()} (" + lines + "x" + cols + ")");
-    colsRemaining -= title.length() + 2; // right side pannel of users + margin (  )
-    var totalUsers = (STR."\{CLIColor.BOLD}\{CLIColor.BLACK}%-\{getMaxUserLength()}s").formatted(STR."(\{controller.totalUsers()})");
-    colsRemaining -= totalUsers.length();
-    sb.append("%s %s".formatted(title, totalUsers));
-    sb.append(" ".repeat(Math.max(0, colsRemaining)));
+    var title = (STR."%-\{cols - 1}s ").formatted(STR."CHADOW CLIENT on \{controller.clientServerHostName()} (" + lines + "x" + cols + STR.") Private message with \{recipient.username()}");
+    sb.append(title);
     sb.append(CLIColor.RESET);
     sb.append('\n');
     return sb.toString();
-  }
-  
-  private String inputField() {
-    var inputField = "";
-    if (!viewCanRefresh.get()) {
-      // (getMaxUserLength() + 21)
-      inputField = ("%s\n")
-          .formatted(STR."[\{CLIColor.BOLD}\{CLIColor.CYAN}\{controller.clientLogin()}\{CLIColor.RESET}]");
-    } else {
-      // (getMaxUserLength() + 50)
-      inputField = ("%s\n")
-          .formatted(STR."\{CLIColor.GREY}[\{CLIColor.GREY}\{CLIColor.BOLD}\{controller.clientLogin()}\{CLIColor.RESET}\{CLIColor.GREY}]\{CLIColor.RESET}");
-    }
-    return inputField + View.inviteCharacter() + CLIColor.BOLD;
   }
   
   /**
@@ -197,8 +171,7 @@ public class MainView implements View {
    *
    * @return
    */
-  private List<YellMessage> getFormattedMessages() {
-    
+  private List<WhisperMessage> getFormattedMessages() {
     var subList = getMessagesToDisplay();
     var list = subList.stream()
                       .flatMap(message -> formatMessage(message, msgLineLength()))
@@ -208,10 +181,7 @@ public class MainView implements View {
   }
   
   
-  private List<YellMessage> getMessagesToDisplay() {
-    
-    var messages = controller.messages();
-    
+  private List<WhisperMessage> getMessagesToDisplay() {
     if (messages.size() <= View.maxLinesView(lines)) {
       return messages;
     }
@@ -220,20 +190,6 @@ public class MainView implements View {
     }
     return messages.subList(messageScroller.getA(), messageScroller.getB());
     
-  }
-  
-  private List<String> getUsersToDisplay() {
-    var users = controller.users();
-    if (users.size() <= View.maxLinesView(lines)) {
-      return new ArrayList<>(users);
-    }
-    if (mode == ClientConsoleController.Mode.CHAT_LIVE_REFRESH) {
-      return users.stream()
-                  .toList();
-    }
-    return users.stream()
-                .skip(userScroller.getA())
-                .toList();
   }
   
   private int msgLineLength() {
@@ -250,11 +206,11 @@ public class MainView implements View {
    * @param lineLength
    * @return
    */
-  private Stream<YellMessage> formatMessage(YellMessage message, int lineLength) {
+  private Stream<WhisperMessage> formatMessage(WhisperMessage message, int lineLength) {
     
     var sanitizedLines = splitAndSanitize(message.txt(), lineLength);
     return IntStream.range(0, sanitizedLines.size())
-                    .mapToObj(index -> new YellMessage(index == 0 ? message.login() : "", sanitizedLines.get(index), message.epoch()));
+                    .mapToObj(index -> new WhisperMessage(index == 0 ? message.username() : "", sanitizedLines.get(index), message.epoch()));
     
   }
   
@@ -269,24 +225,21 @@ public class MainView implements View {
   @Override
   public void scrollPageUp() {
     switch (mode) {
-      case CHAT_SCROLLER -> messageScroller.scrollPageUp();
-      case USERS_SCROLLER -> userScroller.scrollPageUp();
+      case PRIVATE_MESSAGE_SCROLLER -> messageScroller.scrollPageUp();
     }
   }
   
   @Override
   public void scrollPageDown() {
     switch (mode) {
-      case CHAT_SCROLLER -> messageScroller.scrollPageDown();
-      case USERS_SCROLLER -> userScroller.scrollPageDown();
+      case PRIVATE_MESSAGE_SCROLLER -> messageScroller.scrollPageDown();
     }
   }
   
   @Override
   public void scrollBottom() {
     switch (mode) {
-      case CHAT_SCROLLER -> messageScroller.setLines(controller.numberOfMessages());
-      case USERS_SCROLLER -> userScroller.setLines(controller.users().size());
+      case PRIVATE_MESSAGE_SCROLLER -> messageScroller.setLines(controller.numberOfMessages());
     }
   }
   
@@ -294,25 +247,25 @@ public class MainView implements View {
   @Override
   public void scrollLineUp() {
     switch (mode) {
-      case CHAT_SCROLLER -> messageScroller.scrollUp(1);
-      case USERS_SCROLLER -> userScroller.scrollUp(1);
+      case PRIVATE_MESSAGE_SCROLLER -> messageScroller.scrollUp(1);
     }
   }
   
   @Override
   public void scrollLineDown() {
     switch (mode) {
-      case CHAT_SCROLLER -> messageScroller.scrollDown(1);
-      case USERS_SCROLLER -> userScroller.scrollDown(1);
+      case PRIVATE_MESSAGE_SCROLLER -> messageScroller.scrollDown(1);
     }
   }
   
   @Override
   public void scrollTop() {
     switch (mode) {
-      case CHAT_SCROLLER -> messageScroller.moveToTop();
-      case USERS_SCROLLER -> userScroller.moveToTop();
+      case PRIVATE_MESSAGE_SCROLLER -> messageScroller.moveToTop();
     }
   }
   
+  public Recipient receiver() {
+    return recipient;
+  }
 }

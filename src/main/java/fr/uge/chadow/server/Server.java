@@ -98,10 +98,10 @@ public class Server {
     }
   }
 
-  public void whisper(WhisperMessage message) {
-    var sc = clients.get(message.username());
+  public void whisper(WhisperMessage message, String recipient) {
+    var sc = clients.get(recipient);
     if (sc == null) {
-      logger.warning(STR."Client not found for login \{message.username()}");
+      logger.warning(STR."Client not found for login \{recipient}");
       return;
     }
     var session = (Session) sc.keyFor(selector).attachment();

@@ -140,8 +140,10 @@ public class Session {
       }
       case WHISPER -> {
         var message = (WhisperMessage) readers.get(currentOpcode).get();
-        var newMessage = new WhisperMessage(message.username(), message.txt(), System.currentTimeMillis());
-        server.whisper(newMessage);
+        // we receive whisper from login to username
+        // we send whisper to username from login
+        var newMessage = new WhisperMessage(login, message.txt(), System.currentTimeMillis());
+        server.whisper(newMessage, message.username());
       }
       default -> {
         logger.warning(STR."No action for opcode \{currentOpcode}");

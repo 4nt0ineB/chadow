@@ -18,6 +18,8 @@ import java.util.stream.Collectors;
 import static fr.uge.chadow.cli.display.View.colorize;
 
 public class ClientConsoleController {
+  
+  
   public enum Mode {
     CHAT_LIVE_REFRESH, // default
     CHAT_SCROLLER,     // :c, :chat
@@ -26,6 +28,8 @@ public class ClientConsoleController {
     CODEX_SEARCH,      // :search <name>
     CODEX_DETAILS,     // :cdx:<fingerprint>
     CODEX_LIST,        // :mycdx
+    PRIVATE_MESSAGE_LIVE,   // :w, :whisper <username>
+    PRIVATE_MESSAGE_SCROLLER // :m, :msg
   }
   //// app management
   private final static Logger logger = Logger.getLogger(ClientConsoleController.class.getName());
@@ -37,7 +41,8 @@ public class ClientConsoleController {
   private final Display display;
   private View currentView;
   private Selector<?> currentSelector;
-  private MainView mainView;
+  private ChatView mainView;
+  private PrivateMessageView privateMessageView;
   private Mode mode;
   // we can't have reentrant locks because this thread runs inputReader that call display
   // that itself call this controller to get the messages and users.
@@ -57,7 +62,8 @@ public class ClientConsoleController {
     this.lines = lines;
     this.cols = cols;
     AtomicBoolean viewCanRefresh = new AtomicBoolean(true);
-    mainView = new MainView(lines, cols, viewCanRefresh, this);
+    mainView = new ChatView(lines, cols, viewCanRefresh, this);
+    privateMessageView = new PrivateMessageView(lines, cols, viewCanRefresh, this);
     currentView = mainView;
     display = new Display(lines, cols, viewCanRefresh, this);
     inputReader = new InputReader(viewCanRefresh, this);
@@ -66,13 +72,13 @@ public class ClientConsoleController {
   
   public List<YellMessage> messages() {
     synchronized (lock) {
-      return Collections.unmodifiableList(client.getPublicMessages());
+      return client.getPublicMessages();
     }
   }
   
   public List<Codex> codexes() {
     synchronized (lock) {
-      return Collections.unmodifiableList(client.codexes());
+      return client.codexes();
     }
   }
   
@@ -179,18 +185,6 @@ public class ClientConsoleController {
   }
   
   /**
-   * Create a splash screen logo with a list of messages
-   * showing le title "Chadow" in ascii art and the version
-   */
-  public static Collection<? extends YellMessage> splashLogo() {
-    return List.of(
-        new YellMessage("", "┏┓┓    ┓", 0),
-        new YellMessage("", "┃ ┣┓┏┓┏┫┏┓┓┏┏", 0),
-        new YellMessage("", "┗┛┗┗┗┗┗┗┗┛┗┛┛ v1.0.0 - Bastos & Sebbah", 0)
-    );
-  }
-  
-  /**
    * Process the message or the command
    *
    * @param input the user input
@@ -289,7 +283,37 @@ public class ClientConsoleController {
       case CODEX_SEARCH -> throw new Error("Not implemented");
       case CODEX_DETAILS -> processInputModeCodexDetails(input);
       case CODEX_LIST -> processInputModeCodexList(input);
+      case PRIVATE_MESSAGE_LIVE -> processInputModePrivateMessageLive(input);
+      case PRIVATE_MESSAGE_SCROLLER ->{
+        if(input.equals(":w")) {
+          mode = Mode.PRIVATE_MESSAGE_LIVE;
+          mainView.setMode(mode);
+          currentView = mainView;
+          currentView.scrollTop();
+          yield true;
+        }
+        yield processInputModeScroller(input);
+      }
     };
+  }
+  
+  private boolean processInputModePrivateMessageLive(String input) {
+    switch (input) {
+      case ":m", ":msg" -> {
+        mode = Mode.PRIVATE_MESSAGE_SCROLLER;
+        privateMessageView.setMode(mode);
+        currentView = privateMessageView;
+        currentView.scrollTop();
+        return true;
+      }
+      default -> {
+        if(!input.startsWith(":") && !input.isBlank()) {
+          var receiver = privateMessageView.receiver();
+          client.whisper(receiver.id(), input);
+        }
+        return false;
+      }
+    }
   }
   
   private boolean processInputModeCodexList(String input) {
@@ -303,31 +327,33 @@ public class ClientConsoleController {
         currentView.scrollTop();
         logger.info(STR."see cdx: \{View.bytesToHexadecimal(selectedCodexForDetails.id())}");
       }
-      default -> {
-      }
-    }// select codex
+    }
     return true;
   }
   
   private boolean processInputModeLiveRefresh(String input) throws InterruptedException {
-    if (!input.startsWith(":") && !input.isBlank()) {
-      logger.info(STR."send message: \{input}");
-      client.sendMessage(input);
-      return false;
-    }
     switch (input) {
       case ":u", ":users" -> {
         logger.info("focusing users list");
-        mainView.setMode(Mode.USERS_SCROLLER);
+        mode = Mode.USERS_SCROLLER;
+        mainView.setMode(mode);
+        currentView = mainView;
         return true;
       }
       case ":m", ":msg" -> {
         logger.info("focusing messages list");
-        mainView.setMode(Mode.CHAT_SCROLLER);
+        mode = Mode.CHAT_SCROLLER;
+        mainView.setMode(mode);
+        currentView = mainView;
         return true;
       }
+      default -> {
+        if(!input.startsWith(":") && !input.isBlank()) {
+          client.yell(input);
+        }
+        return false;
+      }
     }
-    return false;
   }
   
   private boolean processInputModeScroller(String input) {
@@ -362,7 +388,35 @@ public class ClientConsoleController {
           } catch (InterruptedException e) {
             throw new RuntimeException(e); // @Todo
           }
-        }) ;
+        })
+        .or(() -> commandWhisper(input))
+        ;
+  }
+  
+  private Optional<Boolean> commandWhisper(String input) {
+    var patternWhisper = Pattern.compile(":w\\s+(.*)");
+    var matcherWhisper = patternWhisper.matcher(input);
+    if (matcherWhisper.find()) {
+      var receiverUsername = matcherWhisper.group(1);
+      mode = Mode.PRIVATE_MESSAGE_LIVE;
+      var receiver = client.getRecipient(receiverUsername);
+      if(receiver.isEmpty()) {
+        return Optional.of(true);
+      }
+      privateMessageView.setReceiver(receiver.orElseThrow());
+      mode = Mode.PRIVATE_MESSAGE_LIVE;
+      privateMessageView.setMode(mode);
+      currentView = privateMessageView;
+      try {
+        drawDisplay();
+      } catch (IOException e) {
+        logger.severe(STR."Error while drawing display.\{e.getMessage()}");
+        throw new UncheckedIOException(e);
+      }
+      
+      return Optional.of(false);
+    }
+    return Optional.empty();
   }
   
   private Optional<Boolean> commandResize(String input) throws IOException {
@@ -446,7 +500,7 @@ public class ClientConsoleController {
         [GLOBAL COMMANDS]
           :h, :help - Display this help (scrollable)
           :c, :chat - Back to the [CHAT] in live reload
-          :w, :whisper <username> - Display the private discussion with the other user (TODO)
+          :w, :whisper <username> - Start a new private discussion with a user
           :d - Update and draw the display
           :r <lines> <columns> - Resize the view
           :new <codexName>, <path> - Create a codex from a file or directory
@@ -463,6 +517,10 @@ public class ClientConsoleController {
           
           :m, :msg - Focus on chat (scrollable)
           :u, :users - Focus on the users list (scrollable)
+          
+        [PRIVATE MESSAGES]
+          :m, :msg - Focus on the chat (scrollable)
+          :w - Enables back live reload
           
         [CODEX]
         (scrollable)
