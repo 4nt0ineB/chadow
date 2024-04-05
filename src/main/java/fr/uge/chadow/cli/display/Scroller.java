@@ -12,12 +12,8 @@ public class Scroller {
   
   public Scroller(int lines, int pageHeight) {
     this.pageHeight = pageHeight;
-    setLines(lines);
-  }
-  
-  public void setCurrentLine(int currentLine) {
-    Objects.checkIndex(currentLine, lines);
-    this.currentLine = currentLine;
+    this.lines = lines;
+    currentLine = Math.max(lines - pageHeight, 0);
   }
   
   /**

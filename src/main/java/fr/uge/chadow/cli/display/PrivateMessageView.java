@@ -22,7 +22,6 @@ public class PrivateMessageView implements View {
   private final ClientAPI api;
   private final Scroller messageScroller;
   
-  private final AtomicBoolean viewCanRefresh;
   private final ReentrantLock lock = new ReentrantLock();
   private int lines;
   private int cols;
@@ -30,8 +29,7 @@ public class PrivateMessageView implements View {
   private Recipient recipient;
   private List<WhisperMessage> messages = new ArrayList<>();
   
-  public PrivateMessageView(int lines, int cols, AtomicBoolean viewCanRefresh, ClientAPI api) {
-    Objects.requireNonNull(viewCanRefresh);
+  public PrivateMessageView(int lines, int cols, ClientAPI api) {
     Objects.requireNonNull(api);
     if (lines <= 0 || cols <= 0) {
       throw new IllegalArgumentException("lines and cols must be positive");
@@ -39,7 +37,6 @@ public class PrivateMessageView implements View {
     this.api = api;
     this.lines = lines;
     this.cols = cols;
-    this.viewCanRefresh = viewCanRefresh;
     this.messageScroller = new Scroller(0, View.maxLinesView(lines));
   }
   

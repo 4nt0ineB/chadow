@@ -37,25 +37,18 @@ public class ClientController {
   private final static Logger logger = Logger.getLogger(ClientController.class.getName());
   private final InetSocketAddress serverAddress;
   private final ClientAPI api;
-  private final InputReader inputReader;
   private volatile boolean mustClose = false;
-  private final Object lock = new Object();
   //// display management
-  private final Display display;
+  private Display display;
   private View currentView;
   private Selector<?> currentSelector;
-  private ChatView mainView;
-  private PrivateMessageView privateMessageView;
+  private final ChatView mainView;
+  private final PrivateMessageView privateMessageView;
   private final AtomicBoolean viewCanRefresh = new AtomicBoolean(true);
+  private Codex selectedCodexForDetails;
   private Mode mode;
-  // we can't have reentrant locks because this thread runs inputReader that call display
-  // that itself call this controller to get the messages and users.
-  // Plus we have incoming messages from client, so can have concurrent modifications on the lists
   private int lines;
   private int cols;
-  //// data management
-  
-  private Codex selectedCodexForDetails;
   
   public ClientController(String login, InetSocketAddress serverAddress, int lines, int cols) {
     Objects.requireNonNull(login);
@@ -66,33 +59,40 @@ public class ClientController {
     this.lines = lines;
     this.cols = cols;
     this.serverAddress = serverAddress;
-    this.api = new ClientAPI(login);
-    mainView = new ChatView(lines, cols, viewCanRefresh, api);
-    privateMessageView = new PrivateMessageView(lines, cols, viewCanRefresh, api);
-    display = new Display(lines, cols, this, api);
-    inputReader = new InputReader(viewCanRefresh, this);
+    api = new ClientAPI(login);
+    mainView = new ChatView(lines, cols, api);
     currentView = mainView;
+    privateMessageView = new PrivateMessageView(lines, cols, api);
     mode = Mode.CHAT_LIVE_REFRESH;
   }
   
-  public boolean viewCanRefresh() {
-    return viewCanRefresh.get();
+  public void stopAutoRefresh() throws IOException {
+    viewCanRefresh.set(false);
+    clearDisplayAndMore();
+    drawDisplay();
+  }
+  
+  public AtomicBoolean viewCanRefresh() {
+    return viewCanRefresh;
   }
   
   public View currentView() {
-    synchronized (lock) {
       return currentView;
-    }
   }
   
   public void start() throws IOException {
+    // Creates the display
+    display = new Display(lines, cols, this, api);
+    InputReader inputReader = new InputReader(this);
     logger.info(STR."Starting console (\{lines} rows \{cols} cols");
-    // client
+    // Starts the client
     startClient(new Client(serverAddress, api));
+    // Draws the display one time at the beginning,
+    // even if the client is not connected
     display.draw();
-    // thread that manages the display
+    // Starts display thread
     startDisplay();
-    // Thread that manages the user inputs
+    // start the input reader
     try {
       inputReader.start();
     } catch (UncheckedIOException | IOException | InterruptedException | NoSuchAlgorithmException e) {
@@ -116,13 +116,6 @@ public class ClientController {
           });
   }
   
-  
-  public int numberOfMessages() {
-    synchronized (lock) {
-      return api.getPublicMessages().size();
-    }
-  }
-  
   public Codex currentCodex() {
     return selectedCodexForDetails;
   }
@@ -142,14 +135,12 @@ public class ClientController {
   }
   
   public void drawDisplay() throws IOException {
-    synchronized (lock) {
       display.clear();
       display.draw();
-    }
   }
   
-  public void clearDisplayAndMore(int numberOfLineBreak) {
-    View.clearDisplayAndMore(lines, numberOfLineBreak);
+  public void clearDisplayAndMore() {
+    View.clearDisplayAndMore(lines, lines);
   }
   
   private void exitNicely() {
@@ -166,9 +157,9 @@ public class ClientController {
    * @param input the user input
    * @return true if the user can type again, otherwise it's the view's turn.
    */
-  public boolean processInput(String input) throws IOException {
+  public void processInput(String input) throws IOException {
     logger.info(STR."Processing input: \{input}");
-    return processComplexCommands(input).orElseGet(() -> switch (input) {
+    var letwrite =  processComplexCommands(input).orElseGet(() -> switch (input) {
       case ":d" -> {
         try {
           drawDisplay();
@@ -209,6 +200,9 @@ public class ClientController {
       }
       default -> processCommandInContext(input);
     });
+    clearDisplayAndMore();
+    viewCanRefresh.set(!letwrite);
+    drawDisplay();
   }
   
   private boolean processInputModeCodexDetails(String input) {

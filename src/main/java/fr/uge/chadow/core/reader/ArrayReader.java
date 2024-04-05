@@ -35,7 +35,9 @@ public class ArrayReader<T extends Record> implements Reader<T[]> {
       if (size < 0) {
         return ProcessStatus.ERROR;
       }
-      value = (T[]) new Object[size];
+      @SuppressWarnings("unchecked")
+      T[] obj = (T[]) new Object[size];
+      value = obj;
     }
 
     while (currentIndex != size) {

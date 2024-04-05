@@ -8,20 +8,16 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.Objects;
 import java.util.logging.Logger;
 
 public class InputReader {
   
-  private static final Logger logger = Logger.getLogger(InputReader.class.getName());
   private final ClientController controller;
-  private final AtomicBoolean viewCanRefresh;
   
-  public InputReader(AtomicBoolean viewCanRefresh, ClientController controller) {
+  public InputReader(ClientController controller) {
     Objects.requireNonNull(controller);
     this.controller = controller;
-    this.viewCanRefresh = viewCanRefresh;
   }
   
   /**
@@ -32,10 +28,9 @@ public class InputReader {
    * to be able to type a message (or a command).
    * When the user press enter again the message (or the command) is processed,
    * then the display goes back into autoRefresh mode.
-   *
+   * <p>
    * In writeMode (autoRefresh set to false), the user can escape a line with '\' followed by enter.
    * This is useful to write a multiline message.
-   *
    *
    * @throws IOException
    */
@@ -44,19 +39,14 @@ public class InputReader {
     StringBuilder inputField = new StringBuilder();
     var c = 0;
     var escape = false;
-    var numberOfLineBreak = 0;
-    
     while ((c = reader.read()) != -1) {
-      var canRefresh = viewCanRefresh.get();
-      if (viewCanRefresh.get()) {
+      var canRefresh = controller.viewCanRefresh().get();
+      if (canRefresh) {
         if (c == '\n') {
-          viewCanRefresh.set(!canRefresh);
-          controller.clearDisplayAndMore(numberOfLineBreak);
-          controller.drawDisplay();
+          controller.stopAutoRefresh();
         }
       } else {
-        if (escape && !inputField.toString()
-                                 .endsWith("\n")) {
+        if (escape && !inputField.toString().endsWith("\n")) {
           // escape '\' is replaced as line break in the inputField
           System.out.print(View.inviteCharacter());
           inputField.append('\n');
@@ -65,14 +55,9 @@ public class InputReader {
           // we escape with '\'
           if (c == '\\') {
             escape = true;
-            numberOfLineBreak++;
           } else if (c == '\n') {
-            var letWrite = controller.processInput(inputField.toString());
-            controller.clearDisplayAndMore(numberOfLineBreak);
-            viewCanRefresh.set(!letWrite);
-            controller.drawDisplay();
+            controller.processInput(inputField.toString());
             inputField.setLength(0);
-            numberOfLineBreak = 0;
           } else {
             inputField.append((char) c);
           }

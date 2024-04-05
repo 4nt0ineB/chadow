@@ -22,14 +22,12 @@ public class ChatView implements View {
   private final Scroller messageScroller;
   private final Scroller userScroller;
   
-  private final AtomicBoolean viewCanRefresh;
   private final ReentrantLock lock = new ReentrantLock();
   private int lines;
   private int cols;
   private ClientController.Mode mode = ClientController.Mode.CHAT_LIVE_REFRESH;
   
-  public ChatView(int lines, int cols, AtomicBoolean viewCanRefresh, ClientAPI controller) {
-    Objects.requireNonNull(viewCanRefresh);
+  public ChatView(int lines, int cols, ClientAPI controller) {
     Objects.requireNonNull(controller);
     if (lines <= 0 || cols <= 0) {
       throw new IllegalArgumentException("lines and cols must be positive");
@@ -37,7 +35,6 @@ public class ChatView implements View {
     this.clientAPI = controller;
     this.lines = lines;
     this.cols = cols;
-    this.viewCanRefresh = viewCanRefresh;
     this.messageScroller = new Scroller(0, View.maxLinesView(lines));
     this.userScroller = new Scroller(0, View.maxLinesView(lines));
   }

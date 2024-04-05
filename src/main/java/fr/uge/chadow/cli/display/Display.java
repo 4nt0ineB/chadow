@@ -60,7 +60,7 @@ public class Display {
     System.out.print(CLIColor.CLEAR);
     System.out.flush();
     while (!Thread.interrupted()) {
-      if (controller.viewCanRefresh()) {
+      if (controller.viewCanRefresh().get()) {
         draw();
       }
       Thread.sleep(200);
@@ -88,7 +88,7 @@ public class Display {
   
   private String inputField() {
     var inputField = "";
-    if (!controller.viewCanRefresh()) {
+    if (!controller.viewCanRefresh().get()) {
       // (getMaxUserLength() + 21)
       inputField = ("%s\n")
           .formatted(STR."[\{CLIColor.BOLD}\{CLIColor.CYAN}\{api.login()}\{CLIColor.RESET}]");
