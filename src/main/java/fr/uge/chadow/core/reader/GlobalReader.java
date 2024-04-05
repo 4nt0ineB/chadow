@@ -1,5 +1,7 @@
 package fr.uge.chadow.core.reader;
 
+import fr.uge.chadow.core.protocol.field.Test;
+
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.RecordComponent;
 import java.nio.ByteBuffer;
@@ -34,6 +36,13 @@ public class GlobalReader<T extends Record> implements Reader<T> {
         readerMap.put(long.class, new LongReader());
       } else if (type.equals(byte.class)) {
         readerMap.put(byte.class, new ByteReader());
+      } else if (type.isArray()) {
+        var componentType = type.getComponentType();
+        if (componentType.equals(Test.class)) {
+          readerMap.put(Test.class, new ArrayReader<>(Test.class));
+        } else {
+          throw new IllegalArgumentException(STR."Unsupported type: \{type}");
+        }
       } else {
         throw new IllegalArgumentException(STR."Unsupported type: \{type}");
       }

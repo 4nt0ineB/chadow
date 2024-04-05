@@ -1,7 +1,5 @@
 package fr.uge.chadow.core.reader;
 
-import fr.uge.chadow.core.protocol.MyArray;
-
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
@@ -11,7 +9,7 @@ public class ArrayReader<T extends Record> implements Reader<T[]> {
   }
 
   private final IntReader intReader = new IntReader();
-  //private final GlobalReader<T> reader;
+  private final GlobalReader<T> reader;
 
   private State state = State.WAITING;
   private int size = -1;
@@ -19,9 +17,7 @@ public class ArrayReader<T extends Record> implements Reader<T[]> {
   private T[] value;
 
   public ArrayReader(Class<T> recordClass) {
-    var recordComponents = recordClass.getRecordComponents();
-    var type = recordComponents[1].getType().getComponentType();
-    //reader = new GlobalReader<>(type);
+    reader = new GlobalReader<>(recordClass);
   }
 
   @Override
@@ -42,15 +38,15 @@ public class ArrayReader<T extends Record> implements Reader<T[]> {
       value = (T[]) new Object[size];
     }
 
-//    while (currentIndex != size) {
-//      var result = reader.process(bb);
-//      if (result != ProcessStatus.DONE) {
-//        return result;
-//      }
-//      value[currentIndex] = reader.get();
-//      reader.reset();
-//      currentIndex++;
-//    }
+    while (currentIndex != size) {
+      var result = reader.process(bb);
+      if (result != ProcessStatus.DONE) {
+        return result;
+      }
+      value[currentIndex] = reader.get();
+      reader.reset();
+      currentIndex++;
+    }
     state = State.DONE;
     return ProcessStatus.DONE;
   }
@@ -69,6 +65,6 @@ public class ArrayReader<T extends Record> implements Reader<T[]> {
     size = -1;
     currentIndex = 0;
     intReader.reset();
-    //reader.reset();
+    reader.reset();
   }
 }
