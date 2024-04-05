@@ -2,8 +2,10 @@ package fr.uge.chadow.server;
 
 import fr.uge.chadow.core.protocol.*;
 import fr.uge.chadow.core.reader.ByteReader;
+import fr.uge.chadow.core.reader.FrameReader;
 import fr.uge.chadow.core.reader.GlobalReader;
 import fr.uge.chadow.core.reader.Reader;
+
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -23,6 +25,7 @@ public class Session {
   private final ByteBuffer bufferOut = ByteBuffer.allocate(BUFFER_SIZE);
   private final ByteReader byteReader = new ByteReader();
   private final Map<Opcode, Reader<?>> readers = new HashMap<>();
+  private final FrameReader frameReader = new FrameReader();
   private final SelectionKey key;
   private final Server server;  // we could also have Context as an instance class, which would naturally give access
   // to ServerChatInt.this
