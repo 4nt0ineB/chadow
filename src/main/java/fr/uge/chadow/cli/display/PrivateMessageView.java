@@ -1,7 +1,8 @@
 package fr.uge.chadow.cli.display;
 
 import fr.uge.chadow.cli.CLIColor;
-import fr.uge.chadow.client.ClientConsoleController;
+import fr.uge.chadow.client.ClientAPI;
+import fr.uge.chadow.client.ClientController;
 import fr.uge.chadow.client.Recipient;
 import fr.uge.chadow.core.protocol.WhisperMessage;
 
@@ -18,24 +19,24 @@ import java.util.stream.Stream;
 import static fr.uge.chadow.cli.display.View.splitAndSanitize;
 
 public class PrivateMessageView implements View {
-  private final ClientConsoleController controller;
+  private final ClientAPI api;
   private final Scroller messageScroller;
   
   private final AtomicBoolean viewCanRefresh;
   private final ReentrantLock lock = new ReentrantLock();
   private int lines;
   private int cols;
-  private ClientConsoleController.Mode mode = ClientConsoleController.Mode.PRIVATE_MESSAGE_LIVE;
+  private ClientController.Mode mode = ClientController.Mode.PRIVATE_MESSAGE_LIVE;
   private Recipient recipient;
   private List<WhisperMessage> messages = new ArrayList<>();
   
-  public PrivateMessageView(int lines, int cols, AtomicBoolean viewCanRefresh, ClientConsoleController controller) {
+  public PrivateMessageView(int lines, int cols, AtomicBoolean viewCanRefresh, ClientAPI api) {
     Objects.requireNonNull(viewCanRefresh);
-    Objects.requireNonNull(controller);
+    Objects.requireNonNull(api);
     if (lines <= 0 || cols <= 0) {
       throw new IllegalArgumentException("lines and cols must be positive");
     }
-    this.controller = controller;
+    this.api = api;
     this.lines = lines;
     this.cols = cols;
     this.viewCanRefresh = viewCanRefresh;
@@ -87,7 +88,7 @@ public class PrivateMessageView implements View {
     clear();
     System.out.print(chatHeader());
     System.out.print(chatDisplay());
-    if (mode == ClientConsoleController.Mode.PRIVATE_MESSAGE_LIVE) {
+    if (mode == ClientController.Mode.PRIVATE_MESSAGE_LIVE) {
       updateMessages();
     }
   }
@@ -99,7 +100,7 @@ public class PrivateMessageView implements View {
    * @return
    */
   private int getMaxUserLength() {
-    return Math.max(5, Math.max(recipient.username().length(), controller.clientLogin().length()));
+    return Math.max(5, Math.max(recipient.username().length(), api.login().length()));
   }
   
   /**
@@ -159,7 +160,7 @@ public class PrivateMessageView implements View {
     var sb = new StringBuilder();
     sb.append(CLIColor.CYAN_BACKGROUND);
     sb.append(CLIColor.WHITE);
-    var title = (STR."%-\{cols - 1}s ").formatted(STR."CHADOW CLIENT on \{controller.clientServerHostName()} (" + lines + "x" + cols + STR.") Private message with \{recipient.username()}");
+    var title = (STR."%-\{cols - 1}s ").formatted(STR."CHADOW CLIENT (" + lines + "x" + cols + STR.") Private message with \{recipient.username()}");
     sb.append(title);
     sb.append(CLIColor.RESET);
     sb.append('\n');
@@ -185,7 +186,7 @@ public class PrivateMessageView implements View {
     if (messages.size() <= View.maxLinesView(lines)) {
       return messages;
     }
-    if (mode == ClientConsoleController.Mode.CHAT_LIVE_REFRESH) {
+    if (mode == ClientController.Mode.CHAT_LIVE_REFRESH) {
       return messages.subList(Math.max(0, messages.size() - View.maxLinesView(lines)), messages.size());
     }
     return messages.subList(messageScroller.getA(), messageScroller.getB());
@@ -214,11 +215,11 @@ public class PrivateMessageView implements View {
     
   }
   
-  public ClientConsoleController.Mode getMode() {
+  public ClientController.Mode getMode() {
     return mode;
   }
   
-  public void setMode(ClientConsoleController.Mode mode) {
+  public void setMode(ClientController.Mode mode) {
     this.mode = mode;
   }
   
@@ -239,7 +240,7 @@ public class PrivateMessageView implements View {
   @Override
   public void scrollBottom() {
     switch (mode) {
-      case PRIVATE_MESSAGE_SCROLLER -> messageScroller.setLines(controller.numberOfMessages());
+      case PRIVATE_MESSAGE_SCROLLER -> messageScroller.setLines(api.numberOfMessages());
     }
   }
   

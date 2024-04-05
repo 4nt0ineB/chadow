@@ -1,12 +1,10 @@
 package fr.uge.chadow;
 
-import fr.uge.chadow.client.Client;
-import fr.uge.chadow.client.ClientConsoleController;
+import fr.uge.chadow.client.ClientController;
 import fr.uge.chadow.server.Server;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.Random;
 
 public class Main {
   private static void usage() {
@@ -29,11 +27,17 @@ public class Main {
       usage();
       return;
     }
-    var socket = new InetSocketAddress(args[1], Integer.parseInt(args[2]));
-    var lines = Integer.parseInt(args[3]);
-    var columns = Integer.parseInt(args[4]);
-    var random = new Random();
-    new ClientConsoleController(new Client(args[0], socket), lines, columns).start();
+    InetSocketAddress socket = null;
+    int lines, cols;
+    try {
+      socket = new InetSocketAddress(args[1], Integer.parseInt(args[2]));
+      lines = Integer.parseInt(args[3]);
+      cols = Integer.parseInt(args[4]);
+    } catch (NumberFormatException e) {
+      usage();
+      return;
+    }
+    new ClientController(args[0], socket, lines, cols).start();
   }
   
   public static void main(String[] args) throws IOException, InterruptedException {

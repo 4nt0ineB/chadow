@@ -1,6 +1,7 @@
 package fr.uge.chadow.core.context;
 
 import fr.uge.chadow.client.Client;
+import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.core.protocol.*;
 
 import java.io.IOException;
@@ -10,30 +11,22 @@ import java.util.logging.Logger;
 public final class ClientContext extends SuperContext {
   private static final Logger logger = Logger.getLogger(Client.class.getName());
   private static final int BUFFER_SIZE = 1024;
+  private final ClientAPI api;
   
-  
-  private final Client client;
-  
-  private boolean isConnected = false;
-  
-  public ClientContext(SelectionKey key, Client client) {
+  public ClientContext(SelectionKey key, ClientAPI api) {
     super(key, BUFFER_SIZE);
-    this.client = client;
-  }
-  
-  public boolean isConnected() {
-    return isConnected;
+    this.api = api;
   }
   
   @Override
   public void processCurrentOpcodeAction(Frame frame) {
     switch (frame) {
       case OK ok -> {
-        isConnected = true;
         logger.info("Connected to the server");
+        api.bindContext(this);
       }
-      case YellMessage yellMessage -> client.addMessage(yellMessage);
-      case WhisperMessage whisperMessage -> client.addWhisper(whisperMessage);
+      case YellMessage yellMessage -> api.addMessage(yellMessage);
+      case WhisperMessage whisperMessage -> api.addWhisper(whisperMessage);
       default -> {
         logger.warning("No action for the received frame");
         super.silentlyClose();
@@ -44,9 +37,15 @@ public final class ClientContext extends SuperContext {
   @Override
   public void doConnect() throws IOException {
     super.doConnect();
-    queue.addFirst(new Register(client.login()));
+    super.addFrame(new Register(api.login()));
     getKey().interestOps(SelectionKey.OP_WRITE);
     super.processOut();
     logger.info("** Ready to chat now **");
+  }
+  
+  @Override
+  public void silentlyClose() {
+    super.silentlyClose();
+    api.unbindContext();
   }
 }

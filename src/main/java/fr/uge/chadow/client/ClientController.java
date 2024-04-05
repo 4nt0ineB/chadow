@@ -3,11 +3,11 @@ package fr.uge.chadow.client;
 import fr.uge.chadow.cli.CLIColor;
 import fr.uge.chadow.cli.InputReader;
 import fr.uge.chadow.cli.display.*;
-import fr.uge.chadow.core.protocol.YellMessage;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 
+import java.net.InetSocketAddress;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -17,8 +17,10 @@ import java.util.stream.Collectors;
 
 import static fr.uge.chadow.cli.display.View.colorize;
 
-public class ClientConsoleController {
+public class ClientController {
   
+  
+
   
   public enum Mode {
     CHAT_LIVE_REFRESH, // default
@@ -32,8 +34,9 @@ public class ClientConsoleController {
     PRIVATE_MESSAGE_SCROLLER // :m, :msg
   }
   //// app management
-  private final static Logger logger = Logger.getLogger(ClientConsoleController.class.getName());
-  private final Client client;
+  private final static Logger logger = Logger.getLogger(ClientController.class.getName());
+  private final InetSocketAddress serverAddress;
+  private final ClientAPI api;
   private final InputReader inputReader;
   private volatile boolean mustClose = false;
   private final Object lock = new Object();
@@ -43,6 +46,7 @@ public class ClientConsoleController {
   private Selector<?> currentSelector;
   private ChatView mainView;
   private PrivateMessageView privateMessageView;
+  private final AtomicBoolean viewCanRefresh = new AtomicBoolean(true);
   private Mode mode;
   // we can't have reentrant locks because this thread runs inputReader that call display
   // that itself call this controller to get the messages and users.
@@ -53,33 +57,26 @@ public class ClientConsoleController {
   
   private Codex selectedCodexForDetails;
   
-  public ClientConsoleController(Client client, int lines, int cols) {
-    Objects.requireNonNull(client);
+  public ClientController(String login, InetSocketAddress serverAddress, int lines, int cols) {
+    Objects.requireNonNull(login);
+    Objects.requireNonNull(serverAddress);
     if (lines <= 0 || cols <= 0) {
       throw new IllegalArgumentException("lines and columns must be positive");
     }
-    this.client = client;
     this.lines = lines;
     this.cols = cols;
-    AtomicBoolean viewCanRefresh = new AtomicBoolean(true);
-    mainView = new ChatView(lines, cols, viewCanRefresh, this);
-    privateMessageView = new PrivateMessageView(lines, cols, viewCanRefresh, this);
-    currentView = mainView;
-    display = new Display(lines, cols, viewCanRefresh, this);
+    this.serverAddress = serverAddress;
+    this.api = new ClientAPI(login);
+    mainView = new ChatView(lines, cols, viewCanRefresh, api);
+    privateMessageView = new PrivateMessageView(lines, cols, viewCanRefresh, api);
+    display = new Display(lines, cols, this, api);
     inputReader = new InputReader(viewCanRefresh, this);
+    currentView = mainView;
     mode = Mode.CHAT_LIVE_REFRESH;
   }
   
-  public List<YellMessage> messages() {
-    synchronized (lock) {
-      return client.getPublicMessages();
-    }
-  }
-  
-  public List<Codex> codexes() {
-    synchronized (lock) {
-      return client.codexes();
-    }
+  public boolean viewCanRefresh() {
+    return viewCanRefresh.get();
   }
   
   public View currentView() {
@@ -88,35 +85,13 @@ public class ClientConsoleController {
     }
   }
   
-  
-  public List<String> users() {
-    synchronized (lock) {
-      return client.getUsers();
-    }
-  }
-  
-  public int totalUsers() {
-    synchronized (lock) {
-      return users().size();
-    }
-  }
-  
-  public String clientLogin() {
-    return client.login();
-  }
-  
-  public String clientServerHostName() {
-    return client.serverHostName();
-  }
-  
   public void start() throws IOException {
     logger.info(STR."Starting console (\{lines} rows \{cols} cols");
     // client
-    startClient();
+    startClient(new Client(serverAddress, api));
     display.draw();
     // thread that manages the display
     startDisplay();
-    
     // Thread that manages the user inputs
     try {
       inputReader.start();
@@ -127,17 +102,7 @@ public class ClientConsoleController {
     }
   }
   
-  public int numberOfMessages() {
-    synchronized (lock) {
-      return client.getPublicMessages().size();
-    }
-  }
-  
-  public Codex currentCodex() {
-    return selectedCodexForDetails;
-  }
-  
-  public void startClient() {
+  public void startClient(Client client) {
     Thread.ofPlatform()
           .daemon()
           .start(() -> {
@@ -149,6 +114,17 @@ public class ClientConsoleController {
               mustClose = true;
             }
           });
+  }
+  
+  
+  public int numberOfMessages() {
+    synchronized (lock) {
+      return api.getPublicMessages().size();
+    }
+  }
+  
+  public Codex currentCodex() {
+    return selectedCodexForDetails;
   }
   
   public void startDisplay() {
@@ -217,7 +193,7 @@ public class ClientConsoleController {
       }
       case ":mycdx" -> {
         mode = Mode.CODEX_LIST;
-        currentSelector = View.selectorFromList("My cdx", lines, cols, codexes(), View::codexShortDescription);
+        currentSelector = View.selectorFromList("My cdx", lines, cols, api.codexes(), View::codexShortDescription);
         currentView = currentSelector;
         yield true;
       }
@@ -243,7 +219,7 @@ public class ClientConsoleController {
             currentCodex().stopSharing();
           }else {
             currentCodex().share();
-            client.propose(currentCodex());
+            api.propose(currentCodex());
           }
           mode = Mode.CODEX_DETAILS;
           currentView = codexView(currentCodex());
@@ -253,9 +229,9 @@ public class ClientConsoleController {
       case ":download" -> {
         if(!currentCodex().isComplete()) {
           if(currentCodex().isDownloading()) {
-            client.stopDownloading(currentCodex().idToHexadecimal());
+            api.stopDownloading(currentCodex().idToHexadecimal());
           }else {
-            client.download(currentCodex().idToHexadecimal());
+            api.download(currentCodex().idToHexadecimal());
           }
           mode = Mode.CODEX_DETAILS;
           currentView = codexView(currentCodex());
@@ -309,7 +285,7 @@ public class ClientConsoleController {
       default -> {
         if(!input.startsWith(":") && !input.isBlank()) {
           var receiver = privateMessageView.receiver();
-          client.whisper(receiver.id(), input);
+          api.whisper(receiver.id(), input);
         }
         return false;
       }
@@ -349,7 +325,7 @@ public class ClientConsoleController {
       }
       default -> {
         if(!input.startsWith(":") && !input.isBlank()) {
-          client.yell(input);
+          api.yell(input);
         }
         return false;
       }
@@ -399,7 +375,7 @@ public class ClientConsoleController {
     if (matcherWhisper.find()) {
       var receiverUsername = matcherWhisper.group(1);
       mode = Mode.PRIVATE_MESSAGE_LIVE;
-      var receiver = client.getRecipient(receiverUsername);
+      var receiver = api.getRecipient(receiverUsername);
       if(receiver.isEmpty()) {
         return Optional.of(true);
       }
@@ -451,7 +427,7 @@ public class ClientConsoleController {
       logger.info(STR.":create \{path}\n");
       var codex = Codex.fromPath(codexName, path);
       selectedCodexForDetails = codex;
-      client.addCodex(codex);
+      api.addCodex(codex);
       mode = Mode.CODEX_DETAILS;
       currentView = codexView(codex);
       currentView.scrollTop();
@@ -467,7 +443,7 @@ public class ClientConsoleController {
     if (matcherRetrieve.find()) {
       var fingerprint = matcherRetrieve.group(1);
       logger.info(STR.":cdx: \{fingerprint}\n");
-      var codex = client.getCodex(fingerprint);
+      var codex = api.getCodex(fingerprint);
       selectedCodexForDetails = codex.orElseThrow();
       mode = Mode.CODEX_DETAILS;
       currentView = codexView(selectedCodexForDetails);

@@ -1,7 +1,8 @@
 package fr.uge.chadow.cli.display;
 
 import fr.uge.chadow.cli.CLIColor;
-import fr.uge.chadow.client.ClientConsoleController;
+import fr.uge.chadow.client.ClientAPI;
+import fr.uge.chadow.client.ClientController;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -11,22 +12,22 @@ import java.util.logging.Logger;
 
 public class Display {
   private static final Logger logger = Logger.getLogger(Display.class.getName());
-  private final ClientConsoleController controller;
-  private final AtomicBoolean viewCanRefresh;
+  private final ClientController controller;
+  private final ClientAPI api;
   private final ReentrantLock lock = new ReentrantLock();
   private int lines;
   private int cols;
   
-  public Display(int lines, int cols, AtomicBoolean viewCanRefresh, ClientConsoleController controller) {
-    Objects.requireNonNull(viewCanRefresh);
+  public Display(int lines, int cols, ClientController  controller, ClientAPI api) {
     Objects.requireNonNull(controller);
+    Objects.requireNonNull(api);
     if (lines <= 0 || cols <= 0) {
       throw new IllegalArgumentException("lines and cols must be positive");
     }
+    this.api = api;
     this.controller = controller;
     this.lines = lines;
     this.cols = cols;
-    this.viewCanRefresh = viewCanRefresh;
   }
   
   static String lowInfoBar(int columns) {
@@ -59,7 +60,7 @@ public class Display {
     System.out.print(CLIColor.CLEAR);
     System.out.flush();
     while (!Thread.interrupted()) {
-      if (viewCanRefresh.get()) {
+      if (controller.viewCanRefresh()) {
         draw();
       }
       Thread.sleep(200);
@@ -87,14 +88,14 @@ public class Display {
   
   private String inputField() {
     var inputField = "";
-    if (!viewCanRefresh.get()) {
+    if (!controller.viewCanRefresh()) {
       // (getMaxUserLength() + 21)
       inputField = ("%s\n")
-          .formatted(STR."[\{CLIColor.BOLD}\{CLIColor.CYAN}\{controller.clientLogin()}\{CLIColor.RESET}]");
+          .formatted(STR."[\{CLIColor.BOLD}\{CLIColor.CYAN}\{api.login()}\{CLIColor.RESET}]");
     } else {
       // (getMaxUserLength() + 50)
       inputField = ("%s\n")
-          .formatted(STR."\{CLIColor.GREY}[\{CLIColor.GREY}\{CLIColor.BOLD}\{controller.clientLogin()}\{CLIColor.RESET}\{CLIColor.GREY}]\{CLIColor.RESET}");
+          .formatted(STR."\{CLIColor.GREY}[\{CLIColor.GREY}\{CLIColor.BOLD}\{api.login()}\{CLIColor.RESET}\{CLIColor.GREY}]\{CLIColor.RESET}");
     }
     return inputField + View.inviteCharacter() + CLIColor.BOLD;
   }

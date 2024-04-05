@@ -1,6 +1,5 @@
 package fr.uge.chadow.core.context;
 
-import fr.uge.chadow.client.Client;
 import fr.uge.chadow.core.protocol.Frame;
 import fr.uge.chadow.core.protocol.Opcode;
 import fr.uge.chadow.core.reader.FrameReader;
@@ -15,8 +14,8 @@ import java.util.logging.Logger;
 
 public sealed abstract class SuperContext permits ClientContext, ServerContext {
   
-  private static final Logger logger = Logger.getLogger(Client.class.getName());
-  public final ArrayDeque<Frame> queue = new ArrayDeque<>();
+  private static final Logger logger = Logger.getLogger(SuperContext.class.getName());
+  private final ArrayDeque<Frame> queue = new ArrayDeque<>();
   private final SelectionKey key;
   private final SocketChannel sc;
   private final ByteBuffer bufferIn;
@@ -81,6 +80,11 @@ public sealed abstract class SuperContext permits ClientContext, ServerContext {
     queue.addFirst(frame);
     processOut();
     updateInterestOps();
+    key.selector().wakeup();
+  }
+  
+  protected void addFrame(Frame frame) {
+    queue.addFirst(frame);
   }
   
   /**
@@ -204,4 +208,9 @@ public sealed abstract class SuperContext permits ClientContext, ServerContext {
   protected SocketChannel getSocket() {
     return sc;
   }
+  
+  public void getServerHostname() {
+  
+  }
+  
 }

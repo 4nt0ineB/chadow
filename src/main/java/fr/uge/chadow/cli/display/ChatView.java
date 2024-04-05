@@ -1,7 +1,8 @@
 package fr.uge.chadow.cli.display;
 
 import fr.uge.chadow.cli.CLIColor;
-import fr.uge.chadow.client.ClientConsoleController;
+import fr.uge.chadow.client.ClientAPI;
+import fr.uge.chadow.client.ClientController;
 import fr.uge.chadow.core.protocol.YellMessage;
 
 import java.io.IOException;
@@ -17,7 +18,7 @@ import java.util.stream.Stream;
 import static fr.uge.chadow.cli.display.View.splitAndSanitize;
 
 public class ChatView implements View {
-  private final ClientConsoleController controller;
+  private final ClientAPI clientAPI;
   private final Scroller messageScroller;
   private final Scroller userScroller;
   
@@ -25,15 +26,15 @@ public class ChatView implements View {
   private final ReentrantLock lock = new ReentrantLock();
   private int lines;
   private int cols;
-  private ClientConsoleController.Mode mode = ClientConsoleController.Mode.CHAT_LIVE_REFRESH;
+  private ClientController.Mode mode = ClientController.Mode.CHAT_LIVE_REFRESH;
   
-  public ChatView(int lines, int cols, AtomicBoolean viewCanRefresh, ClientConsoleController controller) {
+  public ChatView(int lines, int cols, AtomicBoolean viewCanRefresh, ClientAPI controller) {
     Objects.requireNonNull(viewCanRefresh);
     Objects.requireNonNull(controller);
     if (lines <= 0 || cols <= 0) {
       throw new IllegalArgumentException("lines and cols must be positive");
     }
-    this.controller = controller;
+    this.clientAPI = controller;
     this.lines = lines;
     this.cols = cols;
     this.viewCanRefresh = viewCanRefresh;
@@ -75,8 +76,8 @@ public class ChatView implements View {
     clear();
     System.out.print(chatHeader());
     System.out.print(chatDisplay());
-    if (mode == ClientConsoleController.Mode.CHAT_LIVE_REFRESH) {
-      messageScroller.setLines(controller.numberOfMessages());
+    if (mode == ClientController.Mode.CHAT_LIVE_REFRESH) {
+      messageScroller.setLines(clientAPI.numberOfMessages());
     }
   }
   
@@ -87,11 +88,11 @@ public class ChatView implements View {
    * @return
    */
   private int getMaxUserLength() {
-    return controller.users()
-                              .stream()
-                              .mapToInt(String::length)
-                              .max()
-                              .orElse(5);
+    return clientAPI.users()
+                    .stream()
+                    .mapToInt(String::length)
+                    .max()
+                    .orElse(5);
   }
   
   /**
@@ -172,9 +173,9 @@ public class ChatView implements View {
     var colsRemaining = cols - getMaxUserLength() - 2;
     sb.append(CLIColor.CYAN_BACKGROUND);
     sb.append(CLIColor.WHITE);
-    var title = (STR."%-\{colsRemaining}s ").formatted(STR."CHADOW CLIENT on \{controller.clientServerHostName()} (" + lines + "x" + cols + ")");
+    var title = (STR."%-\{colsRemaining}s ").formatted(STR."CHADOW CLIENT (" + lines + "x" + cols + ")");
     colsRemaining -= title.length() + 2; // right side pannel of users + margin (  )
-    var totalUsers = (STR."\{CLIColor.BOLD}\{CLIColor.BLACK}%-\{getMaxUserLength()}s").formatted(STR."(\{controller.totalUsers()})");
+    var totalUsers = (STR."\{CLIColor.BOLD}\{CLIColor.BLACK}%-\{getMaxUserLength()}s").formatted(STR."(\{clientAPI.totalUsers()})");
     colsRemaining -= totalUsers.length();
     sb.append("%s %s".formatted(title, totalUsers));
     sb.append(" ".repeat(Math.max(0, colsRemaining)));
@@ -201,12 +202,12 @@ public class ChatView implements View {
   
   private List<YellMessage> getMessagesToDisplay() {
     
-    var messages = controller.messages();
+    var messages = clientAPI.getPublicMessages();
     
     if (messages.size() <= View.maxLinesView(lines)) {
       return messages;
     }
-    if (mode == ClientConsoleController.Mode.CHAT_LIVE_REFRESH) {
+    if (mode == ClientController.Mode.CHAT_LIVE_REFRESH) {
       return messages.subList(Math.max(0, messages.size() - View.maxLinesView(lines)), messages.size());
     }
     return messages.subList(messageScroller.getA(), messageScroller.getB());
@@ -214,11 +215,11 @@ public class ChatView implements View {
   }
   
   private List<String> getUsersToDisplay() {
-    var users = controller.users();
+    var users = clientAPI.users();
     if (users.size() <= View.maxLinesView(lines)) {
       return new ArrayList<>(users);
     }
-    if (mode == ClientConsoleController.Mode.CHAT_LIVE_REFRESH) {
+    if (mode == ClientController.Mode.CHAT_LIVE_REFRESH) {
       return users.stream()
                   .toList();
     }
@@ -249,11 +250,11 @@ public class ChatView implements View {
     
   }
   
-  public ClientConsoleController.Mode getMode() {
+  public ClientController.Mode getMode() {
     return mode;
   }
   
-  public void setMode(ClientConsoleController.Mode mode) {
+  public void setMode(ClientController.Mode mode) {
     this.mode = mode;
   }
   
@@ -276,8 +277,8 @@ public class ChatView implements View {
   @Override
   public void scrollBottom() {
     switch (mode) {
-      case CHAT_SCROLLER -> messageScroller.setLines(controller.numberOfMessages());
-      case USERS_SCROLLER -> userScroller.setLines(controller.users().size());
+      case CHAT_SCROLLER -> messageScroller.setLines(clientAPI.numberOfMessages());
+      case USERS_SCROLLER -> userScroller.setLines(clientAPI.users().size());
     }
   }
   

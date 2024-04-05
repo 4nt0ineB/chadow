@@ -1,7 +1,7 @@
 package fr.uge.chadow.cli;
 
 import fr.uge.chadow.cli.display.View;
-import fr.uge.chadow.client.ClientConsoleController;
+import fr.uge.chadow.client.ClientController;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -15,10 +15,10 @@ import java.util.logging.Logger;
 public class InputReader {
   
   private static final Logger logger = Logger.getLogger(InputReader.class.getName());
-  private final ClientConsoleController controller;
+  private final ClientController controller;
   private final AtomicBoolean viewCanRefresh;
   
-  public InputReader(AtomicBoolean viewCanRefresh, ClientConsoleController controller) {
+  public InputReader(AtomicBoolean viewCanRefresh, ClientController controller) {
     Objects.requireNonNull(controller);
     this.controller = controller;
     this.viewCanRefresh = viewCanRefresh;
