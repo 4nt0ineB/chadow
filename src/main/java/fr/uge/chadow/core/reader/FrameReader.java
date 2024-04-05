@@ -61,6 +61,7 @@ public class FrameReader implements Reader<Frame> {
     state = State.WAITING;
     opcode = null;
     frame = null;
+    byteReader.reset();
     for (var reader : readers.values()) {
       reader.reset();
     }

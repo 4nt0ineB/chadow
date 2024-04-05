@@ -98,14 +98,16 @@ public class Server {
     }
   }
 
-  public void whisper(WhisperMessage message) {
+  public void whisper(WhisperMessage message, String username_sender) {
     var sc = clients.get(message.username());
     if (sc == null) {
-      logger.warning(STR."Client not found for login \{message.username()}");
+      logger.warning(STR."Client \{message.username()} not found");
       return;
     }
     var session = (Session) sc.keyFor(selector).attachment();
-    session.queueFrame(message);
+    var newMessage = new WhisperMessage(username_sender, message.txt(), System.currentTimeMillis());
+    session.queueFrame(newMessage);
+    logger.info(STR."Whispering message \{message.txt()} to \{message.username()}");
   }
 
   public boolean addClient(String login, SocketChannel sc) {
