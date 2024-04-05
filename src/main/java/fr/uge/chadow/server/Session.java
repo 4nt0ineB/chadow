@@ -37,18 +37,6 @@ public class Session {
     this.key = key;
     this.sc = (SocketChannel) key.channel();
     this.server = server;
-
-    for (var opcode : Opcode.values()) {
-      switch (opcode) {
-        case REGISTER -> readers.put(opcode, new GlobalReader<>(Register.class));
-        case YELL -> readers.put(opcode, new GlobalReader<>(YellMessage.class));
-        case WHISPER -> readers.put(opcode, new GlobalReader<>(WhisperMessage.class));
-        default -> {
-          //logger.warning(STR."No reader for opcode \{opcode}");
-          //silentlyClose();
-        }
-      }
-    }
   }
 
   /**
@@ -58,37 +46,8 @@ public class Session {
    * after the call
    */
   private void processIn() {
-    for (;;) {
-      if (currentOpcode == null) {
-        Reader.ProcessStatus opcodeStatus = byteReader.process(bufferIn);
-        switch (opcodeStatus) {
-          case DONE -> {
-            currentOpcode = Opcode.from(byteReader.get());
-            byteReader.reset();
-
-            if (Opcode.REGISTER != currentOpcode && !isAuthenticated()) {
-              logger.warning("Client not authenticated");
-              silentlyClose();
-              return;
-            }
-
-            if (Opcode.REGISTER == currentOpcode && isAuthenticated()) {
-              logger.warning("Client already authenticated");
-              silentlyClose();
-              return;
-            }
-          }
-          case REFILL -> {
-            return;
-          }
-          case ERROR -> {
-            silentlyClose();
-            return;
-          }
-        }
-      }
-
-      Reader.ProcessStatus status = readers.get(currentOpcode).process(bufferIn);
+    for (; ; ) {
+      Reader.ProcessStatus status = frameReader.process(bufferIn);
 
       switch (status) {
         case DONE -> {
@@ -98,8 +57,7 @@ public class Session {
             logger.severe(STR."Error while processing opcode \{currentOpcode}");
             return;
           }
-          readers.get(currentOpcode).reset();
-          currentOpcode = null; // reset opcode
+          frameReader.reset();
         }
         case REFILL -> {
           return;
@@ -112,39 +70,51 @@ public class Session {
     }
   }
 
-  /**
-   * Processes the current opcode received from the client and performs the corresponding action.
-   * The action performed depends on the value of the current opcode.
-   *
-   * @throws IOException if an I/O error occurs while processing the opcode.
-   */
   private void processCurrentOpcodeAction() throws IOException {
-    switch (currentOpcode) {
-      case REGISTER -> {
-        var register = (Register) readers.get(currentOpcode).get();
+    var frame = frameReader.get();
+
+    switch (frame) {
+      case Register register -> {
+        if (isAuthenticated()) {
+          logger.warning(STR."Client \{sc.getRemoteAddress()} is already authenticated");
+          silentlyClose();
+          return;
+        }
+
         login = register.username();
+
         if (!server.addClient(login, sc)) {
           logger.warning(STR."Login \{login} already in use");
           silentlyClose();
           return;
         }
+
         logger.info(STR."Client \{sc.getRemoteAddress()} has logged in as \{login}");
 
         // Send an OK message to the client
         queueFrame(new OK());
       }
-      case YELL -> {
-        var message = (YellMessage) readers.get(currentOpcode).get();
-        var newMessage = new YellMessage(message.login(), message.txt(), System.currentTimeMillis());
+
+      case YellMessage yellMessage -> {
+        if (!isAuthenticated()) {
+          logger.warning(STR."Client \{sc.getRemoteAddress()} is not authenticated");
+          silentlyClose();
+          return;
+        }
+
+        var newMessage = new YellMessage(yellMessage.login(), yellMessage.txt(), System.currentTimeMillis());
         server.broadcast(newMessage);
       }
-      case WHISPER -> {
-        var message = (WhisperMessage) readers.get(currentOpcode).get();
-        // we receive whisper from login to username
-        // we send whisper to username from login
-        var newMessage = new WhisperMessage(login, message.txt(), System.currentTimeMillis());
-        server.whisper(newMessage, message.username());
+
+      case WhisperMessage whisperMessage -> {
+        if (!isAuthenticated()) {
+          logger.warning(STR."Client \{sc.getRemoteAddress()} is not authenticated");
+          silentlyClose();
+          return;
+        }
+        server.whisper(whisperMessage, login);
       }
+
       default -> {
         logger.warning(STR."No action for opcode \{currentOpcode}");
         silentlyClose();
