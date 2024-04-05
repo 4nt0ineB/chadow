@@ -1,15 +1,12 @@
 package fr.uge.chadow.client;
 
+import fr.uge.chadow.core.context.ClientContext;
 import fr.uge.chadow.core.protocol.*;
 import fr.uge.chadow.core.protocol.YellMessage;
-import fr.uge.chadow.core.reader.ByteReader;
-import fr.uge.chadow.core.reader.GlobalReader;
-import fr.uge.chadow.core.reader.Reader;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -22,13 +19,12 @@ import java.util.logging.Logger;
 
 public class Client {
   
-  private static final int BUFFER_SIZE = 1024;
   private static final Logger logger = Logger.getLogger(Client.class.getName());
   private final SocketChannel sc;
   private final Selector selector;
   private final InetSocketAddress serverAddress;
   private final String login;
-  private Context clientContext;
+  private ClientContext clientContext;
   private final HashMap<String, Codex> codexes = new HashMap<>();
   private final ArrayList<YellMessage> publicMessages = new ArrayList<>();
   private final HashMap<UUID, Recipient> privateMessages = new HashMap<>();
@@ -75,7 +71,7 @@ public class Client {
 
     sc.configureBlocking(false);
     var key = sc.register(selector, SelectionKey.OP_CONNECT);
-    clientContext = new Context(key);
+    clientContext = new ClientContext(key, this);
     key.attach(clientContext);
     sc.connect(serverAddress);
     while (!Thread.interrupted()) {
@@ -253,12 +249,12 @@ public class Client {
    * @return true if the client is connected to the server, false otherwise
    */
   public boolean isConnected() {
-    return clientContext.isConnected;
+    return clientContext.isConnected();
   }
 
   /////////// For the session only
 
-  private void addMessage(YellMessage msg) {
+  public void addMessage(YellMessage msg) {
     lock.lock();
     try {
       publicMessages.add(msg);
@@ -268,7 +264,7 @@ public class Client {
     }
   }
 
-  private void addWhisper(WhisperMessage msg) {
+  public void addWhisper(WhisperMessage msg) {
     var Recipient = getRecipient(msg.username());
     Recipient.ifPresentOrElse(r -> r.addMessage(msg), () -> {
       var newRecipient = new Recipient(UUID.randomUUID(), msg.username());
@@ -280,237 +276,7 @@ public class Client {
     logger.info(STR."\{msg.username()} is whispering a message of length \{msg.txt().length()}");
   }
   
-  private class Context {
-    private final SelectionKey key;
-    private final SocketChannel sc;
-    private final ByteBuffer bufferIn = ByteBuffer.allocate(BUFFER_SIZE);
-    private final ByteBuffer bufferOut = ByteBuffer.allocate(BUFFER_SIZE);
-    private ByteBuffer processingFrame;
-    private final ByteReader byteReader = new ByteReader();
-    private final ArrayDeque<Frame> queue = new ArrayDeque<>();
-    private boolean closed = false;
-    private Opcode currentOpcode = null;
-    private boolean isConnected = false;
-
-    private final Map<Opcode, Reader<?>> readers = new HashMap<>();
-
-    private Context(SelectionKey key) {
-      this.key = key;
-      this.sc = (SocketChannel) key.channel();
-      // @Todo refactor with ServerSession
-      for (var opcode : Opcode.values()) {
-        switch (opcode) {
-          case REGISTER -> readers.put(opcode, new GlobalReader<>(Register.class));
-          case YELL -> readers.put(opcode, new GlobalReader<>(YellMessage.class));
-          case OK -> readers.put(opcode, new GlobalReader<>(OK.class));
-          case WHISPER -> readers.put(opcode, new GlobalReader<>(WhisperMessage.class));
-          /*
-          case REQUEST -> {
-            throw new Error("Request opcode not supported");
-              readers.put(opcode, new GlobalReader<>(PROPOSE.class));
-          }
-           */
-          default -> {
-            //logger.warning(STR."No reader for opcode \{opcode}");
-            //silentlyClose();
-          }
-        }
-      }
-    }
-
-    /**
-     * Process the content of bufferIn
-     * <p>
-     * The convention is that bufferIn is in write-mode before the call to process
-     * and after the call
-     */
-    private void processIn() {
-      for (; ; ) {
-        if (currentOpcode == null) {
-          Reader.ProcessStatus opcodeStatus = byteReader.process(bufferIn);
-          switch (opcodeStatus) {
-            case DONE -> {
-              currentOpcode = Opcode.from(byteReader.get());
-              byteReader.reset();
-            }
-            case REFILL -> {
-              return;
-            }
-            case ERROR -> {
-              silentlyClose();
-              return;
-            }
-          }
-        }
-
-        Reader.ProcessStatus status = readers.get(currentOpcode)
-                .process(bufferIn);
-
-        switch (status) {
-          case DONE:
-            try {
-              processCurrentOpcodeAction();
-            } catch (IOException e) {
-              logger.severe(STR."Error while processing opcode \{currentOpcode}");
-              return;
-            }
-            readers.get(currentOpcode)
-                    .reset();
-            currentOpcode = null;
-            break;
-          case REFILL:
-            return;
-          case ERROR:
-            silentlyClose();
-            return;
-        }
-      }
-    }
-
-    /**
-     * Processes the current opcode received from the client and performs the corresponding action.
-     * The action performed depends on the value of the current opcode.
-     *
-     * @throws IOException if an I/O error occurs while processing the opcode.
-     */
-    private void processCurrentOpcodeAction() throws IOException {
-      switch (currentOpcode) {
-        case OK -> {
-          isConnected = true;
-          logger.info(STR."Connected to the server");
-        }
-        case YELL -> addMessage((YellMessage) readers.get(currentOpcode).get());
-        case WHISPER -> addWhisper((WhisperMessage) readers.get(currentOpcode).get());
-        default -> {
-          logger.warning(STR."No action for opcode \{currentOpcode}");
-          silentlyClose();
-        }
-      }
-    }
-    
-    private void queueFrame(Frame frame) {
-      queue.addFirst(frame);
-      processOut();
-      updateInterestOps();
-    }
-
-    /**
-     * Try to fill bufferOut from the message queue
-     */
-    private void processOut() {
-      if (processingFrame == null && !queue.isEmpty()) {
-        while (!queue.isEmpty()) {
-          processingFrame = queue.pollLast().toByteBuffer();
-          processingFrame.flip();
-          logger.info(STR."Processing frame of length \{processingFrame.remaining()}");
-          if (processingFrame.remaining() <= bufferOut.remaining()) { // tant que place on met dedans
-            bufferOut.put(processingFrame);
-            processingFrame.compact();
-          } else { // plus de place
-            processingFrame.compact();
-            break;
-          }
-        }
-      } else if (processingFrame == null) {
-        return;
-      }
-      // mode frame trop longue
-      processingFrame.flip();
-      if (processingFrame.hasRemaining()) {
-        var oldlimit = processingFrame.limit();
-        processingFrame.limit(Math.min(oldlimit, bufferOut.remaining()));
-        bufferOut.put(processingFrame);
-        processingFrame.limit(oldlimit);
-        if (!processingFrame.hasRemaining()) {
-          processingFrame = null;
-        } else {
-          processingFrame.compact();
-        }
-      } else {
-        processingFrame = null;
-      }
-    }
-
-    /**
-     * Update the interestOps of the key looking only at values of the boolean
-     * closed and of both ByteBuffers.
-     * <p>
-     * The convention is that both buffers are in write-mode before the call to
-     * updateInterestOps and after the call. Also, it is assumed that the process has
-     * been called just before updateInterestOps.
-     */
-
-    private void updateInterestOps() {
-      int ops = 0;
-      if (bufferIn.hasRemaining() && !closed) {
-        ops |= SelectionKey.OP_READ;
-      }
-      if (bufferOut.position() > 0) {
-        ops |= SelectionKey.OP_WRITE;
-      }
-      if (ops != 0) {
-        key.interestOps(ops);
-      } else {
-        silentlyClose();
-      }
-    }
-
-    private void silentlyClose() {
-      try {
-        sc.close();
-        closed = true;
-      } catch (IOException e) {
-        // ignore exception
-      }
-    }
-
-    /**
-     * Performs the read action on sc
-     * <p>
-     * The convention is that both buffers are in write-mode before the call to
-     * doRead and after the call
-     *
-     * @throws IOException
-     */
-    private void doRead() throws IOException {
-      if (sc.read(bufferIn) == -1) {
-        closed = true;
-        logger.info(STR."Client \{sc.getRemoteAddress()} has closed the connection");
-      }
-      processIn();
-      updateInterestOps();
-    }
-
-    /**
-     * Performs the write action on sc
-     * <p>
-     * The convention is that both buffers are in write-mode before the call to
-     * doWrite and after the call
-     *
-     * @throws IOException
-     */
-
-    private void doWrite() throws IOException {
-      bufferOut.flip();
-      sc.write(bufferOut);
-      bufferOut.compact();
-      processIn();
-      updateInterestOps();
-    }
-
-    public void doConnect() throws IOException {
-      if (!sc.finishConnect()) {
-        logger.warning("the selector gave a bad hint");
-        return;
-      }
-      queue.addFirst(new Register(login));
-      key.interestOps(SelectionKey.OP_WRITE);
-      processOut();
-
-      logger.info("** Ready to chat now **");
-
-    }
-  }
+  
 
   private void fillWithFakeData() throws IOException, NoSuchAlgorithmException {
     var users = new String[]{"test", "Morpheus", "Trinity", "Neo", "Flynn", "Alan", "Lora", "Gandalf", "Bilbo", "SKIDROW", "Antoine"};

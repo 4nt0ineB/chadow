@@ -15,7 +15,8 @@ public class FrameReader implements Reader<Frame> {
   private final Map<Opcode, GlobalReader<? extends Frame>> readers = Map.of(
           Opcode.REGISTER, new GlobalReader<>(Register.class),
           Opcode.YELL, new GlobalReader<>(YellMessage.class),
-          Opcode.WHISPER, new GlobalReader<>(WhisperMessage.class)
+          Opcode.WHISPER, new GlobalReader<>(WhisperMessage.class),
+          Opcode.OK, new GlobalReader<>(OK.class)
   );
 
   private State state = State.WAITING;

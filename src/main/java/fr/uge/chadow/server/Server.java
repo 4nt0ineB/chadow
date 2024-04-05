@@ -52,10 +52,10 @@ public class Server {
     }
     try {
       if (key.isValid() && key.isWritable()) {
-        ((Session) key.attachment()).doWrite();
+        ((Context) key.attachment()).doWrite();
       }
       if (key.isValid() && key.isReadable()) {
-        ((Session) key.attachment()).doRead();
+        ((Context) key.attachment()).doRead();
       }
     } catch (IOException e) {
       logger.log(Level.INFO, "Connection closed with client due to IOException", e);
@@ -71,7 +71,7 @@ public class Server {
     }
     sc.configureBlocking(false);
     var sckey = sc.register(selector, SelectionKey.OP_READ);
-    sckey.attach(new Session(this, sckey));
+    sckey.attach(new Context(this, sckey));
   }
 
   private void silentlyClose(SelectionKey key) {
@@ -90,7 +90,7 @@ public class Server {
    */
   void broadcast(YellMessage msg) {
     for (var key : selector.keys()) {
-      var session = ((Session) key.attachment());
+      var session = ((Context) key.attachment());
       if (session != null) {
         session.queueFrame(msg);
         logger.info(STR."Broadcasting message \{msg.txt()}");
@@ -104,7 +104,7 @@ public class Server {
       logger.warning(STR."Client \{message.username()} not found");
       return;
     }
-    var session = (Session) sc.keyFor(selector).attachment();
+    var session = (Context) sc.keyFor(selector).attachment();
     var newMessage = new WhisperMessage(username_sender, message.txt(), System.currentTimeMillis());
     session.queueFrame(newMessage);
     logger.info(STR."Whispering message \{message.txt()} to \{message.username()}");
