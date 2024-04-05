@@ -70,7 +70,6 @@ public class GlobalReader<T extends Record> implements Reader<T> {
       T instance = (T) recordClass.getConstructors()[0].newInstance(recordInstanceValues);
       value = instance;
     } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
-      // TODO a little logger here ?
       throw new IllegalStateException(e);
     }
     return ProcessStatus.DONE;
