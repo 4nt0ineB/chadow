@@ -2,7 +2,6 @@ package fr.uge.chadow.client;
 
 
 import fr.uge.chadow.core.context.ClientContext;
-import fr.uge.chadow.core.context.SuperContext;
 import fr.uge.chadow.core.protocol.Request;
 import fr.uge.chadow.core.protocol.RequestDownload;
 import fr.uge.chadow.core.protocol.WhisperMessage;
@@ -12,6 +11,7 @@ import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
@@ -33,9 +33,8 @@ public class ClientAPI {
   private final SortedSet<String> users = new TreeSet<>();
   private final ArrayBlockingQueue<Optional<String>> requestCodexResponseQueue = new ArrayBlockingQueue<>(1);
   
-  
-  
   private final ReentrantLock lock = new ReentrantLock();
+  private final Condition conditionConnectionEstablished = lock.newCondition();
   
   public ClientAPI(String login) {
     this.login = login;
@@ -63,7 +62,13 @@ public class ClientAPI {
    * @param context
    */
   public void bindContext(ClientContext context) {
-    clientContext = context;
+    lock.lock();
+    try {
+      clientContext = context;
+      conditionConnectionEstablished.signalAll();
+    } finally {
+      lock.unlock();
+    }
   }
   
   /**
@@ -72,9 +77,24 @@ public class ClientAPI {
    * and the client is no longer able to interact with the server
    */
   public void unbindContext() {
-    clientContext = null;
+    lock.lock();
+    try {
+      clientContext = null;
+    } finally {
+      lock.unlock();
+    }
   }
   
+  public void waitForConnection() throws InterruptedException {
+    lock.lock();
+    try {
+      while (!isConnected()) {
+        conditionConnectionEstablished.await();
+      }
+    } finally {
+      lock.unlock();
+    }
+  }
   
   /**
    * Check if the client is connected to the server
@@ -82,7 +102,12 @@ public class ClientAPI {
    * @return true if the client is connected to the server, false otherwise
    */
   public boolean isConnected() {
-    return clientContext != null;
+    lock.lock();
+    try {
+      return clientContext != null;
+    } finally {
+      lock.unlock();
+    }
   }
   
   public List<YellMessage> getPublicMessages() {
@@ -265,7 +290,7 @@ public class ClientAPI {
    * Create a splash screen logo with a list of messages
    * showing le title "Chadow" in ascii art and the version
    */
-  public static Collection<YellMessage> splashLogo() {
+  public static List<YellMessage> splashLogo() {
     return List.of(
         new YellMessage("", "┏┓┓    ┓", 0),
         new YellMessage("", "┃ ┣┓┏┓┏┫┏┓┓┏┏", 0),

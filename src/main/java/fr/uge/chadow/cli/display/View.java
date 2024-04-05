@@ -1,6 +1,8 @@
 package fr.uge.chadow.cli.display;
 
 import fr.uge.chadow.cli.CLIColor;
+import fr.uge.chadow.cli.display.view.ScrollableView;
+import fr.uge.chadow.cli.display.view.SelectorView;
 import fr.uge.chadow.client.Codex;
 
 import java.io.IOException;
@@ -28,11 +30,6 @@ public interface View {
     System.out.flush();
   }
   
-  static String thematicBreak(int columns) {
-    String sb = STR."\{String.valueOf(CLIColor.CYAN)}\{CLIColor.BOLD}\{"—".repeat(columns)}\{CLIColor.RESET}\n";
-    return sb;
-  }
-  
   static String inviteCharacter() {
     return STR."\{CLIColor.BOLD}\u00BB ";
   }
@@ -42,6 +39,12 @@ public interface View {
    */
   static void clearDisplayArea(int lines) {
     clearDisplayAndMore(lines, lines);
+  }
+  
+  static void clear(int lines) {
+    View.moveCursorToPosition(1, 1);
+    View.clearDisplayArea(lines);
+    View.moveCursorToPosition(1, 1); // Move cursor back to the top
   }
   
   /**
@@ -156,16 +159,16 @@ public interface View {
       return STR."\{bytes} B";
     }
     if (bytes < 1024 * 1024) {
-      return String.format("%.2f KB", (double) bytes / 1024);
+      return String.format("%.2f KB",  (bytes / 1024d));
     }
     if (bytes < 1024 * 1024 * 1024) {
-      return String.format("%.2f MB", (double) bytes / (1024 * 1024));
+      return String.format("%.2f MB", ((bytes / (1024d * 1024))));
     }
     if (bytes < 1024L * 1024 * 1024 * 1024) {
-      return String.format("%.2f GB", (double) bytes / (1024 * 1024 * 1024));
+      return String.format("%.2f GB", (bytes / (1024d * 1024 * 1024)));
     }
     if (bytes < 1024L * 1024 * 1024 * 1024 * 1024) {
-      return String.format("%.2f TB", (double) bytes / (1024 * 1024 * 1024 * 1024));
+      return String.format("%.2f TB", (bytes / (1024d * 1024 * 1024 * 1024)));
     }
     return "+inf (╯°□°)╯︵ ┻━┻";
   }
@@ -192,12 +195,12 @@ public interface View {
    * @param help
    * @return
    */
-  static Scrollable scrollableFromString(String title, int lines, int cols, String help) {
+  static ScrollableView scrollableFromString(String title, int lines, int cols, String help) {
     var textLines = splitAndSanitize(help, cols);
-    return new Scrollable(title, lines, cols, textLines);
+    return new ScrollableView(title, lines, cols, textLines);
   }
   
-  static <T> Selector<T> selectorFromList(String title, int lines, int cols, List<T> list, Function<? super T, String> mapper) {
+  static <T> SelectorView<T> selectorFromList(String title, int lines, int cols, List<T> list, Function<? super T, String> mapper) {
     var linesByItem = new ArrayList<Map.Entry<T, List<String>>>();
     var linesToDisplay = new ArrayList<String>();
     for(var item : list){
@@ -206,7 +209,7 @@ public interface View {
       linesToDisplay.addAll(formattedDescription);
       linesByItem.add(Map.entry(item, formattedDescription));
     }
-    return new Selector<>(title, lines, cols, linesByItem, new Scrollable(title, lines, cols, linesToDisplay), mapper);
+    return new SelectorView<>(title, lines, cols, linesByItem, new ScrollableView(title, lines, cols, linesToDisplay), mapper);
   }
   
   static String codexShortDescription(Codex cdx) {

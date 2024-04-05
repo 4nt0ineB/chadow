@@ -6,17 +6,19 @@ import fr.uge.chadow.client.ClientController;
 
 import java.io.IOException;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
+/**
+ * Display class is responsible for drawing the view in the console
+ */
 public class Display {
-  private static final Logger logger = Logger.getLogger(Display.class.getName());
   private final ClientController controller;
   private final ClientAPI api;
   private final ReentrantLock lock = new ReentrantLock();
   private int lines;
   private int cols;
+  private View currentView;
   
   public Display(int lines, int cols, ClientController  controller, ClientAPI api) {
     Objects.requireNonNull(controller);
@@ -73,17 +75,24 @@ public class Display {
     View.moveCursorToPosition(1, 1); // Move cursor back to the top
   }
   
+  public void setView(View view) {
+    currentView = view;
+  }
+  
   /**
    * Draw the view in the current mode
    *
    * @throws IOException
    */
   public void draw() throws IOException {
-    controller.currentView().draw();
+    clear();
+    currentView.draw();
     //System.out.print(View.thematicBreak(cols));
     System.out.print(lowInfoBar(cols));
-    System.out.print(inputField());
-    View.moveToInputField(lines);
+    if(api.isConnected()) {
+      System.out.print(inputField());
+      View.moveToInputField(lines);
+    }
   }
   
   private String inputField() {

@@ -3,6 +3,7 @@ package fr.uge.chadow.client;
 import fr.uge.chadow.cli.CLIColor;
 import fr.uge.chadow.cli.InputReader;
 import fr.uge.chadow.cli.display.*;
+import fr.uge.chadow.cli.display.view.*;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -18,9 +19,6 @@ import java.util.stream.Collectors;
 import static fr.uge.chadow.cli.display.View.colorize;
 
 public class ClientController {
-  
-  
-
   
   public enum Mode {
     CHAT_LIVE_REFRESH, // default
@@ -39,12 +37,12 @@ public class ClientController {
   private final ClientAPI api;
   private volatile boolean mustClose = false;
   //// display management
-  private Display display;
-  private View currentView;
-  private Selector<?> currentSelector;
+  private final AtomicBoolean viewCanRefresh = new AtomicBoolean(true);
   private final ChatView mainView;
   private final PrivateMessageView privateMessageView;
-  private final AtomicBoolean viewCanRefresh = new AtomicBoolean(true);
+  private Display display;
+  private SelectorView<?> currentSelector;
+  private View currentView;
   private Codex selectedCodexForDetails;
   private Mode mode;
   private int lines;
@@ -76,14 +74,11 @@ public class ClientController {
     return viewCanRefresh;
   }
   
-  public View currentView() {
-      return currentView;
-  }
-  
   public void start() throws IOException {
     // Creates the display
     display = new Display(lines, cols, this, api);
     InputReader inputReader = new InputReader(this);
+    setCurrentView(new CantConnectScreenView(lines, cols));
     logger.info(STR."Starting console (\{lines} rows \{cols} cols");
     // Starts the client
     startClient(new Client(serverAddress, api));
@@ -92,6 +87,12 @@ public class ClientController {
     display.draw();
     // Starts display thread
     startDisplay();
+    try {
+      api.waitForConnection();
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e); // @Todo
+    }
+    setCurrentView(mainView);
     // start the input reader
     try {
       inputReader.start();
@@ -109,7 +110,9 @@ public class ClientController {
             try {
               client.launch();
             } catch (IOException e) {
-              logger.severe(STR."Client was interrupted. \{e.getMessage()}");
+              logger.severe(STR."The client was interrupted. \{e.getMessage()}");
+            } catch (Throwable e) {
+              throw new RuntimeException(e);
             } finally {
               mustClose = true;
             }
@@ -151,15 +154,19 @@ public class ClientController {
     System.exit(0);
   }
   
+  private void setCurrentView(View view) {
+    currentView = view;
+    display.setView(view);
+  }
+  
   /**
    * Process the message or the command
    *
    * @param input the user input
-   * @return true if the user can type again, otherwise it's the view's turn.
    */
   public void processInput(String input) throws IOException {
     logger.info(STR."Processing input: \{input}");
-    var letwrite =  processComplexCommands(input).orElseGet(() -> switch (input) {
+    var canTypeAgain =  processComplexCommands(input).orElseGet(() -> switch (input) {
       case ":d" -> {
         try {
           drawDisplay();
@@ -172,7 +179,7 @@ public class ClientController {
       case ":c", ":chat" -> {
         mode = Mode.CHAT_LIVE_REFRESH;
         mainView.setMode(mode);
-        currentView = mainView;
+        setCurrentView(mainView);
         try {
           drawDisplay();
           logger.info(STR."Processing input: \{input} 2");
@@ -185,7 +192,7 @@ public class ClientController {
       case ":mycdx" -> {
         mode = Mode.CODEX_LIST;
         currentSelector = View.selectorFromList("My cdx", lines, cols, api.codexes(), View::codexShortDescription);
-        currentView = currentSelector;
+        setCurrentView(currentSelector);
         yield true;
       }
       case ":exit" -> {
@@ -193,7 +200,7 @@ public class ClientController {
         yield false;
       }
       case ":h", ":help" -> {
-        currentView = helpView();
+        setCurrentView(helpView());
         mode = Mode.HELP_SCROLLER;
         currentView.scrollTop();
         yield true;
@@ -201,7 +208,7 @@ public class ClientController {
       default -> processCommandInContext(input);
     });
     clearDisplayAndMore();
-    viewCanRefresh.set(!letwrite);
+    viewCanRefresh.set(!canTypeAgain);
     drawDisplay();
   }
   
@@ -216,7 +223,7 @@ public class ClientController {
             api.propose(currentCodex());
           }
           mode = Mode.CODEX_DETAILS;
-          currentView = codexView(currentCodex());
+          setCurrentView( codexView(currentCodex()));
           currentView.scrollTop();
         }
       }
@@ -228,7 +235,7 @@ public class ClientController {
             api.download(currentCodex().idToHexadecimal());
           }
           mode = Mode.CODEX_DETAILS;
-          currentView = codexView(currentCodex());
+          setCurrentView( codexView(currentCodex()));
           currentView.scrollTop();
         }
       }
@@ -258,7 +265,7 @@ public class ClientController {
         if(input.equals(":w")) {
           mode = Mode.PRIVATE_MESSAGE_LIVE;
           mainView.setMode(mode);
-          currentView = mainView;
+          setCurrentView( mainView);
           currentView.scrollTop();
           yield true;
         }
@@ -272,7 +279,7 @@ public class ClientController {
       case ":m", ":msg" -> {
         mode = Mode.PRIVATE_MESSAGE_SCROLLER;
         privateMessageView.setMode(mode);
-        currentView = privateMessageView;
+        setCurrentView( privateMessageView);
         currentView.scrollTop();
         return true;
       }
@@ -293,7 +300,7 @@ public class ClientController {
       case ":s", ":see" ->{
         mode = Mode.CODEX_DETAILS;
         selectedCodexForDetails = (Codex) currentSelector.get();
-        currentView = codexView(selectedCodexForDetails);
+        setCurrentView(codexView(selectedCodexForDetails));
         currentView.scrollTop();
         logger.info(STR."see cdx: \{View.bytesToHexadecimal(selectedCodexForDetails.id())}");
       }
@@ -307,14 +314,14 @@ public class ClientController {
         logger.info("focusing users list");
         mode = Mode.USERS_SCROLLER;
         mainView.setMode(mode);
-        currentView = mainView;
+        setCurrentView( mainView);
         return true;
       }
       case ":m", ":msg" -> {
         logger.info("focusing messages list");
         mode = Mode.CHAT_SCROLLER;
         mainView.setMode(mode);
-        currentView = mainView;
+        setCurrentView( mainView);
         return true;
       }
       default -> {
@@ -376,7 +383,7 @@ public class ClientController {
       privateMessageView.setReceiver(receiver.orElseThrow());
       mode = Mode.PRIVATE_MESSAGE_LIVE;
       privateMessageView.setMode(mode);
-      currentView = privateMessageView;
+      setCurrentView( privateMessageView);
       try {
         drawDisplay();
       } catch (IOException e) {
@@ -423,7 +430,7 @@ public class ClientController {
       selectedCodexForDetails = codex;
       api.addCodex(codex);
       mode = Mode.CODEX_DETAILS;
-      currentView = codexView(codex);
+      setCurrentView( codexView(codex));
       currentView.scrollTop();
       logger.info(STR."Codex created with id: \{codex.idToHexadecimal()}");
       return Optional.of(true);
@@ -440,14 +447,14 @@ public class ClientController {
       var codex = api.getCodex(fingerprint);
       selectedCodexForDetails = codex.orElseThrow();
       mode = Mode.CODEX_DETAILS;
-      currentView = codexView(selectedCodexForDetails);
+      setCurrentView( codexView(selectedCodexForDetails));
       currentView.scrollTop();
       return Optional.of(true);
     }
     return Optional.empty();
   }
   
-  private Scrollable helpView() {
+  private ScrollableView helpView() {
     var txt = """
         ##  ┓┏  ┓
         ##  ┣┫┏┓┃┏┓
@@ -502,7 +509,7 @@ public class ClientController {
     return View.scrollableFromString("Help", lines, cols, txt);
   }
   
-  private Scrollable codexView(Codex codex) {
+  private ScrollableView codexView(Codex codex) {
     var sb = new StringBuilder();
     
     var splash = """

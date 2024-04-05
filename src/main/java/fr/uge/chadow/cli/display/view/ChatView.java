@@ -1,6 +1,8 @@
-package fr.uge.chadow.cli.display;
+package fr.uge.chadow.cli.display.view;
 
 import fr.uge.chadow.cli.CLIColor;
+import fr.uge.chadow.cli.display.Scroller;
+import fr.uge.chadow.cli.display.View;
 import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.client.ClientController;
 import fr.uge.chadow.core.protocol.YellMessage;
@@ -9,7 +11,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -59,9 +60,7 @@ public class ChatView implements View {
   }
   
   public void clear() {
-    View.moveCursorToPosition(1, 1);
-    View.clearDisplayArea(lines);
-    View.moveCursorToPosition(1, 1); // Move cursor back to the top
+    View.clear(lines);
   }
   
   /**
@@ -98,9 +97,8 @@ public class ChatView implements View {
    * where each line is formatted as follow:
    * <[date] [userx] | [message] > | [usery presence if any]
    *
-   * @throws IOException
    */
-  private String chatDisplay() throws IOException {
+  private String chatDisplay() {
     var sb = new StringBuilder();
     var maxUserLength = getMaxUserLength();
     var lineIndex = 0;
@@ -170,7 +168,7 @@ public class ChatView implements View {
     var colsRemaining = cols - getMaxUserLength() - 2;
     sb.append(CLIColor.CYAN_BACKGROUND);
     sb.append(CLIColor.WHITE);
-    var title = (STR."%-\{colsRemaining}s ").formatted(STR."CHADOW CLIENT (" + lines + "x" + cols + ")");
+    var title = (STR."%-\{colsRemaining}s ").formatted("CHADOW CLIENT (" + lines + "x" + cols + ")");
     colsRemaining -= title.length() + 2; // right side pannel of users + margin (  )
     var totalUsers = (STR."\{CLIColor.BOLD}\{CLIColor.BLACK}%-\{getMaxUserLength()}s").formatted(STR."(\{clientAPI.totalUsers()})");
     colsRemaining -= totalUsers.length();

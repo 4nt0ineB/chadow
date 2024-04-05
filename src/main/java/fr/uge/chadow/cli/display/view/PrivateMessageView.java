@@ -1,6 +1,8 @@
-package fr.uge.chadow.cli.display;
+package fr.uge.chadow.cli.display.view;
 
 import fr.uge.chadow.cli.CLIColor;
+import fr.uge.chadow.cli.display.Scroller;
+import fr.uge.chadow.cli.display.View;
 import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.client.ClientController;
 import fr.uge.chadow.client.Recipient;
@@ -10,7 +12,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -71,9 +72,7 @@ public class PrivateMessageView implements View {
   }
   
   public void clear() {
-    View.moveCursorToPosition(1, 1);
-    View.clearDisplayArea(lines);
-    View.moveCursorToPosition(1, 1); // Move cursor back to the top
+    View.clear(lines);
   }
   
   /**
@@ -82,7 +81,6 @@ public class PrivateMessageView implements View {
    * @throws IOException
    */
   public void draw() throws IOException {
-    clear();
     System.out.print(chatHeader());
     System.out.print(chatDisplay());
     if (mode == ClientController.Mode.PRIVATE_MESSAGE_LIVE) {
@@ -222,44 +220,44 @@ public class PrivateMessageView implements View {
   
   @Override
   public void scrollPageUp() {
-    switch (mode) {
-      case PRIVATE_MESSAGE_SCROLLER -> messageScroller.scrollPageUp();
+    if (Objects.requireNonNull(mode) == ClientController.Mode.PRIVATE_MESSAGE_SCROLLER) {
+      messageScroller.scrollPageUp();
     }
   }
   
   @Override
   public void scrollPageDown() {
-    switch (mode) {
-      case PRIVATE_MESSAGE_SCROLLER -> messageScroller.scrollPageDown();
+    if (mode == ClientController.Mode.PRIVATE_MESSAGE_SCROLLER) {
+      messageScroller.scrollPageDown();
     }
   }
   
   @Override
   public void scrollBottom() {
-    switch (mode) {
-      case PRIVATE_MESSAGE_SCROLLER -> messageScroller.setLines(api.numberOfMessages());
+    if (mode == ClientController.Mode.PRIVATE_MESSAGE_SCROLLER) {
+      messageScroller.setLines(api.numberOfMessages());
     }
   }
   
   
   @Override
   public void scrollLineUp() {
-    switch (mode) {
-      case PRIVATE_MESSAGE_SCROLLER -> messageScroller.scrollUp(1);
+    if (mode == ClientController.Mode.PRIVATE_MESSAGE_SCROLLER) {
+      messageScroller.scrollUp(1);
     }
   }
   
   @Override
   public void scrollLineDown() {
-    switch (mode) {
-      case PRIVATE_MESSAGE_SCROLLER -> messageScroller.scrollDown(1);
+    if (mode == ClientController.Mode.PRIVATE_MESSAGE_SCROLLER) {
+      messageScroller.scrollDown(1);
     }
   }
   
   @Override
   public void scrollTop() {
-    switch (mode) {
-      case PRIVATE_MESSAGE_SCROLLER -> messageScroller.moveToTop();
+    if (mode == ClientController.Mode.PRIVATE_MESSAGE_SCROLLER) {
+      messageScroller.moveToTop();
     }
   }
   

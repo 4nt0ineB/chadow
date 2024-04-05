@@ -1,12 +1,14 @@
-package fr.uge.chadow.cli.display;
+package fr.uge.chadow.cli.display.view;
 
 import fr.uge.chadow.cli.CLIColor;
+import fr.uge.chadow.cli.display.Scroller;
+import fr.uge.chadow.cli.display.View;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-public class Scrollable implements View {
+public class ScrollableView implements View {
   
   
   private final ArrayList<String> textLines;
@@ -15,7 +17,7 @@ public class Scrollable implements View {
   private int lines;
   private int columns;
   
-  public Scrollable(String title, int lines, int cols, List<String> textLines) {
+  public ScrollableView(String title, int lines, int cols, List<String> textLines) {
     Objects.requireNonNull(title);
     Objects.requireNonNull(textLines);
     if (lines <= 0 || cols <= 0) {
@@ -60,9 +62,7 @@ public class Scrollable implements View {
   
   @Override
   public void clear() {
-    View.moveCursorToPosition(1, 1);
-    View.clearDisplayArea(lines);
-    View.moveCursorToPosition(1, 1); // Move cursor back to the top
+    View.clear(lines);
   }
   
   public String header() {

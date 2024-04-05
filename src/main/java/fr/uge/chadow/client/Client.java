@@ -10,11 +10,9 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.Objects;
-import java.util.logging.Logger;
 
 public class Client {
   
-  private static final Logger logger = Logger.getLogger(Client.class.getName());
   private final SocketChannel sc;
   private final Selector selector;
   private final InetSocketAddress serverAddress;
@@ -31,7 +29,6 @@ public class Client {
   }
   
   public void launch() throws IOException {
-
     sc.configureBlocking(false);
     var key = sc.register(selector, SelectionKey.OP_CONNECT);
     clientContext = new ClientContext(key, api);

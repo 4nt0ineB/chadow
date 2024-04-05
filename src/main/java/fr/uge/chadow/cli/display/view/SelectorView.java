@@ -1,24 +1,26 @@
-package fr.uge.chadow.cli.display;
+package fr.uge.chadow.cli.display.view;
 
 import fr.uge.chadow.cli.CLIColor;
+import fr.uge.chadow.cli.display.Selectable;
+import fr.uge.chadow.cli.display.View;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
-public class Selector<T> implements Selectable<T>, View{
+public class SelectorView<T> implements Selectable<T>, View {
   
   
   private final List<Map.Entry<T, List<String>>> linesByItem;
-  private Scrollable scrollableView;
+  private ScrollableView scrollableView;
   private int itemPointerIndex = 0;
   private final String title;
   private final int lines;
   private final int cols;
   private final Function<? super T, String> mapper;
   
-  Selector(String title, int lines, int cols, List<Map.Entry<T, List<String>>> linesByItem, Scrollable scrollableView, Function<? super T, String> mapper) {
+  public SelectorView(String title, int lines, int cols, List<Map.Entry<T, List<String>>> linesByItem,
+                      ScrollableView scrollableView, Function<? super T, String> mapper) {
     this.linesByItem = linesByItem;
     this.scrollableView = scrollableView;
     this.title = title;
@@ -37,9 +39,7 @@ public class Selector<T> implements Selectable<T>, View{
   
   @Override
   public T get() {
-    @SuppressWarnings("unchecked")
-    T item = linesByItem.get(itemPointerIndex).getKey();
-    return item;
+    return linesByItem.get(itemPointerIndex).getKey();
   }
   
   @Override
@@ -92,7 +92,7 @@ public class Selector<T> implements Selectable<T>, View{
     }
     for (var line : linesByItem.get(itemPointerIndex).getValue()) {
       View.moveCursorToPosition(1, 1+lineIndex);
-      System.out.println((STR."\{CLIColor.ORANGE}\{CLIColor.BOLD}%-\{cols}s\{CLIColor.RESET}").formatted(line));
+      System.out.printf(STR."\{STR."\{CLIColor.ORANGE}\{CLIColor.BOLD}%-\{cols}s\{CLIColor.RESET}"}%n", line);
       lineIndex++;
     }
     View.moveCursorToPosition(1, lines - 2);
