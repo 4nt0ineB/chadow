@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import fr.uge.chadow.core.context.ServerContext;
 import fr.uge.chadow.core.protocol.WhisperMessage;
 import fr.uge.chadow.core.protocol.YellMessage;
 
@@ -52,10 +53,10 @@ public class Server {
     }
     try {
       if (key.isValid() && key.isWritable()) {
-        ((Context) key.attachment()).doWrite();
+        ((ServerContext) key.attachment()).doWrite();
       }
       if (key.isValid() && key.isReadable()) {
-        ((Context) key.attachment()).doRead();
+        ((ServerContext) key.attachment()).doRead();
       }
     } catch (IOException e) {
       logger.log(Level.INFO, "Connection closed with client due to IOException", e);
@@ -71,7 +72,7 @@ public class Server {
     }
     sc.configureBlocking(false);
     var sckey = sc.register(selector, SelectionKey.OP_READ);
-    sckey.attach(new Context(this, sckey));
+    sckey.attach(new ServerContext(this, sckey));
   }
 
   private void silentlyClose(SelectionKey key) {
@@ -88,9 +89,9 @@ public class Server {
    *
    * @param msg the message to broadcast
    */
-  void broadcast(YellMessage msg) {
+  public void broadcast(YellMessage msg) {
     for (var key : selector.keys()) {
-      var session = ((Context) key.attachment());
+      var session = ((ServerContext) key.attachment());
       if (session != null) {
         session.queueFrame(msg);
         logger.info(STR."Broadcasting message \{msg.txt()}");
@@ -104,7 +105,7 @@ public class Server {
       logger.warning(STR."Client \{message.username()} not found");
       return;
     }
-    var session = (Context) sc.keyFor(selector).attachment();
+    var session = (ServerContext) sc.keyFor(selector).attachment();
     var newMessage = new WhisperMessage(username_sender, message.txt(), System.currentTimeMillis());
     session.queueFrame(newMessage);
     logger.info(STR."Whispering message \{message.txt()} to \{message.username()}");

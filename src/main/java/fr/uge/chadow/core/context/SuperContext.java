@@ -1,7 +1,8 @@
 package fr.uge.chadow.core.context;
 
 import fr.uge.chadow.client.Client;
-import fr.uge.chadow.core.protocol.*;
+import fr.uge.chadow.core.protocol.Frame;
+import fr.uge.chadow.core.protocol.Opcode;
 import fr.uge.chadow.core.reader.FrameReader;
 import fr.uge.chadow.core.reader.Reader;
 
@@ -12,20 +13,20 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
 import java.util.logging.Logger;
 
-public sealed abstract class SuperContext permits ClientContext{
+public sealed abstract class SuperContext permits ClientContext, ServerContext {
   
   private static final Logger logger = Logger.getLogger(Client.class.getName());
+  public final ArrayDeque<Frame> queue = new ArrayDeque<>();
   private final SelectionKey key;
   private final SocketChannel sc;
   private final ByteBuffer bufferIn;
   private final ByteBuffer bufferOut;
-  public final ArrayDeque<Frame> queue = new ArrayDeque<>();
-  private ByteBuffer processingFrame;
   private final FrameReader frameReader = new FrameReader();
-  private Opcode currentOpcode = null;
+  private ByteBuffer processingFrame;
+  private final Opcode currentOpcode = null;
   private boolean closed = false;
   
-  public SuperContext(SelectionKey key, Client client, int BUFFER_SIZE) {
+  public SuperContext(SelectionKey key, int BUFFER_SIZE) {
     this.key = key;
     this.sc = (SocketChannel) key.channel();
     bufferIn = ByteBuffer.allocate(BUFFER_SIZE);
@@ -70,6 +71,7 @@ public sealed abstract class SuperContext permits ClientContext{
    * @throws IOException if an I/O error occurs while processing the opcode.
    */
   abstract void processCurrentOpcodeAction(Frame frame) throws IOException;
+  
   private void processCurrentOpcodeActionImpl() throws IOException {
     processCurrentOpcodeAction(frameReader.get());
   }
@@ -87,7 +89,8 @@ public sealed abstract class SuperContext permits ClientContext{
   void processOut() {
     if (processingFrame == null && !queue.isEmpty()) {
       while (!queue.isEmpty()) {
-        processingFrame = queue.pollLast().toByteBuffer();
+        processingFrame = queue.pollLast()
+                               .toByteBuffer();
         processingFrame.flip();
         if (processingFrame.remaining() <= bufferOut.remaining()) {
           // If enough space in bufferOut, add the frame
@@ -131,7 +134,6 @@ public sealed abstract class SuperContext permits ClientContext{
    * updateInterestOps and after the call. Also, it is assumed that the process has
    * been called just before updateInterestOps.
    */
-  
   private void updateInterestOps() {
     int ops = 0;
     if (bufferIn.hasRemaining() && !closed) {
@@ -166,7 +168,8 @@ public sealed abstract class SuperContext permits ClientContext{
    */
   public void doRead() throws IOException {
     if (sc.read(bufferIn) == -1) {
-      silentlyClose();
+      closed = true;
+      logger.info(STR."Client \{sc.getRemoteAddress()} has closed the connection");
     }
     processIn();
     updateInterestOps();
@@ -198,4 +201,7 @@ public sealed abstract class SuperContext permits ClientContext{
     return key;
   }
   
+  protected SocketChannel getSocket() {
+    return sc;
+  }
 }

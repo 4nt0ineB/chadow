@@ -1,7 +1,9 @@
 package fr.uge.chadow.client;
 
 import fr.uge.chadow.core.context.ClientContext;
-import fr.uge.chadow.core.protocol.*;
+import fr.uge.chadow.core.protocol.Request;
+import fr.uge.chadow.core.protocol.RequestDownload;
+import fr.uge.chadow.core.protocol.WhisperMessage;
 import fr.uge.chadow.core.protocol.YellMessage;
 
 import java.io.IOException;
@@ -24,43 +26,54 @@ public class Client {
   private final Selector selector;
   private final InetSocketAddress serverAddress;
   private final String login;
-  private ClientContext clientContext;
   private final HashMap<String, Codex> codexes = new HashMap<>();
   private final ArrayList<YellMessage> publicMessages = new ArrayList<>();
   private final HashMap<UUID, Recipient> privateMessages = new HashMap<>();
   private final SortedSet<String> users = new TreeSet<>();
   private final ReentrantLock lock = new ReentrantLock();
   private final ArrayBlockingQueue<Optional<String>> requestCodexResponseQueue = new ArrayBlockingQueue<>(1);
-
-
+  private ClientContext clientContext;
+  
   public Client(String login, InetSocketAddress serverAddress) throws IOException {
     this.serverAddress = serverAddress;
     this.login = login;
     this.sc = SocketChannel.open();
     this.selector = Selector.open();
   }
-
+  
   public static void main(String[] args) throws NumberFormatException, IOException {
     if (args.length != 3) {
       usage();
       return;
     }
-
+    
     new Client(args[0], new InetSocketAddress(args[1], Integer.parseInt(args[2]))).launch();
   }
-
+  
   private static void usage() {
     System.out.println("Usage : ClientChat login hostname port");
   }
-
+  
+  /**
+   * Create a splash screen logo with a list of messages
+   * showing le title "Chadow" in ascii art and the version
+   */
+  public static Collection<YellMessage> splashLogo() {
+    return List.of(
+        new YellMessage("", "┏┓┓    ┓", 0),
+        new YellMessage("", "┃ ┣┓┏┓┏┫┏┓┓┏┏", 0),
+        new YellMessage("", "┗┛┗┗┗┗┗┗┗┛┗┛┛ v1.0.0 - Bastos & Sebbah", 0)
+    );
+  }
+  
   public String serverHostName() {
     return serverAddress.getHostName();
   }
-
+  
   public String login() {
     return login;
   }
-
+  
   public void launch() throws IOException {
     // for dev: fake messages
     try {
@@ -68,7 +81,7 @@ public class Client {
     } catch (NoSuchAlgorithmException e) {
       throw new RuntimeException(e);
     }
-
+    
     sc.configureBlocking(false);
     var key = sc.register(selector, SelectionKey.OP_CONNECT);
     clientContext = new ClientContext(key, this);
@@ -82,7 +95,12 @@ public class Client {
       }
     }
   }
-
+  
+  
+  ////////////// CLIENT API //////////////////////////
+  /// API to interact on session with the server /////
+  ////////////////////////////////////////////////////
+  
   private void treatKey(SelectionKey key) {
     try {
       if (key.isValid() && key.isConnectable()) {
@@ -99,12 +117,7 @@ public class Client {
       throw new UncheckedIOException(ioe);
     }
   }
-
-
-  ////////////// CLIENT API //////////////////////////
-  /// API to interact on session with the server /////
-  ////////////////////////////////////////////////////
-
+  
   public List<YellMessage> getPublicMessages() {
     lock.lock();
     try {
@@ -113,7 +126,7 @@ public class Client {
       lock.unlock();
     }
   }
-
+  
   /**
    * Send instructions to the selector via a BlockingQueue and wake it up
    *
@@ -139,7 +152,7 @@ public class Client {
       lock.unlock();
     }
   }
-
+  
   /**
    * Add a codex to the client
    *
@@ -152,43 +165,45 @@ public class Client {
     }
     codexes.put(codex.idToHexadecimal(), codex);
   }
-
+  
   public List<Codex> codexes() {
     return List.copyOf(codexes.values());
   }
-
+  
   public Optional<Codex> getCodex(String id) throws InterruptedException {
     var codex = codexes.get(id);
-    if(codex != null) {
+    if (codex != null) {
       return Optional.of(codex);
     }
     requestCodexResponseQueue.clear();
     clientContext.queueFrame(new Request(id));
     var fetchedCodexId = requestCodexResponseQueue.poll(5, java.util.concurrent.TimeUnit.SECONDS);
-    if(fetchedCodexId == null) {
+    if (fetchedCodexId == null) {
       return Optional.empty();
     }
     return fetchedCodexId.map(codexes::get);
   }
   
-  public void whisper(UUID recipientId, String message){
+  public void whisper(UUID recipientId, String message) {
     var recipient = getRecipientbyId(recipientId);
-    if(recipient.isEmpty()) {
+    if (recipient.isEmpty()) {
       logger.warning(STR."(whisper) whispering to id \{recipientId}, but was not found");
       return;
     }
-    var recipientUsername = recipient.orElseThrow().username();
+    var recipientUsername = recipient.orElseThrow()
+                                     .username();
     clientContext.queueFrame(new WhisperMessage(recipientUsername, message, 0L));
     logger.info(STR."(whisper) message to \{recipientUsername} of length \{message.length()} queued");
     selector.wakeup();
-    recipient.orElseThrow().addMessage(new WhisperMessage(login, message, System.currentTimeMillis()));
+    recipient.orElseThrow()
+             .addMessage(new WhisperMessage(login, message, System.currentTimeMillis()));
   }
   
   public Optional<Recipient> getRecipientbyId(UUID userId) {
     lock.lock();
     try {
       var recipient = privateMessages.get(userId);
-      if(recipient == null) {
+      if (recipient == null) {
         return Optional.empty();
       }
       return Optional.of(recipient);
@@ -200,9 +215,13 @@ public class Client {
   public Optional<Recipient> getRecipient(String username) {
     lock.lock();
     try {
-      var recipient = privateMessages.values().stream().filter(u -> u.username().equals(username)).findFirst();
+      var recipient = privateMessages.values()
+                                     .stream()
+                                     .filter(u -> u.username()
+                                                   .equals(username))
+                                     .findFirst();
       recipient.ifPresent(r -> {
-        if(!r.hasMessages()) {
+        if (!r.hasMessages()) {
           r.addMessage(new WhisperMessage("(info)", STR."This is the beginning of your private message history with \{username}", System.currentTimeMillis()));
         }
       });
@@ -221,10 +240,9 @@ public class Client {
     }
   }
   
-  
   public void stopDownloading(String id) {
     var codex = codexes.get(id);
-    if(codex == null) {
+    if (codex == null) {
       return;
     }
     codex.stopDownloading();
@@ -233,15 +251,14 @@ public class Client {
   
   public void download(String id) {
     var codex = codexes.get(id);
-    if(codex == null) {
+    if (codex == null) {
       return;
     }
     codex.download();
     clientContext.queueFrame(new RequestDownload(id, (byte) 0));
   }
   
-
-  
+  /////////// For the session only
   
   /**
    * Check if the client is connected to the server
@@ -251,9 +268,7 @@ public class Client {
   public boolean isConnected() {
     return clientContext.isConnected();
   }
-
-  /////////// For the session only
-
+  
   public void addMessage(YellMessage msg) {
     lock.lock();
     try {
@@ -263,7 +278,7 @@ public class Client {
       lock.unlock();
     }
   }
-
+  
   public void addWhisper(WhisperMessage msg) {
     var Recipient = getRecipient(msg.username());
     Recipient.ifPresentOrElse(r -> r.addMessage(msg), () -> {
@@ -273,23 +288,22 @@ public class Client {
       newRecipient.addMessage(msg);
       privateMessages.put(newRecipient.id(), newRecipient);
     });
-    logger.info(STR."\{msg.username()} is whispering a message of length \{msg.txt().length()}");
+    logger.info(STR."\{msg.username()} is whispering a message of length \{msg.txt()
+                                                                              .length()}");
   }
   
-  
-
   private void fillWithFakeData() throws IOException, NoSuchAlgorithmException {
     var users = new String[]{"test", "Morpheus", "Trinity", "Neo", "Flynn", "Alan", "Lora", "Gandalf", "Bilbo", "SKIDROW", "Antoine"};
     this.users.addAll(Arrays.asList(users));
     var messages = new YellMessage[]{
-            new YellMessage("test", "test", System.currentTimeMillis()),
-            new YellMessage("test", "hello how are you", System.currentTimeMillis()),
-            new YellMessage("Morpheus", "Wake up, Neo...", System.currentTimeMillis()),
-            new YellMessage("Morpheus", "The Matrix has you...", System.currentTimeMillis()),
-            new YellMessage("Neo", "what the hell is this", System.currentTimeMillis()),
-            new YellMessage("Alan1", "Master CONTROL PROGRAM\nRELEASE TRON JA 307020...\nI HAVE PRIORITY ACCESS 7", System.currentTimeMillis()),
-            new YellMessage("SKIDROW", "Here is the codex of the FOSS (.deb) : cdx:1eb49a28a0c02b47eed4d0b968bb9aec116a5a47", System.currentTimeMillis()),
-            new YellMessage("Antoine", "Le lien vers le sujet : http://igm.univ-mlv.fr/coursprogreseau/tds/projet2024.html", System.currentTimeMillis())
+        new YellMessage("test", "test", System.currentTimeMillis()),
+        new YellMessage("test", "hello how are you", System.currentTimeMillis()),
+        new YellMessage("Morpheus", "Wake up, Neo...", System.currentTimeMillis()),
+        new YellMessage("Morpheus", "The Matrix has you...", System.currentTimeMillis()),
+        new YellMessage("Neo", "what the hell is this", System.currentTimeMillis()),
+        new YellMessage("Alan1", "Master CONTROL PROGRAM\nRELEASE TRON JA 307020...\nI HAVE PRIORITY ACCESS 7", System.currentTimeMillis()),
+        new YellMessage("SKIDROW", "Here is the codex of the FOSS (.deb) : cdx:1eb49a28a0c02b47eed4d0b968bb9aec116a5a47", System.currentTimeMillis()),
+        new YellMessage("Antoine", "Le lien vers le sujet : http://igm.univ-mlv.fr/coursprogreseau/tds/projet2024.html", System.currentTimeMillis())
     };
     this.publicMessages.addAll(splashLogo());
     this.publicMessages.addAll(Arrays.asList(messages));
@@ -300,17 +314,5 @@ public class Client {
     codexes.put(codex.idToHexadecimal(), codex);
     codex = Codex.fromPath("my codex", "/home/alan1/Downloads/Great Teacher Onizuka (1999)/Great Teacher Onizuka - S01E01 - Lesson 1.mkv");
     codexes.put(codex.idToHexadecimal(), codex);
-  }
-  
-  /**
-   * Create a splash screen logo with a list of messages
-   * showing le title "Chadow" in ascii art and the version
-   */
-  public static Collection<YellMessage> splashLogo() {
-    return List.of(
-        new YellMessage("", "┏┓┓    ┓", 0),
-        new YellMessage("", "┃ ┣┓┏┓┏┫┏┓┓┏┏", 0),
-        new YellMessage("", "┗┛┗┗┗┗┗┗┗┛┗┛┛ v1.0.0 - Bastos & Sebbah", 0)
-    );
   }
 }

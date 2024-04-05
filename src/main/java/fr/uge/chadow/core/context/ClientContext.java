@@ -17,7 +17,7 @@ public final class ClientContext extends SuperContext {
   private boolean isConnected = false;
   
   public ClientContext(SelectionKey key, Client client) {
-    super(key, client, BUFFER_SIZE);
+    super(key, BUFFER_SIZE);
     this.client = client;
   }
   
