@@ -1,6 +1,7 @@
 package fr.uge.chadow.core.context;
 
 import fr.uge.chadow.core.protocol.*;
+import fr.uge.chadow.core.protocol.client.Discovery;
 import fr.uge.chadow.server.Server;
 
 import java.io.IOException;
@@ -13,12 +14,12 @@ public final class ServerContext extends Context {
   private final Server server;
   private boolean closed = false;
   private String login;
-  
+
   public ServerContext(Server server, SelectionKey key) {
     super(key, BUFFER_SIZE);
     this.server = server;
   }
-  
+
   @Override
   public void processCurrentOpcodeAction(Frame frame) throws IOException {
     switch (frame) {
@@ -41,6 +42,15 @@ public final class ServerContext extends Context {
 
         // Send an OK message to the client
         queueFrame(new OK());
+      }
+
+      case Discovery _ -> {
+        if (!isAuthenticated()) {
+          logger.warning(STR."Client \{super.getSocket().getRemoteAddress()} is not authenticated");
+          silentlyClose();
+          return;
+        }
+        server.discovery(login);
       }
 
       case YellMessage yellMessage -> {
@@ -73,7 +83,7 @@ public final class ServerContext extends Context {
   private boolean isAuthenticated() {
     return login != null;
   }
-  
+
   @Override
   public void silentlyClose() {
     super.silentlyClose();
