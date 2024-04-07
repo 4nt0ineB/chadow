@@ -7,7 +7,7 @@ import java.io.IOException;
 import java.nio.channels.SelectionKey;
 import java.util.logging.Logger;
 
-public final class ServerContext extends SuperContext {
+public final class ServerContext extends Context {
   private static final Logger logger = Logger.getLogger(Server.class.getName());
   private static final int BUFFER_SIZE = 1_024;
   private final Server server;

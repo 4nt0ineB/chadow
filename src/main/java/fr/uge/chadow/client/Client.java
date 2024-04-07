@@ -1,7 +1,7 @@
 package fr.uge.chadow.client;
 
 import fr.uge.chadow.core.context.ClientContext;
-import fr.uge.chadow.core.context.SuperContext;
+import fr.uge.chadow.core.context.Context;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -17,7 +17,7 @@ public class Client {
   private final Selector selector;
   private final InetSocketAddress serverAddress;
   private final ClientAPI api;
-  private SuperContext clientContext;
+  private Context clientContext;
   
   public Client(InetSocketAddress serverAddress, ClientAPI api) throws IOException {
     Objects.requireNonNull(serverAddress);

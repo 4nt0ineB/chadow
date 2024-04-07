@@ -12,9 +12,9 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
 import java.util.logging.Logger;
 
-public sealed abstract class SuperContext permits ClientContext, ServerContext {
+public sealed abstract class Context permits ClientContext, ServerContext {
   
-  private static final Logger logger = Logger.getLogger(SuperContext.class.getName());
+  private static final Logger logger = Logger.getLogger(Context.class.getName());
   private final ArrayDeque<Frame> queue = new ArrayDeque<>();
   private final SelectionKey key;
   private final SocketChannel sc;
@@ -25,7 +25,7 @@ public sealed abstract class SuperContext permits ClientContext, ServerContext {
   private final Opcode currentOpcode = null;
   private boolean closed = false;
   
-  public SuperContext(SelectionKey key, int BUFFER_SIZE) {
+  public Context(SelectionKey key, int BUFFER_SIZE) {
     this.key = key;
     this.sc = (SocketChannel) key.channel();
     bufferIn = ByteBuffer.allocate(BUFFER_SIZE);

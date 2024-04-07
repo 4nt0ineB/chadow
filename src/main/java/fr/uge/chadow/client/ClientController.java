@@ -74,49 +74,55 @@ public class ClientController {
     return viewCanRefresh;
   }
   
-  public void start() throws IOException {
-    // Creates the display
+  public boolean mustClose() {
+    return mustClose;
+  }
+  
+  public void start() {
+    // Starts the client thread
+    startClient();
+    if(!api.isConnected()){
+      logger.severe("The client was not able to connect to the server.");
+      var errorView = new CantConnectScreenView(lines, cols);
+      errorView.draw();
+      return;
+    }
+    // Starts display thread
     display = new Display(lines, cols, this, api);
     InputReader inputReader = new InputReader(this);
-    setCurrentView(new CantConnectScreenView(lines, cols));
-    logger.info(STR."Starting console (\{lines} rows \{cols} cols");
-    // Starts the client
-    startClient(new Client(serverAddress, api));
-    // Draws the display one time at the beginning,
-    // even if the client is not connected
-    display.draw();
-    // Starts display thread
-    startDisplay();
-    try {
-      api.waitForConnection();
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e); // @Todo
-    }
     setCurrentView(mainView);
+    startDisplay();
     // start the input reader
     try {
       inputReader.start();
     } catch (UncheckedIOException | IOException | InterruptedException | NoSuchAlgorithmException e) {
-      logger.severe(STR."The client was interrupted.\{e.getMessage()}");
+      logger.severe(STR."The console was interrupted.\{e.getCause()}");
     } finally {
       exitNicely();
     }
   }
   
-  public void startClient(Client client) {
-    Thread.ofPlatform()
-          .daemon()
-          .start(() -> {
-            try {
-              client.launch();
-            } catch (IOException e) {
-              logger.severe(STR."The client was interrupted. \{e.getMessage()}");
-            } catch (Throwable e) {
-              throw new RuntimeException(e);
-            } finally {
-              mustClose = true;
-            }
-          });
+  public void startClient() {
+    try {
+      Thread.ofPlatform()
+            .daemon()
+            .start(() -> {
+              try {
+                logger.info("Client starts");
+                new Client(serverAddress, api).launch();
+              } catch (IOException e) {
+                logger.severe(STR."The client was interrupted. \{e.getMessage()}");
+              }
+            });
+    } catch (UncheckedIOException e) {
+      logger.severe(STR."The client was interrupted while starting.\{e.getCause()}");
+      return;
+    }
+    try {
+      api.waitForConnection();
+    } catch (InterruptedException e) {
+      logger.severe(STR."The client was interrupted while waiting for connection.\{e.getCause()}");
+    }
   }
   
   public Codex currentCodex() {
@@ -128,6 +134,7 @@ public class ClientController {
           .daemon()
           .start(() -> {
             try {
+              logger.info(STR."Display starts with (\{lines} rows \{cols} cols)");
               display.startLoop();
             } catch (IOException | InterruptedException e) {
               logger.severe(STR."The console display was interrupted. \{e.getMessage()}");
@@ -147,10 +154,10 @@ public class ClientController {
   }
   
   private void exitNicely() {
-    // inputReader.stop();
-    // display.stop();
-    // client.shutdown();
     // just for now
+    api.close();
+    mustClose = true;
+    // client.shutdown();
     System.exit(0);
   }
   

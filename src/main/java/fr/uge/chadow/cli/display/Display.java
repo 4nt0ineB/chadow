@@ -61,7 +61,7 @@ public class Display {
   public void startLoop() throws InterruptedException, IOException {
     System.out.print(CLIColor.CLEAR);
     System.out.flush();
-    while (!Thread.interrupted()) {
+    while (!Thread.interrupted() && !controller.mustClose()) {
       if (controller.viewCanRefresh().get()) {
         draw();
       }

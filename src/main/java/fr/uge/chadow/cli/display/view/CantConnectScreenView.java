@@ -23,17 +23,16 @@ public class CantConnectScreenView implements View {
   public void draw() {
     var logo = List.of("┏┓┓    ┓"
                       ,"┃ ┣┓┏┓┏┫┏┓┓┏┏"
-                      ,"┗┛┗┗┗┗┗┗┗┛┗┛┛ can't reach the server...");
+                      ,"┗┛┗┗┗┗┗┗┗┛┗┛┛ couldn't reach the server...");
     var logoWidth = logo.stream().mapToInt(String::length).max().orElse(0);
-    var logoHeight = logo.size();
     var logoX = (cols - logoWidth) / 2;
-    var logoY = (lines - logoHeight) / 2;
-    for (var i = 0; i < logoHeight; i++) {
-      var line = logo.get(i);
-      System.out.print("\033[" + (logoY + i) + ";" + logoX + "H" + line);
+    for(var line : logo) {
+      System.out.print(" ".repeat(logoX));
+      System.out.println(line);
     }
+   
     for (var i = 0; i < lines - View.maxLinesView(lines); i++) {
-      System.out.print("\033[" + (logoY + logoHeight + i) + ";1H" + " ".repeat(cols));
+      System.out.print(" ".repeat(cols));
     }
   }
   

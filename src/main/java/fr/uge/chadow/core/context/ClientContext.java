@@ -5,10 +5,11 @@ import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.core.protocol.*;
 
 import java.io.IOException;
+import java.net.ConnectException;
 import java.nio.channels.SelectionKey;
 import java.util.logging.Logger;
 
-public final class ClientContext extends SuperContext {
+public final class ClientContext extends Context {
   private static final Logger logger = Logger.getLogger(Client.class.getName());
   private static final int BUFFER_SIZE = 1024;
   private final ClientAPI api;
@@ -36,11 +37,14 @@ public final class ClientContext extends SuperContext {
   
   @Override
   public void doConnect() throws IOException {
-    super.doConnect();
+    try {
+      super.doConnect();
+    } catch (IOException e) {
+      api.close();
+    }
     super.addFrame(new Register(api.login()));
     getKey().interestOps(SelectionKey.OP_WRITE);
     super.processOut();
-    logger.info("** Ready to chat now **");
   }
   
   @Override

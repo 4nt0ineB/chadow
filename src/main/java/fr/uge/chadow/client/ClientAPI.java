@@ -22,10 +22,17 @@ import java.util.logging.Logger;
  * Thread-safe.
  */
 public class ClientAPI {
+  enum STATUS {
+    CONNECTING,
+    CONNECTED,
+    CLOSED,
+  }
+  
   private static final Logger logger = Logger.getLogger(ClientAPI.class.getName());
   private ClientContext clientContext;
-  private final String login;
   
+  private final String login;
+  private STATUS status = STATUS.CONNECTING;
   
   private final HashMap<String, Codex> codexes = new HashMap<>();
   private final ArrayList<YellMessage> publicMessages = new ArrayList<>();
@@ -34,9 +41,10 @@ public class ClientAPI {
   private final ArrayBlockingQueue<Optional<String>> requestCodexResponseQueue = new ArrayBlockingQueue<>(1);
   
   private final ReentrantLock lock = new ReentrantLock();
-  private final Condition conditionConnectionEstablished = lock.newCondition();
+  private final Condition connectionCondition = lock.newCondition();
   
   public ClientAPI(String login) {
+    Objects.requireNonNull(login);
     this.login = login;
     try {
       fillWithFakeData();
@@ -48,10 +56,28 @@ public class ClientAPI {
     }
   }
   
-  public String login() {
-    return login;
+  public void close() {
+    lock.lock();
+    try {
+      logger.severe(STR."Closing the client API");
+      status = STATUS.CLOSED;
+      connectionCondition.signalAll();
+    } finally {
+      lock.unlock();
+    }
   }
   
+  public String login() {
+    lock.lock();
+    try {
+      if(!isLogged()) {
+        throw new IllegalStateException("Not logged in");
+      }
+      return login;
+    } finally {
+      lock.unlock();
+    }
+  }
   
   /**
    * Bind the client context to the API
@@ -65,10 +91,16 @@ public class ClientAPI {
     lock.lock();
     try {
       clientContext = context;
-      conditionConnectionEstablished.signalAll();
+      connectionCondition.signalAll();
+      status = STATUS.CONNECTED;
+      logger.info(STR."Connection established, authenticated on the server as \{login}");
     } finally {
       lock.unlock();
     }
+  }
+  
+  public boolean isLogged() {
+    return login != null ;
   }
   
   /**
@@ -88,8 +120,8 @@ public class ClientAPI {
   public void waitForConnection() throws InterruptedException {
     lock.lock();
     try {
-      while (!isConnected()) {
-        conditionConnectionEstablished.await();
+      while (status.equals(STATUS.CONNECTING)) {
+        connectionCondition.await();
       }
     } finally {
       lock.unlock();
@@ -104,7 +136,7 @@ public class ClientAPI {
   public boolean isConnected() {
     lock.lock();
     try {
-      return clientContext != null;
+      return clientContext != null && !status.equals(STATUS.CLOSED);
     } finally {
       lock.unlock();
     }

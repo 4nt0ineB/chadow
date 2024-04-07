@@ -81,7 +81,7 @@ public interface View {
   }
   
   /**
-   * Split the string into multiple lines if it exceeds the maxCharacters of the chat view
+   * Split the string into multiple lines if it exceeds the maxCharacters
    * or if it contains a newline character.
    * Replace tabulation by 4 spaces.
    *
@@ -118,6 +118,13 @@ public interface View {
     return lines;
   }
   
+  /**
+   * Split and sanitize a list of strings
+   *
+   * @param txt
+   * @param maxCharacters
+   * @return
+   */
   static List<String> splitAndSanitize(List<String> txt, int maxCharacters) {
     var lines = new ArrayList<String>();
     for (var line : txt) {
@@ -200,6 +207,15 @@ public interface View {
     return new ScrollableView(title, lines, cols, textLines);
   }
   
+  /**
+   * Create a scrollable view from a list of objects
+   * and the given mapper function to convert the object to a string
+   *
+   * @param title
+   * @param lines
+   * @param cols
+   * @return
+   */
   static <T> SelectorView<T> selectorFromList(String title, int lines, int cols, List<T> list, Function<? super T, String> mapper) {
     var linesByItem = new ArrayList<Map.Entry<T, List<String>>>();
     var linesToDisplay = new ArrayList<String>();
