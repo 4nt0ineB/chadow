@@ -5,7 +5,6 @@ import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.core.protocol.*;
 
 import java.io.IOException;
-import java.net.ConnectException;
 import java.nio.channels.SelectionKey;
 import java.util.logging.Logger;
 
@@ -27,7 +26,7 @@ public final class ClientContext extends Context {
         api.bindContext(this);
       }
       case YellMessage yellMessage -> api.addMessage(yellMessage);
-      case WhisperMessage whisperMessage -> api.addWhisper(whisperMessage);
+      case WhisperMessage whisperMessage -> api.addIncomingPrivateMessage(whisperMessage);
       default -> {
         logger.warning("No action for the received frame");
         super.silentlyClose();

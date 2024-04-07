@@ -90,7 +90,6 @@ public class CodexController {
     logger.info(STR."Creating codex of \"\{rootPath}\"");
     // get all files
     if(rootPath.isFile()){
-      logger.info("AM A FILE");
       fileInfoList.add(fileInfofromPath(rootPath.getPath(), rootPath.toPath()));
     }if(rootPath.isDirectory()) {
       Path start = Paths.get(rootPath.getAbsolutePath());

@@ -37,7 +37,7 @@ public class ClientAPI {
   
   private final CodexController codexController = new CodexController();
   private final ArrayList<YellMessage> publicMessages = new ArrayList<>();
-  private final HashMap<UUID, Recipient> privateMessages = new HashMap<>();
+  private final HashMap<UUID, PrivateDiscussion> privateMessages = new HashMap<>();
   private final SortedSet<String> users = new TreeSet<>();
   private final ArrayBlockingQueue<Optional<String>> requestCodexResponseQueue = new ArrayBlockingQueue<>(1);
   
@@ -77,6 +77,18 @@ public class ClientAPI {
         throw new IllegalStateException("Not logged in");
       }
       return login;
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  public List<PrivateDiscussion> discussionWithUnreadMessages() {
+    lock.lock();
+    try {
+      return privateMessages.values()
+                            .stream()
+                            .filter(PrivateDiscussion::hasNewMessages)
+                            .toList();
     } finally {
       lock.unlock();
     }
@@ -160,7 +172,7 @@ public class ClientAPI {
    *
    * @param msg
    */
-  public void yell(String msg) {
+  public void sendPublicMessage(String msg) {
     logger.info(STR."(yell) message queued of length \{msg.length()}");
     clientContext.queueFrame(new YellMessage(login, msg, 0L));
   }
@@ -206,23 +218,22 @@ public class ClientAPI {
   }
   
   public void whisper(UUID recipientId, String message) {
-    var recipient = getRecipientbyId(recipientId);
-    if (recipient.isEmpty()) {
+    var privateDiscussion = getPrivateDiscussionByRecipientId(recipientId);
+    if (privateDiscussion.isEmpty()) {
       logger.warning(STR."(whisper) whispering to id \{recipientId}, but was not found");
       return;
     }
-    var recipientUsername = recipient.orElseThrow()
+    var recipientUsername = privateDiscussion.orElseThrow()
                                      .username();
     clientContext.queueFrame(new WhisperMessage(recipientUsername, message, 0L));
     logger.info(STR."(whisper) message to \{recipientUsername} of length \{message.length()} queued");
-    recipient.orElseThrow()
-             .addMessage(new WhisperMessage(login, message, System.currentTimeMillis()));
+    privateDiscussion.orElseThrow().addMessage(new WhisperMessage(login, message, System.currentTimeMillis()));
   }
   
-  public Optional<Recipient> getRecipientbyId(UUID userId) {
+  public Optional<PrivateDiscussion> getPrivateDiscussionByRecipientId(UUID recipientId) {
     lock.lock();
     try {
-      var recipient = privateMessages.get(userId);
+      var recipient = privateMessages.get(recipientId);
       if (recipient == null) {
         return Optional.empty();
       }
@@ -232,7 +243,7 @@ public class ClientAPI {
     }
   }
   
-  public Optional<Recipient> getRecipient(String username) {
+  public Optional<PrivateDiscussion> getPrivateDiscussionWith(String username) {
     lock.lock();
     try {
       var recipient = privateMessages.values()
@@ -272,14 +283,18 @@ public class ClientAPI {
   }
   
   
-  public void addWhisper(WhisperMessage msg) {
-    var Recipient = getRecipient(msg.username());
-    Recipient.ifPresentOrElse(r -> r.addMessage(msg), () -> {
-      var newRecipient = new Recipient(UUID.randomUUID(), msg.username());
+  public void addIncomingPrivateMessage(WhisperMessage msg) {
+    var privateDiscussion = getPrivateDiscussionWith(msg.username());
+    privateDiscussion.ifPresentOrElse(d -> {
+      
+      logger.info(STR."Adding incoming message to existing discussion with \{msg.username()}");
+      d.addMessage(msg);
+    }, () -> {
+      var discussion = new PrivateDiscussion(UUID.randomUUID(), msg.username());
       var startMessage = new WhisperMessage("", STR."This is the beginning of your private message history with \{msg.username()}", System.currentTimeMillis());
-      newRecipient.addMessage(startMessage);
-      newRecipient.addMessage(msg);
-      privateMessages.put(newRecipient.id(), newRecipient);
+      discussion.addMessage(startMessage);
+      discussion.addMessage(msg);
+      privateMessages.put(discussion.id(), discussion);
     });
     logger.info(STR."\{msg.username()} is whispering a message of length \{msg.txt()
                                                                               .length()}");
@@ -301,7 +316,7 @@ public class ClientAPI {
     this.publicMessages.addAll(splashLogo());
     this.publicMessages.addAll(Arrays.asList(messages));
     var userId = UUID.randomUUID();
-    this.privateMessages.put(userId, new Recipient(userId, "Alan1"));
+    this.privateMessages.put(userId, new PrivateDiscussion(userId, "Alan1"));
     // test codex
     codexController.createFromPath("my codex", "/home/alan1/Pictures");
   }

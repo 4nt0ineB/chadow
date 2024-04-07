@@ -41,6 +41,7 @@ public class ClientController {
   private final AtomicBoolean viewCanRefresh = new AtomicBoolean(true);
   private final ChatView mainView;
   private final PrivateMessageView privateMessageView;
+  private InfoBar infoBar;
   private Display display;
   private SelectorView<?> currentSelector;
   private View currentView;
@@ -89,7 +90,8 @@ public class ClientController {
       return;
     }
     // Starts display thread
-    display = new Display(lines, cols, this, api);
+    infoBar = new InfoBar(cols, this::updateInfoBar);
+    display = new Display(lines, cols, this, infoBar, api);
     InputReader inputReader = new InputReader(this);
     setCurrentView(mainView);
     startDisplay();
@@ -101,6 +103,17 @@ public class ClientController {
     } finally {
       exitNicely();
     }
+  }
+  
+  public void updateInfoBar(InfoBar infoBar) {
+    infoBar.clear();
+    var unreadDiscussions = api.discussionWithUnreadMessages();
+    unreadDiscussions.forEach(discussion -> {
+      var txt = (STR."\{CLIColor.YELLOW_BACKGROUND}\{CLIColor.BLACK}\u2709 %s\{CLIColor.RESET}").formatted(discussion.username());
+      infoBar.addInfo(txt);
+    });
+    var a = "\u259E";
+    var b = "\u2709";
   }
   
   public void startClient() {
@@ -336,7 +349,7 @@ public class ClientController {
       }
       default -> {
         if(!input.startsWith(":") && !input.isBlank()) {
-          api.yell(input);
+          api.sendPublicMessage(input);
         }
         return false;
       }
@@ -386,11 +399,11 @@ public class ClientController {
     if (matcherWhisper.find()) {
       var receiverUsername = matcherWhisper.group(1);
       mode = Mode.PRIVATE_MESSAGE_LIVE;
-      var receiver = api.getRecipient(receiverUsername);
+      var receiver = api.getPrivateDiscussionWith(receiverUsername);
       if(receiver.isEmpty()) {
         return Optional.of(true);
       }
-      privateMessageView.setReceiver(receiver.orElseThrow());
+      privateMessageView.setPrivateDiscussion(receiver.orElseThrow());
       mode = Mode.PRIVATE_MESSAGE_LIVE;
       privateMessageView.setMode(mode);
       setCurrentView( privateMessageView);
