@@ -44,7 +44,6 @@ public class ClientAPI {
   private final ReentrantLock lock = new ReentrantLock();
   private final Condition connectionCondition = lock.newCondition();
   
- 
   
   public ClientAPI(String login) {
     Objects.requireNonNull(login);
@@ -161,7 +160,7 @@ public class ClientAPI {
   public List<YellMessage> getPublicMessages() {
     lock.lock();
     try {
-      return List.copyOf(publicMessages);
+      return Collections.unmodifiableList(publicMessages);
     } finally {
       lock.unlock();
     }
@@ -173,8 +172,13 @@ public class ClientAPI {
    * @param msg
    */
   public void sendPublicMessage(String msg) {
-    logger.info(STR."(yell) message queued of length \{msg.length()}");
-    clientContext.queueFrame(new YellMessage(login, msg, 0L));
+    lock.lock();
+    try {
+      logger.info(STR."(yell) message queued of length \{msg.length()}");
+      clientContext.queueFrame(new YellMessage(login, msg, 0L));
+    } finally {
+      lock.unlock();
+    }
   }
   
   public void propose(String id) {

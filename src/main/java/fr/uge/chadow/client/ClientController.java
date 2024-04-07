@@ -109,11 +109,9 @@ public class ClientController {
     infoBar.clear();
     var unreadDiscussions = api.discussionWithUnreadMessages();
     unreadDiscussions.forEach(discussion -> {
-      var txt = (STR."\{CLIColor.YELLOW_BACKGROUND}\{CLIColor.BLACK}\u2709 %s\{CLIColor.RESET}").formatted(discussion.username());
+      var txt = (STR."<\{CLIColor.YELLOW_BACKGROUND}\{CLIColor.BOLD}\{CLIColor.BLACK}%s\{CLIColor.RESET}>").formatted(discussion.username());
       infoBar.addInfo(txt);
     });
-    var a = "\u259E";
-    var b = "\u2709";
   }
   
   public void startClient() {
@@ -374,12 +372,12 @@ public class ClientController {
           try {
             return commandNew(input);
           } catch (IOException e) {
+            mustClose = true;
             throw new UncheckedIOException(e);
           } catch (NoSuchAlgorithmException e) {
             logger.severe(STR."Error while creating new codex. The \{e.getMessage()}");
-            throw new RuntimeException(e);
-          } finally {
             mustClose = true;
+            throw new RuntimeException(e);
           }
         })
         .or(() -> {
@@ -394,10 +392,11 @@ public class ClientController {
   }
   
   private Optional<Boolean> commandWhisper(String input) {
-    var patternWhisper = Pattern.compile(":w\\s+(.*)");
+    var patternWhisper = Pattern.compile(":w\\s+(\\S+)(\\s+(.*))?");
     var matcherWhisper = patternWhisper.matcher(input);
     if (matcherWhisper.find()) {
       var receiverUsername = matcherWhisper.group(1);
+      var eventualMessage = matcherWhisper.group(3);
       mode = Mode.PRIVATE_MESSAGE_LIVE;
       var receiver = api.getPrivateDiscussionWith(receiverUsername);
       if(receiver.isEmpty()) {
@@ -407,6 +406,9 @@ public class ClientController {
       mode = Mode.PRIVATE_MESSAGE_LIVE;
       privateMessageView.setMode(mode);
       setCurrentView( privateMessageView);
+      if(eventualMessage != null && !eventualMessage.isBlank()) {
+        api.whisper(receiver.orElseThrow().id(), eventualMessage);
+      }
       try {
         drawDisplay();
       } catch (IOException e) {
@@ -498,7 +500,8 @@ public class ClientController {
         [GLOBAL COMMANDS]
           :h, :help - Display this help (scrollable)
           :c, :chat - Back to the [CHAT] in live reload
-          :w, :whisper <username> - Start a new private discussion with a user
+          :w, :whisper <username> (message)- Start a new private discussion with a user
+            if (message) is present, send the message also
           :d - Update and draw the display
           :r <lines> <columns> - Resize the view
           :new <codexName>, <path> - Create a codex from a file or directory

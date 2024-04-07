@@ -25,6 +25,11 @@ In 'message mode' any input that is not a command is considered as message to be
 The user can type the following commands:
 
 ```shell
+##  ┓┏  ┓
+##  ┣┫┏┓┃┏┓
+##  ┛┗┗━┗┣┛
+##       ┛
+
 'scrollable':
   e - scroll one page up
   s - scroll one page down
@@ -41,7 +46,8 @@ The user can type the following commands:
 [GLOBAL COMMANDS]
   :h, :help - Display this help (scrollable)
   :c, :chat - Back to the [CHAT] in live reload
-  :w, :whisper <username> - Display the private discussion with the other user (TODO)
+  :w, :whisper <username> (message)- Start a new private discussion with a user
+    if (message) is present, send the message also
   :d - Update and draw the display
   :r <lines> <columns> - Resize the view
   :new <codexName>, <path> - Create a codex from a file or directory
@@ -59,10 +65,15 @@ The user can type the following commands:
   :m, :msg - Focus on chat (scrollable)
   :u, :users - Focus on the users list (scrollable)
   
+[PRIVATE MESSAGES]
+  :m, :msg - Focus on the chat (scrollable)
+  :w - Enables back live reload
+  
 [CODEX]
 (scrollable)
 :share - Share/stop sharing the codex
 :download - Download/stop downloading the codex
+        
 ```
 
 ### Sources

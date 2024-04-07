@@ -66,10 +66,11 @@ public class Display {
     System.out.print(CLIColor.CLEAR);
     System.out.flush();
     while (!Thread.interrupted() && !controller.mustClose()) {
-      if (controller.viewCanRefresh().get()) {
+      var canRefresh = controller.viewCanRefresh().get();
+      if (canRefresh) {
         draw();
       }
-      Thread.sleep(300);
+      Thread.sleep(400);
     }
   }
   

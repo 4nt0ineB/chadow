@@ -2,10 +2,11 @@ package fr.uge.chadow.cli.display;
 
 import fr.uge.chadow.cli.CLIColor;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.PriorityQueue;
+import java.util.StringJoiner;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 public class InfoBar {
   
@@ -15,7 +16,7 @@ public class InfoBar {
   
   
   
-  private record Message(PRIORITY priority, String message, long timestamp) {
+  private record Message(PRIORITY priority, String content, long timestamp) {
     enum PRIORITY {
       ERROR,
       INFO,
@@ -36,11 +37,15 @@ public class InfoBar {
   public void draw() {
     updater.accept(this);
     var sb = new StringBuilder();
-    sb.append((STR."\{CLIColor.CYAN_BACKGROUND}\{CLIColor.WHITE}%s\{CLIColor.RESET}").formatted(View.formatDate(System.currentTimeMillis())));
+    sb.append((STR."\{CLIColor.RESET}[%s] ").formatted(View.formatDate(System.currentTimeMillis())));
     for (var message : messages) {
-      sb.append(message.message);
+      sb.append(message.content);
     }
-    System.out.println(sb.substring(0, Math.min(sb.length(), cols)));
+    var lengthWithoutEscapeCodes = CLIColor.countLengthWithoutEscapeCodes(sb.toString());
+    var numberOfEscapeCodes = sb.length() - lengthWithoutEscapeCodes;
+    var length = Math.min(sb.length(), cols + numberOfEscapeCodes);
+    System.out.print(sb.substring(0, length) + CLIColor.RESET);
+    System.out.printf((STR."\{STR."\{CLIColor.CYAN}%s\{CLIColor.RESET}"}%n"), "\u25A0".repeat(cols - length + numberOfEscapeCodes));
   }
   
   public void setDimensions(int cols) {
