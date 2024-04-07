@@ -4,6 +4,7 @@ import fr.uge.chadow.cli.CLIColor;
 import fr.uge.chadow.cli.InputReader;
 import fr.uge.chadow.cli.display.*;
 import fr.uge.chadow.cli.display.view.*;
+import fr.uge.chadow.core.protocol.Codex;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
