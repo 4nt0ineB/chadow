@@ -22,6 +22,7 @@ import java.util.logging.Logger;
  * Thread-safe.
  */
 public class ClientAPI {
+  
   enum STATUS {
     CONNECTING,
     CONNECTED,
@@ -34,7 +35,7 @@ public class ClientAPI {
   private final String login;
   private STATUS status = STATUS.CONNECTING;
   
-  private final HashMap<String, Codex> codexes = new HashMap<>();
+  private final CodexController codexController = new CodexController();
   private final ArrayList<YellMessage> publicMessages = new ArrayList<>();
   private final HashMap<UUID, Recipient> privateMessages = new HashMap<>();
   private final SortedSet<String> users = new TreeSet<>();
@@ -42,6 +43,8 @@ public class ClientAPI {
   
   private final ReentrantLock lock = new ReentrantLock();
   private final Condition connectionCondition = lock.newCondition();
+  
+ 
   
   public ClientAPI(String login) {
     Objects.requireNonNull(login);
@@ -112,6 +115,7 @@ public class ClientAPI {
     lock.lock();
     try {
       clientContext = null;
+      status = STATUS.CLOSED;
     } finally {
       lock.unlock();
     }
@@ -161,8 +165,9 @@ public class ClientAPI {
     clientContext.queueFrame(new YellMessage(login, msg, 0L));
   }
   
-  public void propose(Codex codex) {
-    logger.info(STR."(propose) codex \{codex.name()} (id: \{codex.idToHexadecimal()}) queued");
+  public void propose(String id) {
+    var codex = codexController.getCodexStatus(id).codex();
+    logger.info(STR."(propose) codex \{codex.name()} (id: \{codex.id()}) queued");
     clientContext.queueFrame(codex);
   }
   
@@ -177,23 +182,17 @@ public class ClientAPI {
   
   /**
    * Add a codex to the client
-   *
-   * @param codex
-   * @throws IllegalArgumentException if the codex already exists
    */
-  public void addCodex(Codex codex) {
-    if (codexes.containsKey(codex.name())) {
-      throw new IllegalArgumentException("Codex already exists");
-    }
-    codexes.put(codex.idToHexadecimal(), codex);
+  public CodexController.CodexStatus addCodex(String name, String path) throws IOException, NoSuchAlgorithmException {
+    return codexController.createFromPath(name, path);
   }
   
-  public List<Codex> codexes() {
-    return List.copyOf(codexes.values());
+  public List<CodexController.CodexStatus> codexes() {
+    return List.copyOf(codexController.codexesStatus());
   }
   
-  public Optional<Codex> getCodex(String id) throws InterruptedException {
-    var codex = codexes.get(id);
+  public Optional<CodexController.CodexStatus> getCodex(String id) throws InterruptedException {
+    var codex = codexController.getCodexStatus(id);
     if (codex != null) {
       return Optional.of(codex);
     }
@@ -203,7 +202,7 @@ public class ClientAPI {
     if (fetchedCodexId == null) {
       return Optional.empty();
     }
-    return fetchedCodexId.map(codexes::get);
+    return fetchedCodexId.map(codexController::getCodexStatus);
   }
   
   public void whisper(UUID recipientId, String message) {
@@ -263,20 +262,12 @@ public class ClientAPI {
   }
   
   public void stopDownloading(String id) {
-    var codex = codexes.get(id);
-    if (codex == null) {
-      return;
-    }
-    codex.stopDownloading();
+    codexController.stopDownloading(id);
     // clientContext.queueFrame(new Cancel(id));
   }
   
   public void download(String id) {
-    var codex = codexes.get(id);
-    if (codex == null) {
-      return;
-    }
-    codex.download();
+    codexController.download(id);
     clientContext.queueFrame(new RequestDownload(id, (byte) 0));
   }
   
@@ -312,10 +303,7 @@ public class ClientAPI {
     var userId = UUID.randomUUID();
     this.privateMessages.put(userId, new Recipient(userId, "Alan1"));
     // test codex
-    var codex = Codex.fromPath("my codex", "/home/alan1/Pictures");
-    codexes.put(codex.idToHexadecimal(), codex);
-    codex = Codex.fromPath("my codex", "/home/alan1/Downloads/Great Teacher Onizuka (1999)/Great Teacher Onizuka - S01E01 - Lesson 1.mkv");
-    codexes.put(codex.idToHexadecimal(), codex);
+    codexController.createFromPath("my codex", "/home/alan1/Pictures");
   }
   
   /**
@@ -348,4 +336,24 @@ public class ClientAPI {
       lock.unlock();
     }
   }
+  
+  public boolean isDownloading(String codexId) {
+    return codexController.isDownloading(codexId);
+  }
+  
+  public boolean isSharing(String codexId) {
+    return codexController.isSharing(codexId);
+  }
+  
+  public void stopSharing(String codexId) {
+    codexController.stopSharing(codexId);
+    // clientContext.queueFrame(new Cancel(codexId)); @Todo
+  }
+  
+  public void share(String codexId) {
+    codexController.share(codexId);
+    //propose(codexId); @Todo
+  }
+  
+
 }

@@ -3,7 +3,7 @@ package fr.uge.chadow.cli.display;
 import fr.uge.chadow.cli.CLIColor;
 import fr.uge.chadow.cli.display.view.ScrollableView;
 import fr.uge.chadow.cli.display.view.SelectorView;
-import fr.uge.chadow.client.Codex;
+import fr.uge.chadow.client.CodexController;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
@@ -228,7 +228,8 @@ public interface View {
     return new SelectorView<>(title, lines, cols, linesByItem, new ScrollableView(title, lines, cols, linesToDisplay), mapper);
   }
   
-  static String codexShortDescription(Codex cdx) {
-    return STR."\{cdx.name()} ─ \{cdx.files().size()} files \{bytesToHumanReadable(cdx.totalSize())}";
+  static String codexShortDescription(CodexController.CodexStatus codexStatus) {
+    var codex = codexStatus.codex();
+    return STR."\{codex.name()} ─ \{codex.files().length} files \{bytesToHumanReadable(codex.totalSize())}";
   }
 }

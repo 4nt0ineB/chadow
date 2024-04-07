@@ -43,7 +43,7 @@ public class ClientController {
   private Display display;
   private SelectorView<?> currentSelector;
   private View currentView;
-  private Codex selectedCodexForDetails;
+  private CodexController.CodexStatus selectedCodexForDetails;
   private Mode mode;
   private int lines;
   private int cols;
@@ -75,7 +75,7 @@ public class ClientController {
   }
   
   public boolean mustClose() {
-    return mustClose;
+    return mustClose || !api.isConnected();
   }
   
   public void start() {
@@ -125,7 +125,7 @@ public class ClientController {
     }
   }
   
-  public Codex currentCodex() {
+  public CodexController.CodexStatus currentCodex() {
     return selectedCodexForDetails;
   }
   
@@ -222,27 +222,28 @@ public class ClientController {
   private boolean processInputModeCodexDetails(String input) {
     switch (input) {
       case ":share" -> {
+        var codexId = currentCodex().id();
         if(currentCodex().isComplete()) {
-          if(currentCodex().isSharing()) {
-            currentCodex().stopSharing();
+          if(api.isSharing(codexId)) {
+            api.stopSharing(codexId);
           }else {
-            currentCodex().share();
-            api.propose(currentCodex());
+            api.share(codexId);
           }
           mode = Mode.CODEX_DETAILS;
-          setCurrentView( codexView(currentCodex()));
+          setCurrentView(codexView(currentCodex()));
           currentView.scrollTop();
         }
       }
       case ":download" -> {
+        var codexId = currentCodex().id();
         if(!currentCodex().isComplete()) {
-          if(currentCodex().isDownloading()) {
-            api.stopDownloading(currentCodex().idToHexadecimal());
+          if(api.isDownloading(codexId)) {
+            api.stopDownloading(currentCodex().id());
           }else {
-            api.download(currentCodex().idToHexadecimal());
+            api.download(currentCodex().id());
           }
           mode = Mode.CODEX_DETAILS;
-          setCurrentView( codexView(currentCodex()));
+          setCurrentView(codexView(currentCodex()));
           currentView.scrollTop();
         }
       }
@@ -306,10 +307,11 @@ public class ClientController {
       case "h" -> currentSelector.selectorDown();
       case ":s", ":see" ->{
         mode = Mode.CODEX_DETAILS;
-        selectedCodexForDetails = (Codex) currentSelector.get();
+        selectedCodexForDetails = (CodexController.CodexStatus) currentSelector.get();
+        logger.info(STR."see cdx: \{selectedCodexForDetails.id()}");
         setCurrentView(codexView(selectedCodexForDetails));
         currentView.scrollTop();
-        logger.info(STR."see cdx: \{View.bytesToHexadecimal(selectedCodexForDetails.id())}");
+        logger.info(STR."see cdx: \{selectedCodexForDetails.id()}");
       }
     }
     return true;
@@ -433,13 +435,11 @@ public class ClientController {
       var codexName = matcher.group(1);
       var path = matcher.group(2);
       logger.info(STR.":create \{path}\n");
-      var codex = Codex.fromPath(codexName, path);
-      selectedCodexForDetails = codex;
-      api.addCodex(codex);
+      selectedCodexForDetails = api.addCodex(codexName, path);
       mode = Mode.CODEX_DETAILS;
-      setCurrentView( codexView(codex));
+      setCurrentView(codexView(selectedCodexForDetails));
       currentView.scrollTop();
-      logger.info(STR."Codex created with id: \{codex.idToHexadecimal()}");
+      logger.info(STR."Codex created with id: \{selectedCodexForDetails.id()}");
       return Optional.of(true);
     }
     return Optional.empty();
@@ -516,60 +516,69 @@ public class ClientController {
     return View.scrollableFromString("Help", lines, cols, txt);
   }
   
-  private ScrollableView codexView(Codex codex) {
-    var sb = new StringBuilder();
-    
-    var splash = """
-        ## ┏┓   ┓
-        ## ┃ ┏┓┏┫┏┓┓┏
-        ## ┗┛┗┛┻┗┗━┛┗
-        
-        """;
-    sb.append(splash);
-    sb.append("cdx:")
-      .append(View.bytesToHexadecimal(codex.id()))
-      .append("\n");
-    if (codex.isComplete()) {
-      sb.append(CLIColor.BLUE)
-        .append("▓ Complete\n")
-        .append(CLIColor.RESET);
-    }
-    if (codex.isDownloading() || codex.isSharing()) {
-      sb.append(CLIColor.ITALIC)
-        .append(CLIColor.BOLD)
-        .append(CLIColor.ORANGE)
-        .append(codex.isDownloading() ? "▓ Downloading ..." : codex.isSharing() ? "▓ Sharing... " : "")
-        .append(CLIColor.RESET)
+  private ScrollableView codexView(CodexController.CodexStatus codexStatus) {
+    try {
+      var codex = codexStatus.codex();
+      var sb = new StringBuilder();
+      var splash = """
+          ## ┏┓   ┓
+          ## ┃ ┏┓┏┫┏┓┓┏
+          ## ┗┛┗┛┻┗┗━┛┗
+          
+          """;
+      sb.append(splash);
+      sb.append("cdx:")
+        .append(codex.id())
+        .append("\n");
+      if (codexStatus.isComplete()) {
+        sb.append(CLIColor.BLUE)
+          .append("▓ Complete\n")
+          .append(CLIColor.RESET);
+      }
+      if (api.isDownloading(codex.id()) || api.isSharing(codex.id())) {
+        sb.append(CLIColor.ITALIC)
+          .append(CLIColor.BOLD)
+          .append(CLIColor.ORANGE)
+          .append(api.isDownloading(codex.id()) ? "▓ Downloading ..." : api.isSharing(codex.id()) ? "▓ Sharing... " : "")
+          .append(CLIColor.RESET)
+          .append("\n\n");
+      }
+      
+      sb.append(colorize(CLIColor.BOLD, "Title: "))
+        .append(codex.name())
+        .append("\n");
+      var infoFiles = codex.files();
+      sb.append(colorize(CLIColor.BOLD, "Number of files:  "))
+        .append(infoFiles.length)
+        .append("\n");
+      sb.append(colorize(CLIColor.BOLD, "Total size:   "))
+        .append(View.bytesToHumanReadable(codex.totalSize()))
+        .append("\n");
+      sb.append("Local Path: ")
+        .append(codexStatus.root())
         .append("\n\n");
+      sb.append(colorize(CLIColor.BOLD, "Files:  \n"));
+      Arrays.stream(infoFiles)
+            .collect(Collectors.groupingBy(Codex.FileInfo::absolutePath))
+            .forEach((dir, files) -> {
+              logger.info(STR."dir: \{dir}");
+              sb.append(colorize(CLIColor.BOLD, STR."[\{dir}]\n"));
+              files.forEach(file -> sb.append("\t- ")
+                                      .append(CLIColor.BOLD)
+                                      .append("%10s".formatted(View.bytesToHumanReadable(file.length())))
+                                      .append("  ")
+                                      .append("%.2f%%".formatted(codexStatus.completionRate(file) * 100))
+                                      .append("  ")
+                                      .append(CLIColor.RESET)
+                                      .append(file.filename())
+                                      .append("\n"));
+            });
+      return View.scrollableFromString(STR."[Codex] \{codex.name()}", lines, cols, sb.toString());
+    } catch (Exception e) {
+      logger.severe(STR."Error while creating codex view.\{e.getMessage()}");
+      e.printStackTrace();
+      throw e;
     }
     
-    sb.append(colorize(CLIColor.BOLD, "Title: "))
-      .append(codex.name())
-      .append("\n");
-    var infoFiles = codex.files();
-    sb.append(colorize(CLIColor.BOLD, "Number of files:  "))
-      .append(codex.files()
-                   .size())
-      .append("\n");
-    sb.append(colorize(CLIColor.BOLD, "Total size:   "))
-      .append(View.bytesToHumanReadable(codex.totalSize()))
-      .append("\n");
-    sb.append("Local Path: ").append(codex.root()).append("\n\n");
-    sb.append(colorize(CLIColor.BOLD, "Files:  \n"));
-    infoFiles.stream()
-             .collect(Collectors.groupingBy(Codex.FileInfo::absolutePath))
-             .forEach((dir, files) -> {
-               sb.append(colorize(CLIColor.BOLD, STR."[\{dir}]\n"));
-               files.forEach(file -> sb.append("\t- ")
-                                       .append(CLIColor.BOLD)
-                                       .append("%10s".formatted(View.bytesToHumanReadable(file.length())))
-                                       .append("  ")
-                                       .append("%.2f%%".formatted(file.completionRate() * 100))
-                                       .append("  ")
-                                       .append(CLIColor.RESET)
-                                       .append(file.filename())
-                                       .append("\n"));
-             });
-    return View.scrollableFromString(STR."[Codex] \{codex.name()}", lines, cols, sb.toString());
   }
 }
