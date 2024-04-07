@@ -4,14 +4,18 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.*;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.logging.StreamHandler;
 
 import fr.uge.chadow.core.context.ServerContext;
 import fr.uge.chadow.core.protocol.WhisperMessage;
 import fr.uge.chadow.core.protocol.YellMessage;
+import fr.uge.chadow.core.protocol.field.Username;
+import fr.uge.chadow.core.protocol.server.Discovery;
 
 public class Server {
   private static final Logger logger = Logger.getLogger(Server.class.getName());
@@ -85,6 +89,31 @@ public class Server {
   }
 
   /**
+   * Get the server context associated with the given username
+   *
+   * @param username the username to get the server context from
+   * @return the server context associated with the given username
+   */
+  private ServerContext getServerContext(String username) {
+    var sc = clients.get(username);
+    return (ServerContext) sc.keyFor(selector).attachment();
+  }
+
+  /**
+   * Send a discovery message to the client associated with the given username
+   *
+   * @param username the username to send the discovery message to
+   */
+  public void discovery(String username) {
+    var serverContext = getServerContext(username);
+    var usernames = clients.keySet().stream()
+            .filter(client -> !client.equals(username))
+            .map(Username::new)
+            .toArray(Username[]::new);
+    serverContext.queueFrame(new Discovery(usernames));
+  }
+
+  /**
    * Add a message to all connected clients queue
    *
    * @param msg the message to broadcast
@@ -100,14 +129,9 @@ public class Server {
   }
 
   public void whisper(WhisperMessage message, String username_sender) {
-    var sc = clients.get(message.username());
-    if (sc == null) {
-      logger.warning(STR."Client \{message.username()} not found");
-      return;
-    }
-    var session = (ServerContext) sc.keyFor(selector).attachment();
+    var serverContext = getServerContext(message.username());
     var newMessage = new WhisperMessage(username_sender, message.txt(), System.currentTimeMillis());
-    session.queueFrame(newMessage);
+    serverContext.queueFrame(newMessage);
     logger.info(STR."Whispering message \{message.txt()} to \{message.username()}");
   }
 
