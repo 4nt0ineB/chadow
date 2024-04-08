@@ -4,9 +4,7 @@ import fr.uge.chadow.cli.CLIColor;
 
 import java.util.Comparator;
 import java.util.PriorityQueue;
-import java.util.StringJoiner;
 import java.util.function.Consumer;
-import java.util.regex.Pattern;
 
 public class InfoBar {
   
@@ -15,19 +13,11 @@ public class InfoBar {
   private int cols;
   
   
-  
-  private record Message(PRIORITY priority, String content, long timestamp) {
-    enum PRIORITY {
-      ERROR,
-      INFO,
-      }
-  
-  }
-  
   public InfoBar(int cols, Consumer<InfoBar> updater) {
     this.cols = cols;
     this.updater = updater;
-    messages = new PriorityQueue<>(Comparator.comparingLong(Message::timestamp).reversed()
+    messages = new PriorityQueue<>(Comparator.comparingLong(Message::timestamp)
+                                             .reversed()
                                              .thenComparing(m -> switch (m.priority()) {
                                                case ERROR -> 0;
                                                case INFO -> 1;
@@ -72,6 +62,13 @@ public class InfoBar {
   
   }
   
+  private record Message(PRIORITY priority, String content, long timestamp) {
+    enum PRIORITY {
+      ERROR,
+      INFO,
+    }
+    
+  }
   
   
 }

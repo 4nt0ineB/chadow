@@ -5,7 +5,7 @@ import fr.uge.chadow.cli.display.Scroller;
 import fr.uge.chadow.cli.display.View;
 import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.client.ClientController;
-import fr.uge.chadow.client.PrivateDiscussion;
+import fr.uge.chadow.client.DirectMessages;
 import fr.uge.chadow.core.protocol.WhisperMessage;
 
 import java.io.IOException;
@@ -26,8 +26,8 @@ public class PrivateMessageView implements View {
   private final ReentrantLock lock = new ReentrantLock();
   private int lines;
   private int cols;
-  private ClientController.Mode mode = ClientController.Mode.PRIVATE_MESSAGE_LIVE;
-  private PrivateDiscussion privateDiscussion;
+  private ClientController.Mode mode = ClientController.Mode.DIRECT_MESSAGES_LIVE;
+  private DirectMessages privateDiscussion;
   private List<WhisperMessage> messages = new ArrayList<>();
   
   public PrivateMessageView(int lines, int cols, ClientAPI api) {
@@ -41,7 +41,7 @@ public class PrivateMessageView implements View {
     this.messageScroller = new Scroller(0, View.maxLinesView(lines));
   }
   
-  public void setPrivateDiscussion(PrivateDiscussion privateDiscussion) {
+  public void setPrivateDiscussion(DirectMessages privateDiscussion) {
     Objects.requireNonNull(privateDiscussion);
     this.privateDiscussion = privateDiscussion;
     updateMessages();
@@ -81,7 +81,7 @@ public class PrivateMessageView implements View {
    * @throws IOException
    */
   public void draw() throws IOException {
-    if (mode == ClientController.Mode.PRIVATE_MESSAGE_LIVE) {
+    if (mode == ClientController.Mode.DIRECT_MESSAGES_LIVE) {
       updateMessages();
       
     }
@@ -222,21 +222,21 @@ public class PrivateMessageView implements View {
   
   @Override
   public void scrollPageUp() {
-    if (Objects.requireNonNull(mode) == ClientController.Mode.PRIVATE_MESSAGE_SCROLLER) {
+    if (Objects.requireNonNull(mode) == ClientController.Mode.DIRECT_MESSAGES_SCROLLER) {
       messageScroller.scrollPageUp();
     }
   }
   
   @Override
   public void scrollPageDown() {
-    if (mode == ClientController.Mode.PRIVATE_MESSAGE_SCROLLER) {
+    if (mode == ClientController.Mode.DIRECT_MESSAGES_SCROLLER) {
       messageScroller.scrollPageDown();
     }
   }
   
   @Override
   public void scrollBottom() {
-    if (mode == ClientController.Mode.PRIVATE_MESSAGE_SCROLLER) {
+    if (mode == ClientController.Mode.DIRECT_MESSAGES_SCROLLER) {
       messageScroller.setLines(api.numberOfMessages());
     }
   }
@@ -244,26 +244,26 @@ public class PrivateMessageView implements View {
   
   @Override
   public void scrollLineUp() {
-    if (mode == ClientController.Mode.PRIVATE_MESSAGE_SCROLLER) {
+    if (mode == ClientController.Mode.DIRECT_MESSAGES_SCROLLER) {
       messageScroller.scrollUp(1);
     }
   }
   
   @Override
   public void scrollLineDown() {
-    if (mode == ClientController.Mode.PRIVATE_MESSAGE_SCROLLER) {
+    if (mode == ClientController.Mode.DIRECT_MESSAGES_SCROLLER) {
       messageScroller.scrollDown(1);
     }
   }
   
   @Override
   public void scrollTop() {
-    if (mode == ClientController.Mode.PRIVATE_MESSAGE_SCROLLER) {
+    if (mode == ClientController.Mode.DIRECT_MESSAGES_SCROLLER) {
       messageScroller.moveToTop();
     }
   }
   
-  public PrivateDiscussion receiver() {
+  public DirectMessages receiver() {
     return privateDiscussion;
   }
 }

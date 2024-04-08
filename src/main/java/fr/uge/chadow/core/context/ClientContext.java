@@ -26,7 +26,7 @@ public final class ClientContext extends Context {
         api.bindContext(this);
       }
       case YellMessage yellMessage -> api.addMessage(yellMessage);
-      case WhisperMessage whisperMessage -> api.addIncomingPrivateMessage(whisperMessage);
+      case WhisperMessage whisperMessage -> api.addIncomingDM(whisperMessage);
       default -> {
         logger.warning("No action for the received frame");
         super.silentlyClose();

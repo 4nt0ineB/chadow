@@ -1,11 +1,9 @@
 package fr.uge.chadow.client;
 
 import fr.uge.chadow.core.protocol.WhisperMessage;
-import java.util.Objects;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
@@ -16,20 +14,20 @@ import java.util.logging.Logger;
  * If the recipient is not connected,
  * the messages will be stored under a new recipient username.
  */
-public class PrivateDiscussion {
-  private static final Logger logger = Logger.getLogger(PrivateDiscussion.class.getName());
+public class DirectMessages {
+  private static final Logger logger = Logger.getLogger(DirectMessages.class.getName());
   private final UUID id;
   private String username;
-  private final List<WhisperMessage> discussion = new ArrayList<>();
+  private final List<WhisperMessage> messages = new ArrayList<>();
   private final ReentrantLock lock = new ReentrantLock();
   private volatile boolean hasNewMessages = false;
   
-  PrivateDiscussion(UUID id, String username) {
+  DirectMessages(UUID id, String username) {
     Objects.requireNonNull(id);
     Objects.requireNonNull(username);
     this.id = id;
     this.username = username;
-    logger.info("New private discussion with " + username);
+    logger.info("New dm with " + username);
   }
   
   public UUID id() {
@@ -53,11 +51,9 @@ public class PrivateDiscussion {
   public void addMessage(WhisperMessage message) {
     lock.lock();
     try {
-      discussion.add(message);
-      logger.info("New message from " + message.username()  + " and current is " + username + " => means" + username.equals(message.username()));
+      messages.add(message);
       if(message.username().equals(username)) {
         hasNewMessages = true;
-        logger.info("New message from " + username);
       }
       
     } finally {
@@ -78,7 +74,7 @@ public class PrivateDiscussion {
     lock.lock();
     try {
       markAsRead();
-      return List.copyOf(discussion);
+      return List.copyOf(messages);
     } finally {
       lock.unlock();
     }
@@ -88,7 +84,19 @@ public class PrivateDiscussion {
   public boolean hasMessages() {
     lock.lock();
     try {
-      return !discussion.isEmpty();
+      return !messages.isEmpty();
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  public Optional<WhisperMessage> getLastMessage() {
+    lock.lock();
+    try {
+      if(messages.isEmpty()) {
+        return Optional.empty();
+      }
+      return Optional.of(messages.getLast());
     } finally {
       lock.unlock();
     }
@@ -97,7 +105,7 @@ public class PrivateDiscussion {
   public void clearMessages() {
     lock.lock();
     try {
-      discussion.clear();
+      messages.clear();
     } finally {
       lock.unlock();
     }
@@ -112,7 +120,7 @@ public class PrivateDiscussion {
   void changeUsername(String newUsername) {
     lock.lock();
     try {
-      discussion.stream().map(message -> {
+      messages.stream().map(message -> {
         if(message.username().equals(username)) {
           return  new WhisperMessage(newUsername, message.txt(), message.epoch());
         }

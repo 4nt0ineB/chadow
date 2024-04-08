@@ -4,6 +4,7 @@ import fr.uge.chadow.cli.CLIColor;
 import fr.uge.chadow.cli.display.view.ScrollableView;
 import fr.uge.chadow.cli.display.view.SelectorView;
 import fr.uge.chadow.client.CodexController;
+import fr.uge.chadow.client.DirectMessages;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
@@ -14,16 +15,6 @@ import java.util.Map;
 import java.util.function.Function;
 
 public interface View {
-  
-  void setDimensions(int lines, int cols);
-  void draw() throws IOException;
-  void clear();
-  void scrollPageUp();
-  void scrollPageDown();
-  void scrollBottom();
-  void scrollTop();
-  void scrollLineDown();
-  void scrollLineUp();
   
   static void moveCursorToPosition(int x, int y) {
     System.out.print(STR."\033[\{y};\{x}H");
@@ -59,7 +50,7 @@ public interface View {
       System.out.print(CLIColor.CLEAR_LINE);
     }
   }
-
+  
   /**
    * Calculate the maximum number of lines of content that can be displayed
    * (thus excluding the input field and the header)
@@ -104,7 +95,8 @@ public interface View {
         if (end - start > maxCharacters) {
           // on cherche d'abord le dernier espace avant maxCharacters pour découper
           // sinon on découpe quand même
-          int lastSpace = line.substring(start, end).lastIndexOf(' ');
+          int lastSpace = line.substring(start, end)
+                              .lastIndexOf(' ');
           if (lastSpace != -1) {
             end = start + lastSpace;
           } else {
@@ -166,7 +158,7 @@ public interface View {
       return STR."\{bytes} B";
     }
     if (bytes < 1024 * 1024) {
-      return String.format("%.2f KB",  (bytes / 1024d));
+      return String.format("%.2f KB", (bytes / 1024d));
     }
     if (bytes < 1024 * 1024 * 1024) {
       return String.format("%.2f MB", ((bytes / (1024d * 1024))));
@@ -182,12 +174,13 @@ public interface View {
   
   /**
    * Convert a fingerprint sha1 to a hexadecimal formatted string
+   *
    * @param bytes
    * @return
    */
   static String bytesToHexadecimal(byte[] bytes) {
     StringBuilder sb = new StringBuilder();
-    for(byte b : bytes) {
+    for (byte b : bytes) {
       sb.append(String.format("%02x", b));
     }
     return sb.toString();
@@ -216,10 +209,11 @@ public interface View {
    * @param cols
    * @return
    */
-  static <T> SelectorView<T> selectorFromList(String title, int lines, int cols, List<T> list, Function<? super T, String> mapper) {
+  static <T> SelectorView<T> selectorFromList(String title, int lines, int cols, List<T> list,
+                                              Function<? super T, String> mapper) {
     var linesByItem = new ArrayList<Map.Entry<T, List<String>>>();
     var linesToDisplay = new ArrayList<String>();
-    for(var item : list){
+    for (var item : list) {
       var str = mapper.apply(item);
       var formattedDescription = splitAndSanitize(str, cols);
       linesToDisplay.addAll(formattedDescription);
@@ -232,4 +226,33 @@ public interface View {
     var codex = codexStatus.codex();
     return STR."\{codex.name()} ─ \{codex.files().length} files \{bytesToHumanReadable(codex.totalSize())}";
   }
+  
+  static String directMessageShortDescription(DirectMessages dm) {
+    var optLastMessage = dm.getLastMessage();
+    var username = STR." \{CLIColor.BOLD}\{dm.username()}\{CLIColor.RESET}";
+    if (optLastMessage.isEmpty()) {
+      return username;
+    }
+    var message = optLastMessage.orElseThrow();
+    return STR."\{username} ─ \{formatDate(message.epoch())} ─ \{message.txt()
+                                                                        .replace("\\s", "")}";
+  }
+  
+  void setDimensions(int lines, int cols);
+  
+  void draw() throws IOException;
+  
+  void clear();
+  
+  void scrollPageUp();
+  
+  void scrollPageDown();
+  
+  void scrollBottom();
+  
+  void scrollTop();
+  
+  void scrollLineDown();
+  
+  void scrollLineUp();
 }
