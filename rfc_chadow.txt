@@ -169,12 +169,6 @@ encodé de la manière suivante :
     - Si le nom d'utilisateur est disponible, le serveur envoie une 
     validation au client :
 
-        +-----------------------+
-        | (register) | username | 
-        +-----------------------+
-
-    - le serveur accepte l'username et maintient la connexion
-
         +------+
         | (ok) | 
         +------+

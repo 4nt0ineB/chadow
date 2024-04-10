@@ -3,9 +3,10 @@ package fr.uge.chadow.core.context;
 import fr.uge.chadow.client.Client;
 import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.core.protocol.*;
+import fr.uge.chadow.core.protocol.client.Register;
+import fr.uge.chadow.core.protocol.server.OK;
 
 import java.io.IOException;
-import java.net.ConnectException;
 import java.nio.channels.SelectionKey;
 import java.util.logging.Logger;
 

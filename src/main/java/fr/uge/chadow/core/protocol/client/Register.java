@@ -1,4 +1,7 @@
-package fr.uge.chadow.core.protocol;
+package fr.uge.chadow.core.protocol.client;
+
+import fr.uge.chadow.core.protocol.Frame;
+import fr.uge.chadow.core.protocol.Opcode;
 
 import java.nio.ByteBuffer;
 

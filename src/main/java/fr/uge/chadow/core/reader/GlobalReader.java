@@ -1,6 +1,7 @@
 package fr.uge.chadow.core.reader;
 
-import fr.uge.chadow.core.protocol.field.Username;
+import fr.uge.chadow.core.protocol.field.Codex;
+import fr.uge.chadow.core.protocol.server.Discovery;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.RecordComponent;
@@ -38,8 +39,10 @@ public class GlobalReader<T extends Record> implements Reader<T> {
         readerMap.put(byte.class, new ByteReader());
       } else if (type.isArray()) {
         var componentType = type.getComponentType();
-        if (componentType.equals(Username.class)) {
-          readerMap.put(Username.class, new ArrayReader<>(Username.class));
+        if (componentType.equals(Discovery.Username.class)) {
+          readerMap.put(Discovery.Username.class, new ArrayReader<>(Discovery.Username.class));
+        } else if (componentType.equals(Codex.FileInfo.class)) {
+          readerMap.put(Codex.FileInfo.class, new ArrayReader<>(Codex.FileInfo.class));
         } else {
           throw new IllegalArgumentException(STR."Unsupported type: \{type}");
         }

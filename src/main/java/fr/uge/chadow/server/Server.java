@@ -6,16 +6,18 @@ import java.net.InetSocketAddress;
 import java.nio.channels.*;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.logging.StreamHandler;
 
 import fr.uge.chadow.core.context.ServerContext;
+import fr.uge.chadow.core.protocol.Frame;
 import fr.uge.chadow.core.protocol.WhisperMessage;
-import fr.uge.chadow.core.protocol.YellMessage;
-import fr.uge.chadow.core.protocol.field.Username;
+import fr.uge.chadow.core.protocol.field.Codex;
 import fr.uge.chadow.core.protocol.server.Discovery;
+import fr.uge.chadow.core.protocol.server.Discovery.Username;
+import fr.uge.chadow.core.protocol.server.Event;
 
 public class Server {
   private static final Logger logger = Logger.getLogger(Server.class.getName());
@@ -23,6 +25,7 @@ public class Server {
   private final ServerSocketChannel serverSocketChannel;
   private final Selector selector;
   private final Map<String, SocketChannel> clients = new HashMap<>();
+  private final Map<Codex, List<String>> codexes = new HashMap<>(); // codex -> list of usernames
 
   public Server(int port) throws IOException {
     serverSocketChannel = ServerSocketChannel.open();
@@ -114,16 +117,16 @@ public class Server {
   }
 
   /**
-   * Add a message to all connected clients queue
+   * Broadcast a frame to all connected clients
    *
-   * @param msg the message to broadcast
+   * @param frame the frame to broadcast
    */
-  public void broadcast(YellMessage msg) {
+  public void broadcast(Frame frame) {
     for (var key : selector.keys()) {
       var session = ((ServerContext) key.attachment());
       if (session != null) {
-        session.queueFrame(msg);
-        logger.info(STR."Broadcasting message \{msg.txt()}");
+        session.queueFrame(frame);
+        logger.info(STR."Broadcasting frame \{frame}");
       }
     }
   }
@@ -133,6 +136,11 @@ public class Server {
     var newMessage = new WhisperMessage(username_sender, message.txt(), System.currentTimeMillis());
     serverContext.queueFrame(newMessage);
     logger.info(STR."Whispering message \{message.txt()} to \{message.username()}");
+  }
+
+  public void propose(Codex codex, String username) {
+    var clientCodexes = codexes.computeIfAbsent(codex, k -> new ArrayList<>());
+    clientCodexes.add(username);
   }
 
   public boolean addClient(String login, SocketChannel sc) {
@@ -146,6 +154,7 @@ public class Server {
   public void removeClient(String login) {
     logger.info(STR."Client \{login} has disconnected");
     clients.remove(login);
+    broadcast(new Event((byte) 0, login));
   }
 
   public static void main(String[] args) {

@@ -2,6 +2,10 @@ package fr.uge.chadow.core.context;
 
 import fr.uge.chadow.core.protocol.*;
 import fr.uge.chadow.core.protocol.client.Discovery;
+import fr.uge.chadow.core.protocol.client.Propose;
+import fr.uge.chadow.core.protocol.client.Register;
+import fr.uge.chadow.core.protocol.server.Event;
+import fr.uge.chadow.core.protocol.server.OK;
 import fr.uge.chadow.server.Server;
 
 import java.io.IOException;
@@ -42,6 +46,7 @@ public final class ServerContext extends Context {
 
         // Send an OK message to the client
         queueFrame(new OK());
+        server.broadcast(new Event((byte) 1, login));
       }
 
       case Discovery _ -> {
@@ -71,6 +76,15 @@ public final class ServerContext extends Context {
           return;
         }
         server.whisper(whisperMessage, login);
+      }
+
+      case Propose propose -> {
+        if (!isAuthenticated()) {
+          logger.warning(STR."Client \{super.getSocket().getRemoteAddress()} is not authenticated");
+          silentlyClose();
+          return;
+        }
+        server.propose(propose.codex(), login);
       }
 
       default -> {
