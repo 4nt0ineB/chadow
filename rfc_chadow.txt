@@ -98,24 +98,23 @@ SOMMAIRE
   +-----------------------+-----------------------+
   | 6  | propose          | 7  | request          |
   +-----------------------+-----------------------+
-  | 8  | announce         | 9  | update           |
+  | 8  | announce         | 9  | search           |
   +-----------------------+-----------------------+
-  | 10 | request          | 11 | handshake        |
+  | 10 | request          | 11 | request_response |
   +-----------------------+-----------------------+
-  | 12 | keepalive        | 13 | choke            |
+  | 12 | handshake        | 13 | ok               |
   +-----------------------+-----------------------+
-  | 14 | unchoke          | 15 | interested       |
+  | 14 | needchunk        | 15 | cancel           |
   +-----------------------+-----------------------+
-  | 16 | notinterested    | 17 | have             |
+  | 16 | herechunk        | 17 | denied           |
   +-----------------------+-----------------------+
-  | 18 | needblock        | 19 | cancel           |
+  | 18 | proxy            | 19 | proxyopen        |
   +-----------------------+-----------------------+
-  | 20 | herechunk        | 21 | newchunk         |
+  | 20 | proxyok          | 21 | hidden           |
   +-----------------------+-----------------------+
-  | 22 | proxyopen        | 23 | anonymize        | 
+  | 22 | sharing          | 23 |  stopsharing     |
   +-----------------------+-----------------------+
-  | 24 | disconnect       | 24 | ok               |
-  +-----------------------+-----------------------+
+
                                                                 
   - un int représente 4 octets
   - un long représente 8 octets
@@ -327,9 +326,9 @@ encodé de la manière suivante :
 
   Le serveur répond avec la trame suivante :
 
-  +-------------------+
-  | (request) | codex |
-  +-------------------+
+  +----------------------------+
+  | (request_response) | codex |
+  +----------------------------+
 
   où codex contient les mêmes informations que décrites dans la partie 
   5.1.
@@ -396,7 +395,7 @@ encodé de la manière suivante :
   nécessaires pour effectuer le téléchargement :
 
   +-----------------------------------------------------+
-  | (request_download) | mode | sharers_count | sockets |
+  | (request_download_response) | mode | sharers_count | sockets |
   +-----------------------------------------------------+
 
   - mode : Le mode de téléchargement, en l'occurence 0 pour 
@@ -411,7 +410,7 @@ encodé de la manière suivante :
   trame:
 
   +-----------------------------------------------------------------------------------------+
-  | (request_download) | mode | proxies_count | socket | chain_id | socket | chain_id | ... |
+  | (request_download_response) | mode | proxies_count | socket | chain_id | socket | chain_id | ... |
   +-----------------------------------------------------------------------------------------+
 
   - mode: Le mode de téléchargement, en l'occurence 1 pour 

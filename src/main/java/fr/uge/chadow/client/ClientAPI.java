@@ -378,7 +378,7 @@ public class ClientAPI {
   
   public void share(String codexId) {
     codexController.share(codexId);
-    //propose(codexId); @Todo
+    propose(codexId);
   }
   
   enum STATUS {
