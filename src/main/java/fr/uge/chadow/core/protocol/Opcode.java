@@ -17,6 +17,7 @@ public enum Opcode {
   REQUEST_DOWNLOAD,
   REQUEST_OPEN_DOWNLOAD_RESPONSE,
   REQUEST_CLOSED_DOWNLOAD_RESPONSE,
+  UPDATE,
   HANDSHAKE,
   DENIED,
   NEEDCHUNK,
@@ -46,15 +47,16 @@ public enum Opcode {
         case 13 -> REQUEST_DOWNLOAD;
         case 14 -> REQUEST_OPEN_DOWNLOAD_RESPONSE;
         case 15 -> REQUEST_CLOSED_DOWNLOAD_RESPONSE;
-        case 16 -> HANDSHAKE;
-        case 17 -> DENIED;
-        case 18 -> NEEDCHUNK;
-        case 19 -> CANCEL;
-        case 20 -> HERECHUNK;
-        case 21 -> PROXY;
-        case 22 -> PROXYOPEN;
-        case 23 -> PROXYOK;
-        case 24 -> HIDDEN;
+        case 16 -> UPDATE;
+        case 17 -> HANDSHAKE;
+        case 18 -> DENIED;
+        case 19 -> NEEDCHUNK;
+        case 20 -> CANCEL;
+        case 21 -> HERECHUNK;
+        case 22 -> PROXY;
+        case 23 -> PROXYOPEN;
+        case 24 -> PROXYOK;
+        case 25 -> HIDDEN;
         default -> throw new IllegalArgumentException(STR."Invalid value: \{value}");
     };
   }
