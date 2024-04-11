@@ -16,11 +16,12 @@ public class Display {
   private final ClientController controller;
   private final ClientAPI api;
   private final ReentrantLock lock = new ReentrantLock();
+  private final InfoBar infoBar;
   private int lines;
   private int cols;
   private View currentView;
   
-  public Display(int lines, int cols, ClientController  controller, ClientAPI api) {
+  public Display(int lines, int cols, ClientController  controller, InfoBar infoBar, ClientAPI api) {
     Objects.requireNonNull(controller);
     Objects.requireNonNull(api);
     if (lines <= 0 || cols <= 0) {
@@ -28,6 +29,7 @@ public class Display {
     }
     this.api = api;
     this.controller = controller;
+    this.infoBar = infoBar;
     this.lines = lines;
     this.cols = cols;
   }
@@ -50,6 +52,8 @@ public class Display {
     try {
       this.lines = lines;
       this.cols = cols;
+      currentView.setDimensions(lines, cols);
+      infoBar.setDimensions(cols);
     } finally {
       lock.unlock();
     }
@@ -62,10 +66,11 @@ public class Display {
     System.out.print(CLIColor.CLEAR);
     System.out.flush();
     while (!Thread.interrupted() && !controller.mustClose()) {
-      if (controller.viewCanRefresh().get()) {
+      var canRefresh = controller.viewCanRefresh().get();
+      if (canRefresh) {
         draw();
       }
-      Thread.sleep(200);
+      Thread.sleep(400);
     }
   }
   
@@ -88,7 +93,8 @@ public class Display {
     clear();
     currentView.draw();
     //System.out.print(View.thematicBreak(cols));
-    System.out.print(lowInfoBar(cols));
+    //System.out.print(lowInfoBar(cols));
+    infoBar.draw();
     if(api.isConnected()) {
       System.out.print(inputField());
       View.moveToInputField(lines);

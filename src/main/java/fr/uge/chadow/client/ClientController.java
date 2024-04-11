@@ -2,16 +2,20 @@ package fr.uge.chadow.client;
 
 import fr.uge.chadow.cli.CLIColor;
 import fr.uge.chadow.cli.InputReader;
-import fr.uge.chadow.cli.display.*;
+import fr.uge.chadow.cli.display.Display;
+import fr.uge.chadow.cli.display.InfoBar;
+import fr.uge.chadow.cli.display.View;
 import fr.uge.chadow.cli.display.view.*;
 import fr.uge.chadow.core.protocol.field.Codex;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-
 import java.net.InetSocketAddress;
 import java.security.NoSuchAlgorithmException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -20,27 +24,17 @@ import java.util.stream.Collectors;
 import static fr.uge.chadow.cli.display.View.colorize;
 
 public class ClientController {
-  
-  public enum Mode {
-    CHAT_LIVE_REFRESH, // default
-    CHAT_SCROLLER,     // :c, :chat
-    USERS_SCROLLER,    // :u, :users
-    HELP_SCROLLER,     // :h, :help
-    CODEX_SEARCH,      // :search <name>
-    CODEX_DETAILS,     // :cdx:<fingerprint>
-    CODEX_LIST,        // :mycdx
-    PRIVATE_MESSAGE_LIVE,   // :w, :whisper <username>
-    PRIVATE_MESSAGE_SCROLLER // :m, :msg
-  }
+
   //// app management
   private final static Logger logger = Logger.getLogger(ClientController.class.getName());
   private final InetSocketAddress serverAddress;
   private final ClientAPI api;
-  private volatile boolean mustClose = false;
   //// display management
   private final AtomicBoolean viewCanRefresh = new AtomicBoolean(true);
   private final ChatView mainView;
   private final PrivateMessageView privateMessageView;
+  private volatile boolean mustClose = false;
+  private InfoBar infoBar;
   private Display display;
   private SelectorView<?> currentSelector;
   private View currentView;
@@ -48,7 +42,6 @@ public class ClientController {
   private Mode mode;
   private int lines;
   private int cols;
-  
   public ClientController(String login, InetSocketAddress serverAddress, int lines, int cols) {
     Objects.requireNonNull(login);
     Objects.requireNonNull(serverAddress);
@@ -82,14 +75,15 @@ public class ClientController {
   public void start() {
     // Starts the client thread
     startClient();
-    if(!api.isConnected()){
+    if (!api.isConnected()) {
       logger.severe("The client was not able to connect to the server.");
       var errorView = new CantConnectScreenView(lines, cols);
       errorView.draw();
       return;
     }
     // Starts display thread
-    display = new Display(lines, cols, this, api);
+    infoBar = new InfoBar(cols, this::updateInfoBar);
+    display = new Display(lines, cols, this, infoBar, api);
     InputReader inputReader = new InputReader(this);
     setCurrentView(mainView);
     startDisplay();
@@ -103,6 +97,16 @@ public class ClientController {
     }
   }
   
+  public void updateInfoBar(InfoBar infoBar) {
+    infoBar.clear();
+    var unreadDiscussions = api.discussionWithUnreadMessages();
+    unreadDiscussions.forEach(discussion -> {
+      var txt = (STR."<\{CLIColor.YELLOW_BACKGROUND}\{CLIColor.BOLD}\{CLIColor.BLACK}%s\{CLIColor.RESET}>")
+          .formatted(discussion.username());
+      infoBar.addInfo(txt);
+    });
+  }
+
   public void startClient() {
     try {
       Thread.ofPlatform()
@@ -145,9 +149,14 @@ public class ClientController {
           });
   }
   
-  public void drawDisplay() throws IOException {
+  public void drawDisplay() {
+    try {
       display.clear();
       display.draw();
+    } catch (IOException e) {
+      logger.severe(STR."Error while drawing display.\{e.getMessage()}");
+      mustClose = true;
+    }
   }
   
   public void clearDisplayAndMore() {
@@ -172,62 +181,115 @@ public class ClientController {
    *
    * @param input the user input
    */
-  public void processInput(String input) throws IOException {
+  public void processInput(String input) {
     logger.info(STR."Processing input: \{input}");
-    var canTypeAgain =  processComplexCommands(input).orElseGet(() -> switch (input) {
-      case ":d" -> {
-        try {
-          drawDisplay();
-        } catch (IOException e) {
-          logger.severe(STR."Error while drawing display.\{e.getMessage()}");
-          throw new UncheckedIOException(e);
-        }
-        yield true;
-      }
-      case ":c", ":chat" -> {
-        mode = Mode.CHAT_LIVE_REFRESH;
-        mainView.setMode(mode);
-        setCurrentView(mainView);
-        try {
-          drawDisplay();
-          logger.info(STR."Processing input: \{input} 2");
-        } catch (IOException e) {
-          logger.severe(STR."Error while drawing display.\{e.getMessage()}");
-          throw new UncheckedIOException(e);
-        }
-        yield false;
-      }
-      case ":mycdx" -> {
-        mode = Mode.CODEX_LIST;
-        currentSelector = View.selectorFromList("My cdx", lines, cols, api.codexes(), View::codexShortDescription);
-        setCurrentView(currentSelector);
-        yield true;
-      }
-      case ":exit" -> {
-        exitNicely();
-        yield false;
-      }
-      case ":h", ":help" -> {
-        setCurrentView(helpView());
-        mode = Mode.HELP_SCROLLER;
-        currentView.scrollTop();
-        yield true;
-      }
-      default -> processCommandInContext(input);
-    });
+    var canRetype = globalCommandDisplayChat(input)
+        .or(() -> globalCommandDisplayDM(input))
+        .or(() -> globalCommandDisplayCodexes(input))
+        .or(() -> globalCommandHelp(input))
+        .or(() -> globalCommandExit(input))
+        .or(() -> globalCommandResize(input))
+        .or(() -> globalCommandNewCodex(input))
+        .or(() -> globalCommandCodexDetail(input))
+        .or(() -> globalCommandWhisper(input))
+        .or(() -> globalCommandDraw(input))
+        .or(() -> Optional.of(processCommandInContext(input)));
     clearDisplayAndMore();
-    viewCanRefresh.set(!canTypeAgain);
+    viewCanRefresh.set(!canRetype.orElse(false));
     drawDisplay();
+  }
+
+  private boolean processCommandInContext(String input) {
+    return switch (mode) {
+      case CHAT_LIVE_REFRESH -> processInputModeLiveRefresh(input);
+      case CHAT_SCROLLER, USERS_SCROLLER, HELP_SCROLLER -> processInputModeScroller(input);
+      case CODEX_SEARCH -> throw new Error("Not implemented");
+      case CODEX_DETAILS -> processInputModeCodexDetails(input);
+      case CODEX_LIST -> processInputModeCodexList(input);
+      case DIRECT_MESSAGES_LIVE -> processInputModeDirectMessagesLive(input);
+      case DIRECT_MESSAGES_SCROLLER -> processInputModeDMScroller(input);
+      case DIRECT_MESSAGES_LIST -> processCommandDirectMessagesList(input);
+    };
+  }
+
+  private Optional<Boolean> globalCommandDraw(String input) {
+    if (input.equals(":d")) {
+      drawDisplay();
+      return Optional.of(!viewCanRefresh.get());
+    }
+    return Optional.empty();
+  }
+
+  private Optional<Boolean> globalCommandDisplayDM(String input) {
+    if (input.equals(":ws") || input.equals(":whispers")) {
+      mode = Mode.DIRECT_MESSAGES_LIST;
+      var list = api.getAllDirectMessages()
+                    .stream()
+                    .sorted(Comparator.comparingLong(dm -> dm.getLastMessage()
+                                                             .map(WhisperMessage::epoch)
+                                                             .orElseGet(() -> Long.MIN_VALUE)))
+                    .toList();
+      currentSelector = View.selectorFromList("Direct messages", lines, cols, list, directMessages -> {
+        var str = View.directMessageShortDescription(directMessages);
+        var lengthWithoutEscapeCodes = CLIColor.countLengthWithoutEscapeCodes(str);
+        var numberOfEscapeCodes = str.length() - lengthWithoutEscapeCodes;
+        var length = Math.min(str.length(), cols + numberOfEscapeCodes);
+        return str.substring(0, length) + CLIColor.RESET;
+      });
+      setCurrentView(currentSelector);
+      logger.info("Displaying whispers");
+      return Optional.of(true);
+    }
+    return Optional.empty();
+  }
+
+  private Optional<Boolean> globalCommandDisplayCodexes(String input) {
+    if (input.equals(":mycdx")) {
+      mode = Mode.CODEX_LIST;
+      currentSelector = View.selectorFromList("My cdx", lines, cols, api.codexes(), View::codexShortDescription);
+      setCurrentView(currentSelector);
+      return Optional.of(true);
+    }
+    return Optional.empty();
+  }
+
+  private Optional<Boolean> globalCommandHelp(String input) {
+    if (input.equals(":h") || input.equals(":help")) {
+      setCurrentView(helpView());
+      mode = Mode.HELP_SCROLLER;
+      currentView.scrollTop();
+      return Optional.of(true);
+    }
+    return Optional.empty();
+  }
+
+  private Optional<Boolean> globalCommandExit(String input) {
+    if (input.equals(":exit")) {
+      exitNicely();
+      return Optional.of(false);
+    }
+    return Optional.empty();
+  }
+
+  private Optional<Boolean> globalCommandDisplayChat(String input) {
+    if (input.equals(":c") || input.equals(":chat")) {
+      mode = Mode.CHAT_LIVE_REFRESH;
+      mainView.setMode(mode);
+      setCurrentView(mainView);
+      drawDisplay();
+      return Optional.of(true);
+    }
+    return Optional.empty();
   }
   
   private boolean processInputModeCodexDetails(String input) {
     switch (input) {
       case ":share" -> {
         var codexId = currentCodex().id();
-        if(currentCodex().isComplete()) {
-          if(api.isSharing(codexId)) {
+        if (currentCodex().isComplete()) {
+          if (api.isSharing(codexId)) {
             api.stopSharing(codexId);
-          }else {
+          } else {
             api.share(codexId);
           }
           mode = Mode.CODEX_DETAILS;
@@ -237,10 +299,10 @@ public class ClientController {
       }
       case ":download" -> {
         var codexId = currentCodex().id();
-        if(!currentCodex().isComplete()) {
-          if(api.isDownloading(codexId)) {
+        if (!currentCodex().isComplete()) {
+          if (api.isDownloading(codexId)) {
             api.stopDownloading(currentCodex().id());
-          }else {
+          } else {
             api.download(currentCodex().id());
           }
           mode = Mode.CODEX_DETAILS;
@@ -255,45 +317,44 @@ public class ClientController {
     return true;
   }
   
-  private boolean processCommandInContext(String input) {
-    return switch (mode) {
-      case CHAT_LIVE_REFRESH -> {
-        try {
-          yield processInputModeLiveRefresh(input);
-        } catch (InterruptedException e) {
-          logger.severe(STR."Interrupted while processing input in live refresh mode.\{e.getMessage()}");
-          throw new RuntimeException(e);
-        }
-      }
-      case CHAT_SCROLLER, USERS_SCROLLER, HELP_SCROLLER -> processInputModeScroller(input);
-      case CODEX_SEARCH -> throw new Error("Not implemented");
-      case CODEX_DETAILS -> processInputModeCodexDetails(input);
-      case CODEX_LIST -> processInputModeCodexList(input);
-      case PRIVATE_MESSAGE_LIVE -> processInputModePrivateMessageLive(input);
-      case PRIVATE_MESSAGE_SCROLLER ->{
-        if(input.equals(":w")) {
-          mode = Mode.PRIVATE_MESSAGE_LIVE;
-          mainView.setMode(mode);
-          setCurrentView( mainView);
-          currentView.scrollTop();
-          yield true;
-        }
-        yield processInputModeScroller(input);
-      }
-    };
+  private boolean processInputModeDMScroller(String input) {
+    if (input.equals(":w")) {
+      mode = Mode.DIRECT_MESSAGES_LIVE;
+      mainView.setMode(mode);
+      setCurrentView(mainView);
+      currentView.scrollTop();
+      return true;
+    }
+    return processInputModeScroller(input);
   }
   
-  private boolean processInputModePrivateMessageLive(String input) {
+  private boolean processCommandDirectMessagesList(String input) {
+    switch (input) {
+      case "y" -> currentSelector.selectorUp();
+      case "h" -> currentSelector.selectorDown();
+      case ":s", ":see" -> {
+        var selected = (DirectMessages) currentSelector.get();
+        mode = Mode.DIRECT_MESSAGES_LIVE;
+        privateMessageView.setPrivateDiscussion(selected);
+        privateMessageView.setMode(mode);
+        setCurrentView(privateMessageView);
+        currentView.scrollTop();
+      }
+    };
+    return true;
+  }
+
+  private boolean processInputModeDirectMessagesLive(String input) {
     switch (input) {
       case ":m", ":msg" -> {
-        mode = Mode.PRIVATE_MESSAGE_SCROLLER;
+        mode = Mode.DIRECT_MESSAGES_SCROLLER;
         privateMessageView.setMode(mode);
-        setCurrentView( privateMessageView);
+        setCurrentView(privateMessageView);
         currentView.scrollTop();
         return true;
       }
       default -> {
-        if(!input.startsWith(":") && !input.isBlank()) {
+        if (!input.startsWith(":") && !input.isBlank()) {
           var receiver = privateMessageView.receiver();
           api.whisper(receiver.id(), input);
         }
@@ -306,7 +367,7 @@ public class ClientController {
     switch (input) {
       case "y" -> currentSelector.selectorUp();
       case "h" -> currentSelector.selectorDown();
-      case ":s", ":see" ->{
+      case ":s", ":see" -> {
         mode = Mode.CODEX_DETAILS;
         selectedCodexForDetails = (CodexController.CodexStatus) currentSelector.get();
         logger.info(STR."see cdx: \{selectedCodexForDetails.id()}");
@@ -318,25 +379,25 @@ public class ClientController {
     return true;
   }
   
-  private boolean processInputModeLiveRefresh(String input) throws InterruptedException {
+  private boolean processInputModeLiveRefresh(String input) {
     switch (input) {
       case ":u", ":users" -> {
         logger.info("focusing users list");
         mode = Mode.USERS_SCROLLER;
         mainView.setMode(mode);
-        setCurrentView( mainView);
+        setCurrentView(mainView);
         return true;
       }
       case ":m", ":msg" -> {
         logger.info("focusing messages list");
         mode = Mode.CHAT_SCROLLER;
         mainView.setMode(mode);
-        setCurrentView( mainView);
+        setCurrentView(mainView);
         return true;
       }
       default -> {
-        if(!input.startsWith(":") && !input.isBlank()) {
-          api.yell(input);
+        if (!input.startsWith(":") && !input.isBlank()) {
+          api.sendPublicMessage(input);
         }
         return false;
       }
@@ -355,58 +416,32 @@ public class ClientController {
     return true;
   }
   
-  private Optional<Boolean> processComplexCommands(String input) throws IOException {
-    return commandResize(input)
-        .or(() -> {
-          try {
-            return commandNew(input);
-          } catch (IOException e) {
-            throw new UncheckedIOException(e);
-          } catch (NoSuchAlgorithmException e) {
-            logger.severe(STR."Error while creating new codex. The \{e.getMessage()}");
-            throw new RuntimeException(e);
-          } finally {
-            mustClose = true;
-          }
-        })
-        .or(() -> {
-          try {
-            return commandCdxDetails(input);
-          } catch (InterruptedException e) {
-            throw new RuntimeException(e); // @Todo
-          }
-        })
-        .or(() -> commandWhisper(input))
-        ;
-  }
-  
-  private Optional<Boolean> commandWhisper(String input) {
-    var patternWhisper = Pattern.compile(":w\\s+(.*)");
+  private Optional<Boolean> globalCommandWhisper(String input) {
+    var patternWhisper = Pattern.compile(":w\\s+(\\S+)(\\s+(.*))?");
     var matcherWhisper = patternWhisper.matcher(input);
     if (matcherWhisper.find()) {
       var receiverUsername = matcherWhisper.group(1);
-      mode = Mode.PRIVATE_MESSAGE_LIVE;
-      var receiver = api.getRecipient(receiverUsername);
-      if(receiver.isEmpty()) {
+      var eventualMessage = matcherWhisper.group(3);
+      mode = Mode.DIRECT_MESSAGES_LIVE;
+      var receiver = api.getDirectMessagesOf(receiverUsername);
+      if (receiver.isEmpty()) {
         return Optional.of(true);
       }
-      privateMessageView.setReceiver(receiver.orElseThrow());
-      mode = Mode.PRIVATE_MESSAGE_LIVE;
+      privateMessageView.setPrivateDiscussion(receiver.orElseThrow());
+      mode = Mode.DIRECT_MESSAGES_LIVE;
       privateMessageView.setMode(mode);
-      setCurrentView( privateMessageView);
-      try {
-        drawDisplay();
-      } catch (IOException e) {
-        logger.severe(STR."Error while drawing display.\{e.getMessage()}");
-        throw new UncheckedIOException(e);
+      setCurrentView(privateMessageView);
+      if (eventualMessage != null && !eventualMessage.isBlank()) {
+        api.whisper(receiver.orElseThrow()
+                            .id(), eventualMessage);
       }
-      
+      drawDisplay();
       return Optional.of(false);
     }
     return Optional.empty();
   }
   
-  private Optional<Boolean> commandResize(String input) throws IOException {
+  private Optional<Boolean> globalCommandResize(String input) {
     if (input.startsWith(":r ")) {
       var split = input.split(" ");
       if (split.length == 3) {
@@ -419,6 +454,9 @@ public class ClientController {
           cols = x;
           lines = y;
           display.setDimensions(x, y);
+          privateMessageView.setDimensions(x, y);
+          mainView.setDimensions(x, y);
+          infoBar.setDimensions(x);
           drawDisplay();
         } catch (NumberFormatException e) {
           return Optional.of(false);
@@ -429,33 +467,47 @@ public class ClientController {
     return Optional.empty();
   }
   
-  private Optional<Boolean> commandNew(String input) throws IOException, NoSuchAlgorithmException {
-    var patternNew = Pattern.compile(":new\\s+(.*),\\s+(.*)");
-    var matcher = patternNew.matcher(input);
-    if (matcher.find()) {
-      var codexName = matcher.group(1);
-      var path = matcher.group(2);
-      logger.info(STR.":create \{path}\n");
-      selectedCodexForDetails = api.addCodex(codexName, path);
-      mode = Mode.CODEX_DETAILS;
-      setCurrentView(codexView(selectedCodexForDetails));
-      currentView.scrollTop();
-      logger.info(STR."Codex created with id: \{selectedCodexForDetails.id()}");
-      return Optional.of(true);
+  private Optional<Boolean> globalCommandNewCodex(String input) {
+    try {
+      var patternNew = Pattern.compile(":new\\s+(.*),\\s+(.*)");
+      var matcher = patternNew.matcher(input);
+      if (matcher.find()) {
+        var codexName = matcher.group(1);
+        var path = matcher.group(2);
+        logger.info(STR.":create \{path}\n");
+        selectedCodexForDetails = api.addCodex(codexName, path);
+        mode = Mode.CODEX_DETAILS;
+        setCurrentView(codexView(selectedCodexForDetails));
+        currentView.scrollTop();
+        logger.info(STR."Codex created with id: \{selectedCodexForDetails.id()}");
+        return Optional.of(true);
+      }
+      return Optional.empty();
+    } catch (IOException e) {
+      mustClose = true;
+    } catch (NoSuchAlgorithmException e) {
+      logger.severe(STR."Error while creating new codex. The \{e.getMessage()}");
+      mustClose = true;
     }
     return Optional.empty();
   }
   
-  private Optional<Boolean> commandCdxDetails(String input) throws InterruptedException {
+  private Optional<Boolean> globalCommandCodexDetail(String input) {
     var patternRetrieve = Pattern.compile(":cdx:(.*)");
     var matcherRetrieve = patternRetrieve.matcher(input);
     if (matcherRetrieve.find()) {
       var fingerprint = matcherRetrieve.group(1);
       logger.info(STR.":cdx: \{fingerprint}\n");
-      var codex = api.getCodex(fingerprint);
+      Optional<CodexController.CodexStatus> codex = null;
+      try {
+        codex = api.getCodex(fingerprint);
+      } catch (InterruptedException e) {
+        logger.severe(STR."Error while retrieving codex.\{e.getMessage()}");
+        mustClose = true;
+      }
       selectedCodexForDetails = codex.orElseThrow();
       mode = Mode.CODEX_DETAILS;
-      setCurrentView( codexView(selectedCodexForDetails));
+      setCurrentView(codexView(selectedCodexForDetails));
       currentView.scrollTop();
       return Optional.of(true);
     }
@@ -485,7 +537,9 @@ public class ClientController {
         [GLOBAL COMMANDS]
           :h, :help - Display this help (scrollable)
           :c, :chat - Back to the [CHAT] in live reload
-          :w, :whisper <username> - Start a new private discussion with a user
+          :w, :whisper <username> (message)- Create and display a new DM with a user
+            if (message) is present, send the message also
+          :ws, :whispers - Display the list of DM (selectable)
           :d - Update and draw the display
           :r <lines> <columns> - Resize the view
           :new <codexName>, <path> - Create a codex from a file or directory
@@ -503,7 +557,7 @@ public class ClientController {
           :m, :msg - Focus on chat (scrollable)
           :u, :users - Focus on the users list (scrollable)
           
-        [PRIVATE MESSAGES]
+        [Direct Messages]
           :m, :msg - Focus on the chat (scrollable)
           :w - Enables back live reload
           
@@ -544,7 +598,6 @@ public class ClientController {
           .append(CLIColor.RESET)
           .append("\n\n");
       }
-      
       sb.append(colorize(CLIColor.BOLD, "Title: "))
         .append(codex.name())
         .append("\n");
@@ -577,9 +630,23 @@ public class ClientController {
       return View.scrollableFromString(STR."[Codex] \{codex.name()}", lines, cols, sb.toString());
     } catch (Exception e) {
       logger.severe(STR."Error while creating codex view.\{e.getMessage()}");
-      e.printStackTrace();
-      throw e;
+      mustClose = true;
+      exitNicely();
+      System.exit(0);
     }
-    
+    return null;
+  }
+
+  public enum Mode {
+    CHAT_LIVE_REFRESH, // default
+    CHAT_SCROLLER,     // :c, :chat
+    USERS_SCROLLER,    // :u, :users
+    HELP_SCROLLER,     // :h, :help
+    CODEX_SEARCH,      // :search <name>
+    CODEX_DETAILS,     // :cdx:<fingerprint>
+    CODEX_LIST,        // :mycdx
+    DIRECT_MESSAGES_LIVE,   // :w, :whisper <username>
+    DIRECT_MESSAGES_SCROLLER, // :m, :msg
+    DIRECT_MESSAGES_LIST // :ws, :whispers
   }
 }

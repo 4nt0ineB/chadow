@@ -2,6 +2,7 @@ package fr.uge.chadow.cli;
 
 import java.util.Objects;
 import java.util.Random;
+import java.util.regex.Pattern;
 
 /**
  * Provides ANSI colors
@@ -75,6 +76,13 @@ public enum CLIColor {
     int g = random.nextInt(100) + 110;
     int b = random.nextInt(100) + 110;
     return rgb(r, g, b);
+  }
+  
+  public static int countLengthWithoutEscapeCodes(String str) {
+    String escapeCodePattern = "\\u001B\\[\\d+m|\\033\\[\\d+;\\d+;\\d+m|\\033\\[\\d+;\\d+m|\\033\\[\\d+m";
+    Pattern pattern = Pattern.compile(escapeCodePattern);
+    String strWithoutEscapeCodes = pattern.matcher(str).replaceAll("");
+    return strWithoutEscapeCodes.length();
   }
 
 }

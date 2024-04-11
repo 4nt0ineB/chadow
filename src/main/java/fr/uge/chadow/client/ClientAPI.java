@@ -24,28 +24,18 @@ import java.util.logging.Logger;
  */
 public class ClientAPI {
   
-  enum STATUS {
-    CONNECTING,
-    CONNECTED,
-    CLOSED,
-  }
   
   private static final Logger logger = Logger.getLogger(ClientAPI.class.getName());
-  private ClientContext clientContext;
-  
   private final String login;
-  private STATUS status = STATUS.CONNECTING;
-  
   private final CodexController codexController = new CodexController();
   private final ArrayList<YellMessage> publicMessages = new ArrayList<>();
-  private final HashMap<UUID, Recipient> privateMessages = new HashMap<>();
+  private final HashMap<UUID, DirectMessages> directMessages = new HashMap<>();
   private final SortedSet<String> users = new TreeSet<>();
   private final ArrayBlockingQueue<Optional<String>> requestCodexResponseQueue = new ArrayBlockingQueue<>(1);
-  
   private final ReentrantLock lock = new ReentrantLock();
   private final Condition connectionCondition = lock.newCondition();
-  
- 
+  private ClientContext clientContext;
+  private STATUS status = STATUS.CONNECTING;
   
   public ClientAPI(String login) {
     Objects.requireNonNull(login);
@@ -60,10 +50,22 @@ public class ClientAPI {
     }
   }
   
+  /**
+   * Create a splash screen logo with a list of messages
+   * showing le title "Chadow" in ascii art and the version
+   */
+  public static List<YellMessage> splashLogo() {
+    return List.of(
+        new YellMessage("", "┏┓┓    ┓", 0),
+        new YellMessage("", "┃ ┣┓┏┓┏┫┏┓┓┏┏", 0),
+        new YellMessage("", "┗┛┗┗┗┗┗┗┗┛┗┛┛ v1.0.0 - Bastos & Sebbah", 0)
+    );
+  }
+  
   public void close() {
     lock.lock();
     try {
-      logger.severe(STR."Closing the client API");
+      logger.severe("Closing the client API");
       status = STATUS.CLOSED;
       connectionCondition.signalAll();
     } finally {
@@ -74,10 +76,22 @@ public class ClientAPI {
   public String login() {
     lock.lock();
     try {
-      if(!isLogged()) {
+      if (!isLogged()) {
         throw new IllegalStateException("Not logged in");
       }
       return login;
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  public List<DirectMessages> discussionWithUnreadMessages() {
+    lock.lock();
+    try {
+      return directMessages.values()
+                           .stream()
+                           .filter(DirectMessages::hasNewMessages)
+                           .toList();
     } finally {
       lock.unlock();
     }
@@ -89,6 +103,7 @@ public class ClientAPI {
    * and the client is ready to interact with the server
    * The connection is supposed to be alive when
    * a context is bound to the API
+   *
    * @param context
    */
   public void bindContext(ClientContext context) {
@@ -104,7 +119,7 @@ public class ClientAPI {
   }
   
   public boolean isLogged() {
-    return login != null ;
+    return login != null;
   }
   
   /**
@@ -150,7 +165,7 @@ public class ClientAPI {
   public List<YellMessage> getPublicMessages() {
     lock.lock();
     try {
-      return List.copyOf(publicMessages);
+      return Collections.unmodifiableList(publicMessages);
     } finally {
       lock.unlock();
     }
@@ -161,13 +176,20 @@ public class ClientAPI {
    *
    * @param msg
    */
-  public void yell(String msg) {
-    logger.info(STR."(yell) message queued of length \{msg.length()}");
-    clientContext.queueFrame(new YellMessage(login, msg, 0L));
+  public void sendPublicMessage(String msg) {
+    lock.lock();
+    try {
+      logger.info(STR."(yell) message queued of length \{msg.length()}");
+      clientContext.queueFrame(new YellMessage(login, msg, 0L));
+    } finally {
+      lock.unlock();
+    }
   }
   
+  
   public void propose(String id) {
-    var codex = codexController.getCodexStatus(id).codex();
+    var codex = codexController.getCodexStatus(id)
+                               .codex();
     logger.info(STR."(propose) codex \{codex.name()} (id: \{codex.id()}) queued");
     clientContext.queueFrame(new Propose(codex));
   }
@@ -207,23 +229,23 @@ public class ClientAPI {
   }
   
   public void whisper(UUID recipientId, String message) {
-    var recipient = getRecipientbyId(recipientId);
-    if (recipient.isEmpty()) {
+    var dm = getPrivateDiscussionByRecipientId(recipientId);
+    if (dm.isEmpty()) {
       logger.warning(STR."(whisper) whispering to id \{recipientId}, but was not found");
       return;
     }
-    var recipientUsername = recipient.orElseThrow()
-                                     .username();
+    var recipientUsername = dm.orElseThrow()
+                              .username();
     clientContext.queueFrame(new WhisperMessage(recipientUsername, message, 0L));
     logger.info(STR."(whisper) message to \{recipientUsername} of length \{message.length()} queued");
-    recipient.orElseThrow()
-             .addMessage(new WhisperMessage(login, message, System.currentTimeMillis()));
+    dm.orElseThrow()
+      .addMessage(new WhisperMessage(login, message, System.currentTimeMillis()));
   }
   
-  public Optional<Recipient> getRecipientbyId(UUID userId) {
+  public Optional<DirectMessages> getPrivateDiscussionByRecipientId(UUID recipientId) {
     lock.lock();
     try {
-      var recipient = privateMessages.get(userId);
+      var recipient = directMessages.get(recipientId);
       if (recipient == null) {
         return Optional.empty();
       }
@@ -233,17 +255,29 @@ public class ClientAPI {
     }
   }
   
-  public Optional<Recipient> getRecipient(String username) {
+  public List<DirectMessages> getAllDirectMessages() {
     lock.lock();
     try {
-      var recipient = privateMessages.values()
-                                     .stream()
-                                     .filter(u -> u.username()
-                                                   .equals(username))
-                                     .findFirst();
+      return directMessages.values()
+                           .stream()
+                           .filter(DirectMessages::hasMessages)
+                           .toList();
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  public Optional<DirectMessages> getDirectMessagesOf(String username) {
+    lock.lock();
+    try {
+      var recipient = directMessages.values()
+                                    .stream()
+                                    .filter(u -> u.username()
+                                                  .equals(username))
+                                    .findFirst();
       recipient.ifPresent(r -> {
         if (!r.hasMessages()) {
-          r.addMessage(new WhisperMessage("(info)", STR."This is the beginning of your private message history with \{username}", System.currentTimeMillis()));
+          r.addMessage(new WhisperMessage("(info)", STR."This is the beginning of your direct message history with \{username}", System.currentTimeMillis()));
         }
       });
       return recipient;
@@ -273,14 +307,18 @@ public class ClientAPI {
   }
   
   
-  public void addWhisper(WhisperMessage msg) {
-    var Recipient = getRecipient(msg.username());
-    Recipient.ifPresentOrElse(r -> r.addMessage(msg), () -> {
-      var newRecipient = new Recipient(UUID.randomUUID(), msg.username());
-      var startMessage = new WhisperMessage("", STR."This is the beginning of your private message history with \{msg.username()}", System.currentTimeMillis());
-      newRecipient.addMessage(startMessage);
-      newRecipient.addMessage(msg);
-      privateMessages.put(newRecipient.id(), newRecipient);
+  public void addIncomingDM(WhisperMessage msg) {
+    var dm = getDirectMessagesOf(msg.username());
+    dm.ifPresentOrElse(d -> {
+      
+      logger.info(STR."Adding incoming message to existing discussion with \{msg.username()}");
+      d.addMessage(msg);
+    }, () -> {
+      var newDM = new DirectMessages(UUID.randomUUID(), msg.username());
+      var startMessage = new WhisperMessage("", STR."This is the beginning of your direct message history with \{msg.username()}", System.currentTimeMillis());
+      newDM.addMessage(startMessage);
+      newDM.addMessage(msg);
+      directMessages.put(newDM.id(), newDM);
     });
     logger.info(STR."\{msg.username()} is whispering a message of length \{msg.txt()
                                                                               .length()}");
@@ -302,21 +340,9 @@ public class ClientAPI {
     this.publicMessages.addAll(splashLogo());
     this.publicMessages.addAll(Arrays.asList(messages));
     var userId = UUID.randomUUID();
-    this.privateMessages.put(userId, new Recipient(userId, "Alan1"));
+    this.directMessages.put(userId, new DirectMessages(userId, "Alan1"));
     // test codex
     codexController.createFromPath("my codex", "/home/alan1/Pictures");
-  }
-  
-  /**
-   * Create a splash screen logo with a list of messages
-   * showing le title "Chadow" in ascii art and the version
-   */
-  public static List<YellMessage> splashLogo() {
-    return List.of(
-        new YellMessage("", "┏┓┓    ┓", 0),
-        new YellMessage("", "┃ ┣┓┏┓┏┫┏┓┓┏┏", 0),
-        new YellMessage("", "┗┛┗┗┗┗┗┗┗┛┗┛┛ v1.0.0 - Bastos & Sebbah", 0)
-    );
   }
   
   public int numberOfMessages() {
@@ -327,7 +353,6 @@ public class ClientAPI {
       lock.unlock();
     }
   }
-  
   
   public int totalUsers() {
     lock.lock();
@@ -356,5 +381,11 @@ public class ClientAPI {
     //propose(codexId); @Todo
   }
   
-
+  enum STATUS {
+    CONNECTING,
+    CONNECTED,
+    CLOSED,
+  }
+  
+  
 }
