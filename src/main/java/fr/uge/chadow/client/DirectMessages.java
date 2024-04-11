@@ -132,6 +132,12 @@ public class DirectMessages {
     }
   }
   
+  public static DirectMessages create(String username) {
+    var newDM = new DirectMessages(UUID.randomUUID(), username);
+    var startMessage = new WhisperMessage("", STR."This is the beginning of your direct message history with \{username}", System.currentTimeMillis());
+    newDM.addMessage(startMessage);
+    return newDM;
+  }
   
   public boolean hasNewMessages() {
     lock.lock();

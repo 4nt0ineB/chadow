@@ -2,8 +2,11 @@ package fr.uge.chadow.core.reader;
 
 
 import fr.uge.chadow.core.protocol.*;
+import fr.uge.chadow.core.protocol.client.Discovery;
 import fr.uge.chadow.core.protocol.client.Register;
+import fr.uge.chadow.core.protocol.server.Event;
 import fr.uge.chadow.core.protocol.server.OK;
+import fr.uge.chadow.core.protocol.server.RequestResponse;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
@@ -18,7 +21,10 @@ public class FrameReader implements Reader<Frame> {
           Opcode.REGISTER, new GlobalReader<>(Register.class),
           Opcode.YELL, new GlobalReader<>(YellMessage.class),
           Opcode.WHISPER, new GlobalReader<>(WhisperMessage.class),
-          Opcode.OK, new GlobalReader<>(OK.class)
+          Opcode.OK, new GlobalReader<>(OK.class),
+          Opcode.DISCOVERY, new GlobalReader<>(Discovery.class),
+          Opcode.EVENT, new GlobalReader<>(Event.class),
+          Opcode.REQUEST_RESPONSE, new GlobalReader<>(RequestResponse.class)
   );
 
   private State state = State.WAITING;

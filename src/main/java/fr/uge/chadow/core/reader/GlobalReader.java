@@ -46,6 +46,7 @@ public class GlobalReader<T extends Record> implements Reader<T> {
         } else {
           throw new IllegalArgumentException(STR."Unsupported type: \{type}");
         }
+        
       } else {
         throw new IllegalArgumentException(STR."Unsupported type: \{type}");
       }

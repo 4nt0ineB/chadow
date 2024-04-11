@@ -7,6 +7,7 @@ import fr.uge.chadow.core.protocol.client.Request;
 import fr.uge.chadow.core.protocol.RequestDownload;
 import fr.uge.chadow.core.protocol.WhisperMessage;
 import fr.uge.chadow.core.protocol.YellMessage;
+import fr.uge.chadow.core.protocol.field.Codex;
 
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
@@ -31,7 +32,7 @@ public class ClientAPI {
   private final ArrayList<YellMessage> publicMessages = new ArrayList<>();
   private final HashMap<UUID, DirectMessages> directMessages = new HashMap<>();
   private final SortedSet<String> users = new TreeSet<>();
-  private final ArrayBlockingQueue<Optional<String>> requestCodexResponseQueue = new ArrayBlockingQueue<>(1);
+  private final ArrayBlockingQueue<Optional<Codex>> requestCodexResponseQueue = new ArrayBlockingQueue<>(1);
   private final ReentrantLock lock = new ReentrantLock();
   private final Condition connectionCondition = lock.newCondition();
   private ClientContext clientContext;
@@ -203,6 +204,7 @@ public class ClientAPI {
     }
   }
   
+  
   /**
    * Add a codex to the client
    */
@@ -219,13 +221,27 @@ public class ClientAPI {
     if (codex != null) {
       return Optional.of(codex);
     }
+    // didn't find the codex, request it
     requestCodexResponseQueue.clear();
     clientContext.queueFrame(new Request(id));
-    var fetchedCodexId = requestCodexResponseQueue.poll(5, java.util.concurrent.TimeUnit.SECONDS);
-    if (fetchedCodexId == null) {
+    var fetchedCodex = requestCodexResponseQueue.poll(5, java.util.concurrent.TimeUnit.SECONDS);
+    if(fetchedCodex.isEmpty()){
       return Optional.empty();
     }
-    return fetchedCodexId.map(codexController::getCodexStatus);
+    return Optional.of(codexController.fromFetchedCodex(fetchedCodex.orElseThrow(), "/tmp"));
+  }
+  
+  public void saveFetchedCodex(Codex codex) {
+    lock.lock();
+    try {
+      try {
+        requestCodexResponseQueue.put(Optional.of(codex));
+      } catch (InterruptedException e) {
+        close();
+      }
+    } finally {
+      lock.unlock();
+    }
   }
   
   public void whisper(UUID recipientId, String message) {
@@ -280,6 +296,11 @@ public class ClientAPI {
           r.addMessage(new WhisperMessage("(info)", STR."This is the beginning of your direct message history with \{username}", System.currentTimeMillis()));
         }
       });
+      if(recipient.isEmpty()){
+        var dm = DirectMessages.create(username);
+        directMessages.put(dm.id(), dm);
+        return Optional.of(dm);
+      }
       return recipient;
     } finally {
       lock.unlock();
@@ -310,19 +331,17 @@ public class ClientAPI {
   public void addIncomingDM(WhisperMessage msg) {
     var dm = getDirectMessagesOf(msg.username());
     dm.ifPresentOrElse(d -> {
-      
       logger.info(STR."Adding incoming message to existing discussion with \{msg.username()}");
       d.addMessage(msg);
     }, () -> {
-      var newDM = new DirectMessages(UUID.randomUUID(), msg.username());
-      var startMessage = new WhisperMessage("", STR."This is the beginning of your direct message history with \{msg.username()}", System.currentTimeMillis());
-      newDM.addMessage(startMessage);
-      newDM.addMessage(msg);
+      var newDM = DirectMessages.create(msg.username());
       directMessages.put(newDM.id(), newDM);
     });
     logger.info(STR."\{msg.username()} is whispering a message of length \{msg.txt()
                                                                               .length()}");
   }
+  
+  
   
   private void fillWithFakeData() throws IOException, NoSuchAlgorithmException {
     var users = new String[]{"test", "Morpheus", "Trinity", "Neo", "Flynn", "Alan", "Lora", "Gandalf", "Bilbo", "SKIDROW", "Antoine"};
@@ -339,8 +358,8 @@ public class ClientAPI {
     };
     this.publicMessages.addAll(splashLogo());
     this.publicMessages.addAll(Arrays.asList(messages));
-    var userId = UUID.randomUUID();
-    this.directMessages.put(userId, new DirectMessages(userId, "Alan1"));
+    //var userId = UUID.randomUUID();
+    //this.directMessages.put(userId, new DirectMessages(userId, "Alan1"));
     // test codex
     codexController.createFromPath("my codex", "/home/alan1/Pictures");
   }
@@ -379,6 +398,28 @@ public class ClientAPI {
   public void share(String codexId) {
     codexController.share(codexId);
     propose(codexId);
+  }
+  
+  public void addUser(String username) {
+    lock.lock();
+    try {
+      users.add(username);
+      addMessage(new YellMessage("-->", STR."User \{username} has joined", System.currentTimeMillis()));
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  public void removeUser(String username) {
+    users.remove(username);
+    getDirectMessagesOf(username)
+        .ifPresent(dm -> {
+          var random = new Random();
+          var newUsername = STR."\{dm.username()}[\{random.nextInt(1000)}]";
+          dm.changeUsername(newUsername);
+          dm.addMessage(new WhisperMessage("-->", STR."User \{username} has left", System.currentTimeMillis()));
+          dm.addMessage(new WhisperMessage("-->", STR."\{username} renamed as \{newUsername}", System.currentTimeMillis()));
+        });
   }
   
   enum STATUS {

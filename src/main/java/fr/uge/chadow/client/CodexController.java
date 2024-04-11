@@ -20,8 +20,10 @@ public class CodexController {
   private static final Logger logger = Logger.getLogger(Codex.class.getName());
   private static final HashMap<String, CodexStatus> codexes = new HashMap<>();
   
-  private void addCodex(Codex codex, String root) {
-    codexes.putIfAbsent(codex.id(), new CodexStatus(codex, root));
+  private CodexStatus addCodex(Codex codex, String root) {
+    var codexStatus = new CodexStatus(codex, root);
+    var existing = codexes.putIfAbsent(codex.id(), codexStatus);
+    return existing == null ? codexStatus : existing;
   }
   
   public CodexStatus getCodexStatus(String id) {
@@ -74,6 +76,10 @@ public class CodexController {
   
   private void log(Codex codex, String message) {
     logger.info(STR."Codex \{codex.name()} with id: \{codex.id()} - \{message}");
+  }
+  
+  CodexStatus fromFetchedCodex(Codex codex, String root) {
+    return addCodex(codex, root);
   }
   
   /**
@@ -228,5 +234,7 @@ public class CodexController {
     public void setAllComplete() {
       chunks.values().forEach(bitSet -> bitSet.flip(0, bitSet.size()));
     }
+    
+    
   }
 }

@@ -3,7 +3,9 @@ package fr.uge.chadow.core.context;
 import fr.uge.chadow.client.Client;
 import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.core.protocol.*;
+import fr.uge.chadow.core.protocol.client.Discovery;
 import fr.uge.chadow.core.protocol.client.Register;
+import fr.uge.chadow.core.protocol.server.Event;
 import fr.uge.chadow.core.protocol.server.OK;
 import fr.uge.chadow.core.protocol.server.RequestResponse;
 
@@ -23,6 +25,7 @@ public final class ClientContext extends Context {
   
   @Override
   public void processCurrentOpcodeAction(Frame frame) {
+    logger.info("Processing frame");
     switch (frame) {
       case OK ok -> {
         logger.info("Connected to the server");
@@ -30,7 +33,20 @@ public final class ClientContext extends Context {
       }
       case YellMessage yellMessage -> api.addMessage(yellMessage);
       case WhisperMessage whisperMessage -> api.addIncomingDM(whisperMessage);
-      case RequestResponse request -> {} //api.fetchCodex(request);
+      case RequestResponse request -> {
+      
+      }
+      case Discovery discovery -> {
+        logger.info("Received discovery response");
+      }
+      case Event event -> {
+        if(event.code() == (byte) 0) {
+          logger.info("Received event 0");
+          
+        } else {
+          logger.warning("Received event " + event.code());
+        }
+      }
       default -> {
         logger.warning("No action for the received frame");
         super.silentlyClose();
