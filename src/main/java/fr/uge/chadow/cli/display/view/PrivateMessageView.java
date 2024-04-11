@@ -157,7 +157,7 @@ public class PrivateMessageView implements View {
     var sb = new StringBuilder();
     sb.append(CLIColor.CYAN_BACKGROUND);
     sb.append(CLIColor.WHITE);
-    var title = (STR."%-\{cols - 1}s ").formatted(STR."CHADOW CLIENT (" + lines + "x" + cols + STR.") Private message with \{privateDiscussion.username()}");
+    var title = (STR."%-\{cols - 1}s ").formatted(STR."CHADOW CLIENT (" + lines + "x" + cols + STR.") Direct messages with \{privateDiscussion.username()}");
     sb.append(title);
     sb.append(CLIColor.RESET);
     sb.append('\n');

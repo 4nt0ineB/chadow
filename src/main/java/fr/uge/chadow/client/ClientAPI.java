@@ -276,7 +276,7 @@ public class ClientAPI {
                                     .findFirst();
       recipient.ifPresent(r -> {
         if (!r.hasMessages()) {
-          r.addMessage(new WhisperMessage("(info)", STR."This is the beginning of your private message history with \{username}", System.currentTimeMillis()));
+          r.addMessage(new WhisperMessage("(info)", STR."This is the beginning of your direct message history with \{username}", System.currentTimeMillis()));
         }
       });
       return recipient;
@@ -314,7 +314,7 @@ public class ClientAPI {
       d.addMessage(msg);
     }, () -> {
       var newDM = new DirectMessages(UUID.randomUUID(), msg.username());
-      var startMessage = new WhisperMessage("", STR."This is the beginning of your private message history with \{msg.username()}", System.currentTimeMillis());
+      var startMessage = new WhisperMessage("", STR."This is the beginning of your direct message history with \{msg.username()}", System.currentTimeMillis());
       newDM.addMessage(startMessage);
       newDM.addMessage(msg);
       directMessages.put(newDM.id(), newDM);
