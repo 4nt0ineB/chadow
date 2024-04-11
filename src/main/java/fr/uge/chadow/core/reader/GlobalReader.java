@@ -37,6 +37,8 @@ public class GlobalReader<T extends Record> implements Reader<T> {
         readerMap.put(long.class, new LongReader());
       } else if (type.equals(byte.class)) {
         readerMap.put(byte.class, new ByteReader());
+      } else if (type.equals(Codex.class)) {
+        readerMap.put(Codex.class, new GlobalReader<>(Codex.class));
       } else if (type.isArray()) {
         var componentType = type.getComponentType();
         if (componentType.equals(DiscoveryResponse.Username.class)) {

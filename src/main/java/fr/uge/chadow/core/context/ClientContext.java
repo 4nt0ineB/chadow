@@ -42,9 +42,10 @@ public final class ClientContext extends Context {
       case Event event -> {
         if(event.code() == (byte) 0) {
           logger.info("Received event 0");
-          
+          api.removeUser(event.username());
         } else {
-          logger.warning("Received event " + event.code());
+          logger.warning(STR."Received event \{event.code()}");
+          api.addUser(event.username());
         }
       }
       default -> {

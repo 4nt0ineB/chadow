@@ -22,6 +22,7 @@ public class FrameReader implements Reader<Frame> {
           Opcode.YELL, new GlobalReader<>(YellMessage.class),
           Opcode.WHISPER, new GlobalReader<>(WhisperMessage.class),
           Opcode.OK, new GlobalReader<>(OK.class),
+          
           Opcode.DISCOVERY, new GlobalReader<>(Discovery.class),
           Opcode.EVENT, new GlobalReader<>(Event.class),
           Opcode.REQUEST_RESPONSE, new GlobalReader<>(RequestResponse.class)

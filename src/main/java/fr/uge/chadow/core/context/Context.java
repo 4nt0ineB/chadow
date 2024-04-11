@@ -155,8 +155,8 @@ public sealed abstract class Context permits ClientContext, ServerContext {
   
   void silentlyClose() {
     try {
-      sc.close();
       closed = true;
+      sc.close();
     } catch (IOException e) {
       // ignore exception
     }

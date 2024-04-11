@@ -163,7 +163,7 @@ public class Server {
     clients.remove(login);
     broadcast(new Event((byte) 0, login));
   }
-
+  
   public static void main(String[] args) {
     if (args.length != 1) {
       usage();

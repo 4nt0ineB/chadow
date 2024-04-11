@@ -114,7 +114,7 @@ public final class ServerContext extends Context {
 
   @Override
   public void silentlyClose() {
-    super.silentlyClose();
     server.removeClient(login);
+    super.silentlyClose();
   }
 }

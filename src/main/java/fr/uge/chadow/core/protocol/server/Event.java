@@ -12,8 +12,7 @@ public record Event(byte code, String username) implements Frame {
   public ByteBuffer toByteBuffer() {
     var opcode = Opcode.EVENT.toByte();
     var bbUsername = UTF_8.encode(username);
-    var bb = ByteBuffer.allocate(Byte.BYTES + Integer.BYTES + bbUsername.remaining());
-
-    return bb.put(opcode).putInt(bbUsername.remaining()).put(bbUsername);
+    var bb = ByteBuffer.allocate(Byte.BYTES + Byte.BYTES + Integer.BYTES + bbUsername.remaining());
+    return bb.put(opcode).put(code).putInt(bbUsername.remaining()).put(bbUsername);
   }
 }
