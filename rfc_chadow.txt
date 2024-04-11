@@ -204,9 +204,9 @@ encodé de la manière suivante :
               
   Le serveur répond avec la liste des noms d'utilisateurs présents:
 
-  +-------------------------+
+  +----------------------------------+
   | (discovery_response) | usernames |
-  +-------------------------+
+  +----------------------------------+
 
   usernames: 
     liste des usernames des clients connectés. Concaténation des 
@@ -400,9 +400,9 @@ encodé de la manière suivante :
   Le serveur répond ensuite avec une trame contenant les informations 
   nécessaires pour effectuer le téléchargement :
 
-  +-----------------------------------------------------+
+  +-------------------------------------------------------------------+
   | (request_open_download_response) | mode | sharers_count | sockets |
-  +-----------------------------------------------------+
+  +-------------------------------------------------------------------+
 
   - mode : Le mode de téléchargement, en l'occurence 0 pour 
            le mode ouvert (byte).
@@ -415,9 +415,9 @@ encodé de la manière suivante :
   Si le téléchargement est en mode fermé, le serveur revoie cette 
   trame:
 
-  +-----------------------------------------------------------------------------------------+
+  +---------------------------------------------------------------------------------------------------------+
   | (request_closed_download_response) | mode | proxies_count | socket | chain_id | socket | chain_id | ... |
-  +-----------------------------------------------------------------------------------------+
+  +---------------------------------------------------------------------------------------------------------+
 
   - mode: Le mode de téléchargement, en l'occurence 1 pour 
           le mode fermé (byte).
@@ -471,9 +471,9 @@ encodé de la manière suivante :
   Si le client reçoit un handshake avec un codex_id qu'il ne possède 
   pas où qu'il ne souhaite pas partager il peut la refuse avec :
 
-  +-------------------------+
-  | (denied) | codex_id     | 
-  +-------------------------+
+  +---------------------+
+  | (denied) | codex_id |
+  +---------------------+
 
   puis ferme la connexion.
 
@@ -519,9 +519,9 @@ encodé de la manière suivante :
   
   Le sharer répond à une requête de chunk:
 
-  +---------------------------------+
-  | (herechunk) | offset |  payload |
-  +---------------------------------+ 
+  +--------------------------------+
+  | (herechunk) | offset | payload |
+  +--------------------------------+
 
   offset:      l'indice du byte dans le chunk (int).
   payload:     la donnée
