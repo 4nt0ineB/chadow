@@ -10,7 +10,7 @@ public record Propose(Codex codex) implements Frame {
   @Override
   public ByteBuffer toByteBuffer() {
     var opcode = Opcode.PROPOSE.toByte();
-    var codexBuffer = codex.toByteBuffer();
+    var codexBuffer = codex.toByteBuffer().flip();
     var buffer = ByteBuffer.allocate(Byte.BYTES + codexBuffer.remaining());
     return buffer.put(opcode).put(codexBuffer);
   }
