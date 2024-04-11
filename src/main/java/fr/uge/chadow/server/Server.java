@@ -15,10 +15,10 @@ import fr.uge.chadow.core.context.ServerContext;
 import fr.uge.chadow.core.protocol.Frame;
 import fr.uge.chadow.core.protocol.WhisperMessage;
 import fr.uge.chadow.core.protocol.field.Codex;
-import fr.uge.chadow.core.protocol.server.Discovery;
-import fr.uge.chadow.core.protocol.server.Discovery.Username;
+import fr.uge.chadow.core.protocol.server.DiscoveryResponse;
+import fr.uge.chadow.core.protocol.server.DiscoveryResponse.Username;
 import fr.uge.chadow.core.protocol.server.Event;
-import fr.uge.chadow.core.protocol.server.Request;
+import fr.uge.chadow.core.protocol.server.RequestResponse;
 
 public class Server {
   private static final Logger logger = Logger.getLogger(Server.class.getName());
@@ -109,7 +109,7 @@ public class Server {
             .filter(client -> !client.equals(username))
             .map(Username::new)
             .toArray(Username[]::new);
-    serverContext.queueFrame(new Discovery(usernames));
+    serverContext.queueFrame(new DiscoveryResponse(usernames));
   }
 
   /**
@@ -147,7 +147,7 @@ public class Server {
       logger.warning(STR."Codex \{codexId} not found");
       return;
     }
-    serverContext.queueFrame(new Request(codex));
+    serverContext.queueFrame(new RequestResponse(codex));
   }
 
   public boolean addClient(String login, SocketChannel sc) {

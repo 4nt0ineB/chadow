@@ -6,10 +6,10 @@ import fr.uge.chadow.core.protocol.field.Codex;
 
 import java.nio.ByteBuffer;
 
-public record Request(Codex codex) implements Frame {
+public record RequestResponse(Codex codex) implements Frame {
   @Override
   public ByteBuffer toByteBuffer() {
-    var opcode = Opcode.REQUEST.toByte();
+    var opcode = Opcode.REQUEST_RESPONSE.toByte();
     var codexIdBuffer = codex.toByteBuffer().flip();
 
     var bb = ByteBuffer.allocate(Byte.BYTES + codexIdBuffer.remaining());

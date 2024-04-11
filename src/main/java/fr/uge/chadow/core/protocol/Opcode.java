@@ -3,54 +3,59 @@ package fr.uge.chadow.core.protocol;
 public enum Opcode {
   ERROR,
   REGISTER,
+  OK,
   DISCOVERY,
+  DISCOVERY_RESPONSE,
   EVENT,
   YELL,
   WHISPER,
   PROPOSE,
-  ANNOUNCE,
-  SEARCH,
   REQUEST,
+  REQUEST_RESPONSE,
+  SEARCH,
+  SEARCH_RESPONSE,
+  REQUEST_DOWNLOAD,
+  REQUEST_OPEN_DOWNLOAD_RESPONSE,
+  REQUEST_CLOSED_DOWNLOAD_RESPONSE,
   HANDSHAKE,
+  DENIED,
   NEEDCHUNK,
   CANCEL,
   HERECHUNK,
-  DENIED,
   PROXY,
   PROXYOPEN,
   PROXYOK,
   HIDDEN,
-  SHARING,
-  STOPSHARING,
-  OK,
-  REQUEST_RESPONSE;
+  ;
 
   public static Opcode from(byte value) {
     return switch (value) {
-      case 0 -> ERROR;
-      case 1 -> REGISTER;
-      case 2 -> DISCOVERY;
-      case 3 -> EVENT;
-      case 4 -> YELL;
-      case 5 -> WHISPER;
-      case 6 -> PROPOSE;
-      case 7 -> ANNOUNCE;
-      case 8 -> SEARCH;
-      case 9 -> REQUEST;
-      case 10 -> HANDSHAKE;
-      case 11 -> NEEDCHUNK;
-      case 12 -> CANCEL;
-      case 13 -> HERECHUNK;
-      case 14 -> DENIED;
-      case 15 -> PROXY;
-      case 16 -> PROXYOPEN;
-      case 17 -> PROXYOK;
-      case 18 -> HIDDEN;
-      case 19 -> SHARING;
-      case 20 -> STOPSHARING;
-      case 21 -> OK;
-      case 22 -> REQUEST_RESPONSE;
-      default -> throw new IllegalArgumentException("Invalid value for Opcode");
+        case 0 -> ERROR;
+        case 1 -> REGISTER;
+        case 2 -> OK;
+        case 3 -> DISCOVERY;
+        case 4 -> DISCOVERY_RESPONSE;
+        case 5 -> EVENT;
+        case 6 -> YELL;
+        case 7 -> WHISPER;
+        case 8 -> PROPOSE;
+        case 9 -> REQUEST;
+        case 10 -> REQUEST_RESPONSE;
+        case 11 -> SEARCH;
+        case 12 -> SEARCH_RESPONSE;
+        case 13 -> REQUEST_DOWNLOAD;
+        case 14 -> REQUEST_OPEN_DOWNLOAD_RESPONSE;
+        case 15 -> REQUEST_CLOSED_DOWNLOAD_RESPONSE;
+        case 16 -> HANDSHAKE;
+        case 17 -> DENIED;
+        case 18 -> NEEDCHUNK;
+        case 19 -> CANCEL;
+        case 20 -> HERECHUNK;
+        case 21 -> PROXY;
+        case 22 -> PROXYOPEN;
+        case 23 -> PROXYOK;
+        case 24 -> HIDDEN;
+        default -> throw new IllegalArgumentException(STR."Invalid value: \{value}");
     };
   }
 

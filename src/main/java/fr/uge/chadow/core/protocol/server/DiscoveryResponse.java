@@ -8,7 +8,7 @@ import java.util.Arrays;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-public record Discovery(Username[] usernames) implements Frame {
+public record DiscoveryResponse(Username[] usernames) implements Frame {
   public record Username(String username) {
     public ByteBuffer toByteBuffer() {
       var bbUsername = UTF_8.encode(username);
@@ -31,7 +31,7 @@ public record Discovery(Username[] usernames) implements Frame {
 
     var bbDiscovery = ByteBuffer.allocate(Byte.BYTES + Integer.BYTES + bufferCapacity);
 
-    bbDiscovery.put(Opcode.DISCOVERY.toByte()).putInt(usernames.length);
+    bbDiscovery.put(Opcode.DISCOVERY_RESPONSE.toByte()).putInt(usernames.length);
     Arrays.stream(usernamesByteBuffersArray).forEach(usernameByteBuffer -> {
       usernameByteBuffer.flip();
       bbDiscovery.put(usernameByteBuffer);

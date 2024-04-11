@@ -1,7 +1,7 @@
 package fr.uge.chadow.core.reader;
 
 import fr.uge.chadow.core.protocol.field.Codex;
-import fr.uge.chadow.core.protocol.server.Discovery;
+import fr.uge.chadow.core.protocol.server.DiscoveryResponse;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.RecordComponent;
@@ -39,8 +39,8 @@ public class GlobalReader<T extends Record> implements Reader<T> {
         readerMap.put(byte.class, new ByteReader());
       } else if (type.isArray()) {
         var componentType = type.getComponentType();
-        if (componentType.equals(Discovery.Username.class)) {
-          readerMap.put(Discovery.Username.class, new ArrayReader<>(Discovery.Username.class));
+        if (componentType.equals(DiscoveryResponse.Username.class)) {
+          readerMap.put(DiscoveryResponse.Username.class, new ArrayReader<>(DiscoveryResponse.Username.class));
         } else if (componentType.equals(Codex.FileInfo.class)) {
           readerMap.put(Codex.FileInfo.class, new ArrayReader<>(Codex.FileInfo.class));
         } else {

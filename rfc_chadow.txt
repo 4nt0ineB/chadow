@@ -199,7 +199,7 @@ encodé de la manière suivante :
   Le serveur répond avec la liste des noms d'utilisateurs présents:
 
   +-------------------------+
-  | (discovery) | usernames |
+  | (discovery_response) | usernames |
   +-------------------------+
 
   usernames: 
@@ -360,7 +360,7 @@ encodé de la manière suivante :
   Le serveur répond avec les informations suivantes :
 
   +----------------------------------------+
-  | (search) | number_of_results | results |
+  | (search_response) | number_of_results | results |
   +----------------------------------------+
 
   number_of_results : (int) le nombre total de résultats.
@@ -395,7 +395,7 @@ encodé de la manière suivante :
   nécessaires pour effectuer le téléchargement :
 
   +-----------------------------------------------------+
-  | (request_download_response) | mode | sharers_count | sockets |
+  | (request_open_download_response) | mode | sharers_count | sockets |
   +-----------------------------------------------------+
 
   - mode : Le mode de téléchargement, en l'occurence 0 pour 
@@ -410,7 +410,7 @@ encodé de la manière suivante :
   trame:
 
   +-----------------------------------------------------------------------------------------+
-  | (request_download_response) | mode | proxies_count | socket | chain_id | socket | chain_id | ... |
+  | (request_closed_download_response) | mode | proxies_count | socket | chain_id | socket | chain_id | ... |
   +-----------------------------------------------------------------------------------------+
 
   - mode: Le mode de téléchargement, en l'occurence 1 pour 
@@ -506,7 +506,7 @@ encodé de la manière suivante :
 
   8.2.2 Annulation
   Le client peut envoyer une trame pour annuler la requête 
-  (need_block) d'un block. La trame est identique à celle envoyée 
+  (needchunk) d'un block. La trame est identique à celle envoyée
   pour la requête mais l'opcode est remplacé par (cancel).
 
   8.2.3 Envoie du block

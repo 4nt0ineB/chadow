@@ -4,8 +4,8 @@ import fr.uge.chadow.client.Client;
 import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.core.protocol.*;
 import fr.uge.chadow.core.protocol.client.Register;
-import fr.uge.chadow.core.protocol.client.Request;
 import fr.uge.chadow.core.protocol.server.OK;
+import fr.uge.chadow.core.protocol.server.RequestResponse;
 
 import java.io.IOException;
 import java.nio.channels.SelectionKey;
@@ -30,7 +30,7 @@ public final class ClientContext extends Context {
       }
       case YellMessage yellMessage -> api.addMessage(yellMessage);
       case WhisperMessage whisperMessage -> api.addIncomingDM(whisperMessage);
-      case fr.uge.chadow.core.protocol.server.Request request -> {} //api.fetchCodex(request);
+      case RequestResponse request -> {} //api.fetchCodex(request);
       default -> {
         logger.warning("No action for the received frame");
         super.silentlyClose();
