@@ -2,7 +2,8 @@ package fr.uge.chadow.client;
 
 
 import fr.uge.chadow.core.context.ClientContext;
-import fr.uge.chadow.core.protocol.Request;
+import fr.uge.chadow.core.protocol.client.Propose;
+import fr.uge.chadow.core.protocol.client.Request;
 import fr.uge.chadow.core.protocol.RequestDownload;
 import fr.uge.chadow.core.protocol.WhisperMessage;
 import fr.uge.chadow.core.protocol.YellMessage;
@@ -168,7 +169,7 @@ public class ClientAPI {
   public void propose(String id) {
     var codex = codexController.getCodexStatus(id).codex();
     logger.info(STR."(propose) codex \{codex.name()} (id: \{codex.id()}) queued");
-    clientContext.queueFrame(codex);
+    clientContext.queueFrame(new Propose(codex));
   }
   
   public List<String> users() {

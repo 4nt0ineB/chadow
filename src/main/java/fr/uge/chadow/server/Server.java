@@ -18,6 +18,7 @@ import fr.uge.chadow.core.protocol.field.Codex;
 import fr.uge.chadow.core.protocol.server.Discovery;
 import fr.uge.chadow.core.protocol.server.Discovery.Username;
 import fr.uge.chadow.core.protocol.server.Event;
+import fr.uge.chadow.core.protocol.server.Request;
 
 public class Server {
   private static final Logger logger = Logger.getLogger(Server.class.getName());
@@ -102,13 +103,8 @@ public class Server {
     return (ServerContext) sc.keyFor(selector).attachment();
   }
 
-  /**
-   * Send a discovery message to the client associated with the given username
-   *
-   * @param username the username to send the discovery message to
-   */
-  public void discovery(String username) {
-    var serverContext = getServerContext(username);
+  public void discovery(ServerContext serverContext) {
+    var username = serverContext.login();
     var usernames = clients.keySet().stream()
             .filter(client -> !client.equals(username))
             .map(Username::new)
@@ -141,6 +137,17 @@ public class Server {
   public void propose(Codex codex, String username) {
     var clientCodexes = codexes.computeIfAbsent(codex, k -> new ArrayList<>());
     clientCodexes.add(username);
+  }
+
+  public void request(String codexId, ServerContext serverContext) {
+    var codex = codexes.keySet().stream()
+            .filter(c -> c.id().equals(codexId))
+            .findFirst().orElse(null);
+    if (codex == null) {
+      logger.warning(STR."Codex \{codexId} not found");
+      return;
+    }
+    serverContext.queueFrame(new Request(codex));
   }
 
   public boolean addClient(String login, SocketChannel sc) {

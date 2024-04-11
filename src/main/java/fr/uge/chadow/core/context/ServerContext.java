@@ -4,6 +4,7 @@ import fr.uge.chadow.core.protocol.*;
 import fr.uge.chadow.core.protocol.client.Discovery;
 import fr.uge.chadow.core.protocol.client.Propose;
 import fr.uge.chadow.core.protocol.client.Register;
+import fr.uge.chadow.core.protocol.client.Request;
 import fr.uge.chadow.core.protocol.server.Event;
 import fr.uge.chadow.core.protocol.server.OK;
 import fr.uge.chadow.server.Server;
@@ -55,7 +56,7 @@ public final class ServerContext extends Context {
           silentlyClose();
           return;
         }
-        server.discovery(login);
+        server.discovery(this);
       }
 
       case YellMessage yellMessage -> {
@@ -87,11 +88,24 @@ public final class ServerContext extends Context {
         server.propose(propose.codex(), login);
       }
 
+      case Request request -> {
+        if (!isAuthenticated()) {
+          logger.warning(STR."Client \{super.getSocket().getRemoteAddress()} is not authenticated");
+          silentlyClose();
+          return;
+        }
+        server.request(request.codexId(), this);
+      }
+
       default -> {
         logger.warning("No action for the received frame ");
         silentlyClose();
       }
     }
+  }
+
+  public String login() {
+    return login;
   }
 
   private boolean isAuthenticated() {
@@ -103,5 +117,4 @@ public final class ServerContext extends Context {
     super.silentlyClose();
     server.removeClient(login);
   }
-
 }
