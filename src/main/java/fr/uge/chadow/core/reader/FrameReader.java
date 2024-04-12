@@ -4,6 +4,7 @@ package fr.uge.chadow.core.reader;
 import fr.uge.chadow.core.protocol.*;
 import fr.uge.chadow.core.protocol.client.Discovery;
 import fr.uge.chadow.core.protocol.client.Register;
+import fr.uge.chadow.core.protocol.server.DiscoveryResponse;
 import fr.uge.chadow.core.protocol.server.Event;
 import fr.uge.chadow.core.protocol.server.OK;
 import fr.uge.chadow.core.protocol.server.RequestResponse;
@@ -22,8 +23,8 @@ public class FrameReader implements Reader<Frame> {
           Opcode.YELL, new GlobalReader<>(YellMessage.class),
           Opcode.WHISPER, new GlobalReader<>(WhisperMessage.class),
           Opcode.OK, new GlobalReader<>(OK.class),
-          
           Opcode.DISCOVERY, new GlobalReader<>(Discovery.class),
+          Opcode.DISCOVERY_RESPONSE, new GlobalReader<>(DiscoveryResponse.class),
           Opcode.EVENT, new GlobalReader<>(Event.class),
           Opcode.REQUEST_RESPONSE, new GlobalReader<>(RequestResponse.class)
   );

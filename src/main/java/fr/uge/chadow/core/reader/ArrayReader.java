@@ -1,5 +1,6 @@
 package fr.uge.chadow.core.reader;
 
+import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
@@ -10,6 +11,7 @@ public class ArrayReader<T extends Record> implements Reader<T[]> {
 
   private final IntReader intReader = new IntReader();
   private final GlobalReader<T> reader;
+  private final Class<T> recordClass;
 
   private State state = State.WAITING;
   private int size = -1;
@@ -17,6 +19,7 @@ public class ArrayReader<T extends Record> implements Reader<T[]> {
   private T[] value;
 
   public ArrayReader(Class<T> recordClass) {
+    this.recordClass = recordClass;
     reader = new GlobalReader<>(recordClass);
   }
 
@@ -36,7 +39,8 @@ public class ArrayReader<T extends Record> implements Reader<T[]> {
         return ProcessStatus.ERROR;
       }
       @SuppressWarnings("unchecked")
-      T[] obj = (T[]) new Object[size];
+      T[] obj = (T[]) Array.newInstance(recordClass, size);
+
       value = obj;
     }
 

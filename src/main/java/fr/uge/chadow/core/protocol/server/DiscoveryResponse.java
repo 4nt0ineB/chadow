@@ -21,7 +21,7 @@ public record DiscoveryResponse(Username[] usernames) implements Frame {
   public ByteBuffer toByteBuffer() {
     var usernamesByteBuffersArray = new ByteBuffer[usernames.length];
     for (int i = 0; i < usernames.length; i++) {
-      usernamesByteBuffersArray[i] = usernames[i].toByteBuffer();
+      usernamesByteBuffersArray[i] = usernames[i].toByteBuffer().flip();
     }
 
     int bufferCapacity = 0;
@@ -33,7 +33,6 @@ public record DiscoveryResponse(Username[] usernames) implements Frame {
 
     bbDiscovery.put(Opcode.DISCOVERY_RESPONSE.toByte()).putInt(usernames.length);
     Arrays.stream(usernamesByteBuffersArray).forEach(usernameByteBuffer -> {
-      usernameByteBuffer.flip();
       bbDiscovery.put(usernameByteBuffer);
     });
     return bbDiscovery;
