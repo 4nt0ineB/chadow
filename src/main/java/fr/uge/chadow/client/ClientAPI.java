@@ -8,6 +8,7 @@ import fr.uge.chadow.core.protocol.RequestDownload;
 import fr.uge.chadow.core.protocol.WhisperMessage;
 import fr.uge.chadow.core.protocol.YellMessage;
 import fr.uge.chadow.core.protocol.field.Codex;
+import fr.uge.chadow.core.protocol.server.DiscoveryResponse;
 
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
@@ -426,6 +427,17 @@ public class ClientAPI {
           dm.addMessage(new WhisperMessage("<--", STR."\{username} renamed as \{newUsername}", System.currentTimeMillis()));
         });
     addMessage(new YellMessage("<--", STR."\{username} left", System.currentTimeMillis()));
+  }
+  
+  public void addUserFromDiscovery(List<DiscoveryResponse.Username> usernames) {
+    lock.lock();
+    try {
+      for (var username : usernames) {
+        users.add(username.username());
+      }
+    } finally {
+      lock.unlock();
+    }
   }
   
   enum STATUS {

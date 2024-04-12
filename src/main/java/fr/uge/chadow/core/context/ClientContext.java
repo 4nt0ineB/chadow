@@ -13,6 +13,7 @@ import fr.uge.chadow.core.protocol.server.RequestResponse;
 import java.io.IOException;
 import java.nio.channels.SelectionKey;
 import java.util.Arrays;
+import java.util.List;
 import java.util.logging.Logger;
 
 public final class ClientContext extends Context {
@@ -42,8 +43,8 @@ public final class ClientContext extends Context {
       
       }
       case DiscoveryResponse discoveryResponse -> {
-        logger.info(STR."Received discovery response: \{Arrays.toString(discoveryResponse.usernames())}");
-        
+        logger.info(STR."Received discovery response (\{discoveryResponse.usernames().length} users)");
+        api.addUserFromDiscovery(List.of(discoveryResponse.usernames()));
       }
       case Event event -> {
         if(event.code() == (byte) 0) {
