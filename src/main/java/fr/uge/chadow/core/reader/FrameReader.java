@@ -11,8 +11,10 @@ import fr.uge.chadow.core.protocol.server.RequestResponse;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
+import java.util.logging.Logger;
 
 public class FrameReader implements Reader<Frame> {
+  private static final Logger logger = Logger.getLogger(FrameReader.class.getName());
   private enum State {
     DONE, WAITING, ERROR
   }
@@ -49,7 +51,8 @@ public class FrameReader implements Reader<Frame> {
         return ProcessStatus.ERROR;
       }
     }
-
+  
+    logger.info("Opcode: " + opcode.name());
     ProcessStatus frameStatus = readers.get(opcode).process(bb);
     if (frameStatus != ProcessStatus.DONE) {
       return frameStatus;

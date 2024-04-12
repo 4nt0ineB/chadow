@@ -245,6 +245,7 @@ public class ClientAPI {
   }
   
   public void whisper(UUID recipientId, String message) {
+    
     var dm = getPrivateDiscussionByRecipientId(recipientId);
     if (dm.isEmpty()) {
       logger.warning(STR."(whisper) whispering to id \{recipientId}, but was not found");
@@ -252,6 +253,10 @@ public class ClientAPI {
     }
     var recipientUsername = dm.orElseThrow()
                               .username();
+    if(!users.contains(recipientUsername)) {
+      logger.warning(STR."(whisper) whispering to \{recipientUsername}, but this user is not connected");
+      return;
+    }
     clientContext.queueFrame(new WhisperMessage(recipientUsername, message, 0L));
     logger.info(STR."(whisper) message to \{recipientUsername} of length \{message.length()} queued");
     dm.orElseThrow()
@@ -344,8 +349,8 @@ public class ClientAPI {
   
   
   private void fillWithFakeData() throws IOException, NoSuchAlgorithmException {
-    var users = new String[]{"test", "Morpheus", "Trinity", "Neo", "Flynn", "Alan", "Lora", "Gandalf", "Bilbo", "SKIDROW", "Antoine"};
-    this.users.addAll(Arrays.asList(users));
+    //var users = new String[]{"test", "Morpheus", "Trinity", "Neo", "Flynn", "Alan", "Lora", "Gandalf", "Bilbo", "SKIDROW", "Antoine"};
+    //this.users.addAll(Arrays.asList(users));
     var messages = new YellMessage[]{
         new YellMessage("test", "test", System.currentTimeMillis()),
         new YellMessage("test", "hello how are you", System.currentTimeMillis()),
@@ -404,7 +409,7 @@ public class ClientAPI {
     lock.lock();
     try {
       users.add(username);
-      addMessage(new YellMessage("-->", STR."User \{username} has joined", System.currentTimeMillis()));
+      addMessage(new YellMessage("-->", STR."\{username} has joined", System.currentTimeMillis()));
     } finally {
       lock.unlock();
     }
@@ -417,9 +422,10 @@ public class ClientAPI {
           var random = new Random();
           var newUsername = STR."\{dm.username()}[\{random.nextInt(1000)}]";
           dm.changeUsername(newUsername);
-          dm.addMessage(new WhisperMessage("-->", STR."User \{username} has left", System.currentTimeMillis()));
-          dm.addMessage(new WhisperMessage("-->", STR."\{username} renamed as \{newUsername}", System.currentTimeMillis()));
+          dm.addMessage(new WhisperMessage("<--", STR."User \{username} left", System.currentTimeMillis()));
+          dm.addMessage(new WhisperMessage("<--", STR."\{username} renamed as \{newUsername}", System.currentTimeMillis()));
         });
+    addMessage(new YellMessage("<--", STR."\{username} left", System.currentTimeMillis()));
   }
   
   enum STATUS {

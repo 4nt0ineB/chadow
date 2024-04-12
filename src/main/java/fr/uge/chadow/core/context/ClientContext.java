@@ -5,6 +5,7 @@ import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.core.protocol.*;
 import fr.uge.chadow.core.protocol.client.Discovery;
 import fr.uge.chadow.core.protocol.client.Register;
+import fr.uge.chadow.core.protocol.server.DiscoveryResponse;
 import fr.uge.chadow.core.protocol.server.Event;
 import fr.uge.chadow.core.protocol.server.OK;
 import fr.uge.chadow.core.protocol.server.RequestResponse;
@@ -30,14 +31,18 @@ public final class ClientContext extends Context {
       case OK ok -> {
         logger.info("Connected to the server");
         api.bindContext(this);
+        
+        super.addFrame(new Discovery());
+        super.processOut();
       }
       case YellMessage yellMessage -> api.addMessage(yellMessage);
       case WhisperMessage whisperMessage -> api.addIncomingDM(whisperMessage);
       case RequestResponse request -> {
       
       }
-      case Discovery discovery -> {
-        logger.info("Received discovery response");
+      case DiscoveryResponse discoveryResponse -> {
+        logger.info("Received discovery response: " + discoveryResponse.usernames());
+        
       }
       case Event event -> {
         if(event.code() == (byte) 0) {

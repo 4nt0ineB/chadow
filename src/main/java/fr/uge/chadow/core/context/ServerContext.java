@@ -56,6 +56,7 @@ public final class ServerContext extends Context {
           silentlyClose();
           return;
         }
+        logger.info("discovery requested");
         server.discovery(this);
       }
 
