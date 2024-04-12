@@ -15,6 +15,7 @@ import fr.uge.chadow.core.context.ServerContext;
 import fr.uge.chadow.core.protocol.Frame;
 import fr.uge.chadow.core.protocol.WhisperMessage;
 import fr.uge.chadow.core.protocol.field.Codex;
+import fr.uge.chadow.core.protocol.field.SocketField;
 import fr.uge.chadow.core.protocol.server.DiscoveryResponse;
 import fr.uge.chadow.core.protocol.server.DiscoveryResponse.Username;
 import fr.uge.chadow.core.protocol.server.Event;
@@ -164,14 +165,13 @@ public class Server {
                 var ipString = inetSocketAddress.getAddress().getHostAddress();
                 var port = inetSocketAddress.getPort();
 
-                return new RequestOpenDownload.SocketField(ipString, port);
+                return new SocketField(ipString, port);
               } catch (IOException e) {
-
                 logger.warning(STR."Error while getting remote address of \{sc}");
                 silentlyClose(sc.keyFor(selector));
                 return null;
               }
-            }).toArray(RequestOpenDownload.SocketField[]::new);
+            }).toArray(SocketField[]::new);
 
     serverContext.queueFrame(new RequestOpenDownload(sharersSocketFieldArray));
   }
