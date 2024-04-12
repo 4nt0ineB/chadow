@@ -18,6 +18,7 @@ import fr.uge.chadow.core.protocol.field.Codex;
 import fr.uge.chadow.core.protocol.server.DiscoveryResponse;
 import fr.uge.chadow.core.protocol.server.DiscoveryResponse.Username;
 import fr.uge.chadow.core.protocol.server.Event;
+import fr.uge.chadow.core.protocol.server.RequestOpenDownload;
 import fr.uge.chadow.core.protocol.server.RequestResponse;
 
 public class Server {
@@ -105,10 +106,7 @@ public class Server {
 
   public void discovery(ServerContext serverContext) {
     var username = serverContext.login();
-    var usernames = clients.keySet().stream()
-            .filter(client -> !client.equals(username))
-            .map(Username::new)
-            .toArray(Username[]::new);
+    var usernames = clients.keySet().stream().filter(client -> !client.equals(username)).map(Username::new).toArray(Username[]::new);
     serverContext.queueFrame(new DiscoveryResponse(usernames));
   }
 
@@ -144,12 +142,38 @@ public class Server {
     logger.info("map : " + codexes);
     var codex = codexes.keySet().stream()
             .filter(c -> c.id().equals(codexId))
-            .findFirst().orElse(null);
+            .findFirst()
+            .orElse(null);
     if (codex == null) {
       logger.warning(STR."Codex \{codexId} not found");
       return;
     }
     serverContext.queueFrame(new RequestResponse(codex));
+  }
+
+  public void requestOpenDownload(String codexId, ServerContext serverContext) {
+    var sharersList = codexes.entrySet().stream().filter(e -> e.getKey().id().equals(codexId)).map(Map.Entry::getValue).findFirst().orElseThrow();
+
+    var sharersSocketFieldArray = sharersList.stream()
+            .map(clients::get)
+            .map(sc -> {
+              try {
+                var inetSocketAddress = (InetSocketAddress) sc.getRemoteAddress();
+
+                // Get the IP address and port of the client
+                var ipString = inetSocketAddress.getAddress().getHostAddress();
+                var port = inetSocketAddress.getPort();
+
+                return new RequestOpenDownload.SocketField(ipString, port);
+              } catch (IOException e) {
+
+                logger.warning(STR."Error while getting remote address of \{sc}");
+                silentlyClose(sc.keyFor(selector));
+                return null;
+              }
+            }).toArray(RequestOpenDownload.SocketField[]::new);
+
+    serverContext.queueFrame(new RequestOpenDownload(sharersSocketFieldArray));
   }
 
   public boolean addClient(String login, SocketChannel sc) {
@@ -165,7 +189,7 @@ public class Server {
     clients.remove(login);
     broadcast(new Event((byte) 0, login));
   }
-  
+
   public static void main(String[] args) {
     if (args.length != 1) {
       usage();

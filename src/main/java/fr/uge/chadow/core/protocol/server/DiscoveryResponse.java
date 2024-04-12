@@ -32,9 +32,7 @@ public record DiscoveryResponse(Username[] usernames) implements Frame {
     var bbDiscovery = ByteBuffer.allocate(Byte.BYTES + Integer.BYTES + bufferCapacity);
 
     bbDiscovery.put(Opcode.DISCOVERY_RESPONSE.toByte()).putInt(usernames.length);
-    Arrays.stream(usernamesByteBuffersArray).forEach(usernameByteBuffer -> {
-      bbDiscovery.put(usernameByteBuffer);
-    });
+    Arrays.stream(usernamesByteBuffersArray).forEach(bbDiscovery::put);
     return bbDiscovery;
   }
 }

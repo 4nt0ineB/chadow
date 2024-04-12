@@ -4,7 +4,7 @@ package fr.uge.chadow.client;
 import fr.uge.chadow.core.context.ClientContext;
 import fr.uge.chadow.core.protocol.client.Propose;
 import fr.uge.chadow.core.protocol.client.Request;
-import fr.uge.chadow.core.protocol.RequestDownload;
+import fr.uge.chadow.core.protocol.client.RequestDownload;
 import fr.uge.chadow.core.protocol.WhisperMessage;
 import fr.uge.chadow.core.protocol.YellMessage;
 import fr.uge.chadow.core.protocol.field.Codex;

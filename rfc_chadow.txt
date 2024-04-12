@@ -400,12 +400,10 @@ encodé de la manière suivante :
   Le serveur répond ensuite avec une trame contenant les informations 
   nécessaires pour effectuer le téléchargement :
 
-  +-------------------------------------------------------------------+
-  | (request_open_download_response) | mode | sharers_count | sockets |
-  +-------------------------------------------------------------------+
+  +------------------------------------------------------------+
+  | (request_open_download_response) | sharers_count | sockets |
+  +------------------------------------------------------------+
 
-  - mode : Le mode de téléchargement, en l'occurence 0 pour 
-           le mode ouvert (byte).
   - sharers_count : Le nombre de sharers actifs disponibles pour le 
                     téléchargement (int).
   - sockets : Une liste de sockets (définie dans la section "Encodage") 
@@ -415,15 +413,13 @@ encodé de la manière suivante :
   Si le téléchargement est en mode fermé, le serveur revoie cette 
   trame:
 
-  +---------------------------------------------------------------------------------------------------------+
-  | (request_closed_download_response) | mode | proxies_count | socket | chain_id | socket | chain_id | ... |
-  +---------------------------------------------------------------------------------------------------------+
+  +--------------------------------------------------------------------------------------------------+
+  | (request_closed_download_response) | proxies_count | socket | chain_id | socket | chain_id | ... |
+  +--------------------------------------------------------------------------------------------------+
 
-  - mode: Le mode de téléchargement, en l'occurence 1 pour 
-          le mode fermé (byte).
   - proxies_count: Le nombre de clients disponibles pour agir en tant 
                    que proxy (int).
-  - Une list de socket/chain_id:
+  - Une liste de socket/chain_id:
     - socket : Le socket (défini dans la section "Encodage") du premier 
                maillon de la chaîne de proxies.
     - chain_id: L'identifiant associé au téléchargement et au 

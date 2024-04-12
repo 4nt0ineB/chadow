@@ -1,10 +1,7 @@
 package fr.uge.chadow.core.context;
 
 import fr.uge.chadow.core.protocol.*;
-import fr.uge.chadow.core.protocol.client.Discovery;
-import fr.uge.chadow.core.protocol.client.Propose;
-import fr.uge.chadow.core.protocol.client.Register;
-import fr.uge.chadow.core.protocol.client.Request;
+import fr.uge.chadow.core.protocol.client.*;
 import fr.uge.chadow.core.protocol.server.Event;
 import fr.uge.chadow.core.protocol.server.OK;
 import fr.uge.chadow.server.Server;
@@ -95,6 +92,19 @@ public final class ServerContext extends Context {
           return;
         }
         server.request(request.codexId(), this);
+      }
+
+      case RequestDownload requestDownload -> {
+        if (!isAuthenticated()) {
+          logger.warning(STR."Client \{super.getSocket().getRemoteAddress()} is not authenticated");
+          silentlyClose();
+          return;
+        }
+        if (requestDownload.mode() == 0) {
+          server.requestOpenDownload(requestDownload.codexId(), this);
+        } else {
+          // TODO : implement closed download
+        }
       }
 
       default -> {
