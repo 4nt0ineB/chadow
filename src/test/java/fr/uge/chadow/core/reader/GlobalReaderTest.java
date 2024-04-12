@@ -1,11 +1,17 @@
 package fr.uge.chadow.core.reader;
 
+import fr.uge.chadow.client.CodexController;
 import fr.uge.chadow.core.protocol.YellMessage;
 import fr.uge.chadow.core.protocol.TestPacket;
+import fr.uge.chadow.core.protocol.client.Propose;
+import fr.uge.chadow.core.protocol.server.DiscoveryResponse;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.NoSuchAlgorithmException;
+import java.util.logging.Logger;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
@@ -132,5 +138,27 @@ public class GlobalReaderTest {
       }
     }
     assertEquals(new TestPacket(testString, testInt, testLong, testString2), reader.get());
+  }
+  
+  @Test
+  public void proposeCodex() {
+    var codexController = new CodexController();
+    CodexController.CodexStatus codexStatus;
+    try {
+      codexStatus = codexController.createFromPath("my codex", "/home/alan1/Pictures");
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } catch (NoSuchAlgorithmException e) {
+      throw new RuntimeException(e);
+    }
+    //System.out.println(codexStatus.codex().id());
+    var propose = new Propose(codexStatus.codex());
+    var reader = new GlobalReader<>(Propose.class);
+    var bb = propose.toByteBuffer();
+    bb.flip();
+    bb.get(); // Skip opcode
+    bb.compact();
+    assertEquals(Reader.ProcessStatus.DONE, reader.process(bb));
+    System.out.println(reader.get().codex());
   }
 }

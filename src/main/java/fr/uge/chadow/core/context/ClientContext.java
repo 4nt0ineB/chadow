@@ -39,8 +39,9 @@ public final class ClientContext extends Context {
       }
       case YellMessage yellMessage -> api.addMessage(yellMessage);
       case WhisperMessage whisperMessage -> api.addIncomingDM(whisperMessage);
-      case RequestResponse request -> {
-      
+      case RequestResponse requestResponse -> {
+        logger.info(STR."Received RequestResponse cdx: \{requestResponse.codex().id()}");
+        api.saveFetchedCodex(requestResponse.codex());
       }
       case DiscoveryResponse discoveryResponse -> {
         logger.info(STR."Received discovery response (\{discoveryResponse.usernames().length} users)");

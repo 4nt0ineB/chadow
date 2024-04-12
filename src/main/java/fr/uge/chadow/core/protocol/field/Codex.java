@@ -26,6 +26,21 @@ public record Codex(String id, String name, Codex.FileInfo[] files) {
       Objects.requireNonNull(filename);
       Objects.requireNonNull(absolutePath);
     }
+    
+    private ByteBuffer toByteBuffer() {
+      var bbId = UTF8.encode(id);
+      var bbFilename = UTF8.encode(filename);
+      var bbAbsolutePath = UTF8.encode(absolutePath);
+      var bufferSize = Integer.BYTES + bbId.remaining() + Integer.BYTES + bbFilename.remaining() + Long.BYTES + Integer.BYTES + bbAbsolutePath.remaining();
+      return ByteBuffer.allocate(bufferSize)
+              .putInt(bbId.remaining())
+              .put(bbId)
+              .putInt(bbFilename.remaining())
+              .put(bbFilename)
+              .putLong(length)
+              .putInt(bbAbsolutePath.remaining())
+              .put(bbAbsolutePath);
+    }
   }
 
   public ByteBuffer toByteBuffer() {
@@ -34,18 +49,13 @@ public record Codex(String id, String name, Codex.FileInfo[] files) {
     var bbNumberFiles = files.length;
     var bbFiles = ByteBuffer.allocate(0);
     for (var file : files) {
-      var bbFileId = UTF8.encode(file.id());
-      var bbFilename = UTF8.encode(file.filename());
-      var fileBuffer = ByteBuffer.allocate(Integer.BYTES + bbFileId.remaining() + Integer.BYTES + bbFilename.remaining());
-      fileBuffer
-              .putInt(bbFileId.remaining())
-              .put(bbFileId)
-              .putInt(bbFilename.remaining())
-              .put(bbFilename);
-      var tmpBuff = ByteBuffer.allocate(bbFiles.flip().remaining() + fileBuffer.flip().remaining());
+      var fileBuffer = file.toByteBuffer();
+      fileBuffer.flip();
+      bbFiles.flip();
+      var tmpBuff = ByteBuffer.allocate(bbFiles.remaining() + fileBuffer.remaining());
       tmpBuff.put(bbFiles);
       tmpBuff.put(fileBuffer);
-      bbFiles = tmpBuff.compact();
+      bbFiles = tmpBuff;
     }
     bbFiles.flip();
     // id, name size, name, number of files, files

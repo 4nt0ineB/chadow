@@ -136,10 +136,12 @@ public class Server {
 
   public void propose(Codex codex, String username) {
     var clientCodexes = codexes.computeIfAbsent(codex, k -> new ArrayList<>());
+    logger.info("Proposing: " + codex);
     clientCodexes.add(username);
   }
 
   public void request(String codexId, ServerContext serverContext) {
+    logger.info("map : " + codexes);
     var codex = codexes.keySet().stream()
             .filter(c -> c.id().equals(codexId))
             .findFirst().orElse(null);

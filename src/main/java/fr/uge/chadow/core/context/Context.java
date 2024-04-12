@@ -6,6 +6,7 @@ import fr.uge.chadow.core.reader.FrameReader;
 import fr.uge.chadow.core.reader.Reader;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
@@ -158,7 +159,7 @@ public sealed abstract class Context permits ClientContext, ServerContext {
       closed = true;
       sc.close();
     } catch (IOException e) {
-      // ignore exception
+      throw new UncheckedIOException(e);
     }
   }
   
@@ -189,9 +190,9 @@ public sealed abstract class Context permits ClientContext, ServerContext {
    */
   
   public void doWrite() throws IOException {
-    sc.write(bufferOut.flip());
+    var r = sc.write(bufferOut.flip());
     bufferOut.compact();
-    processIn();
+    processOut();
     updateInterestOps();
   }
   

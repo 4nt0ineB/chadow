@@ -90,7 +90,7 @@ public class CodexController {
    * @throws IOException
    * @throws NoSuchAlgorithmException
    */
-  CodexStatus createFromPath(String codexName, String directory) throws IOException, NoSuchAlgorithmException {
+  public CodexStatus createFromPath(String codexName, String directory) throws IOException, NoSuchAlgorithmException {
     var rootPath = new File(directory);
     var fileInfoList = new ArrayList<Codex.FileInfo>();
     logger.info(STR."Creating codex of \"\{rootPath}\"");

@@ -12,6 +12,7 @@ public record Request(String codexId) implements Frame {
   public ByteBuffer toByteBuffer() {
     var opcode = Opcode.REQUEST.toByte();
     var codexIdBuffer = UTF_8.encode(codexId);
+    
     var bb = ByteBuffer.allocate(Byte.BYTES + Integer.BYTES + codexIdBuffer.remaining());
 
     return bb.put(opcode).putInt(codexIdBuffer.remaining()).put(codexIdBuffer);

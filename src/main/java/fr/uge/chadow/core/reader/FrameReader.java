@@ -3,7 +3,9 @@ package fr.uge.chadow.core.reader;
 
 import fr.uge.chadow.core.protocol.*;
 import fr.uge.chadow.core.protocol.client.Discovery;
+import fr.uge.chadow.core.protocol.client.Propose;
 import fr.uge.chadow.core.protocol.client.Register;
+import fr.uge.chadow.core.protocol.client.Request;
 import fr.uge.chadow.core.protocol.server.DiscoveryResponse;
 import fr.uge.chadow.core.protocol.server.Event;
 import fr.uge.chadow.core.protocol.server.OK;
@@ -26,6 +28,8 @@ public class FrameReader implements Reader<Frame> {
           Opcode.WHISPER, new GlobalReader<>(WhisperMessage.class),
           Opcode.OK, new GlobalReader<>(OK.class),
           Opcode.DISCOVERY, new GlobalReader<>(Discovery.class),
+          Opcode.PROPOSE, new GlobalReader<>(Propose.class),
+          Opcode.REQUEST, new GlobalReader<>(Request.class),
           Opcode.DISCOVERY_RESPONSE, new GlobalReader<>(DiscoveryResponse.class),
           Opcode.EVENT, new GlobalReader<>(Event.class),
           Opcode.REQUEST_RESPONSE, new GlobalReader<>(RequestResponse.class)
@@ -52,7 +56,7 @@ public class FrameReader implements Reader<Frame> {
       }
     }
   
-    logger.info("Opcode: " + opcode.name());
+    logger.info("Opcode: " + opcode);
     ProcessStatus frameStatus = readers.get(opcode).process(bb);
     if (frameStatus != ProcessStatus.DONE) {
       return frameStatus;

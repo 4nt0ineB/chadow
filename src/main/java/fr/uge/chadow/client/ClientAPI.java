@@ -225,6 +225,7 @@ public class ClientAPI {
     // didn't find the codex, request it
     requestCodexResponseQueue.clear();
     clientContext.queueFrame(new Request(id));
+    logger.info(STR."(getCodex) requesting codex (id: \{id})");
     var fetchedCodex = requestCodexResponseQueue.poll(5, java.util.concurrent.TimeUnit.SECONDS);
     if(fetchedCodex.isEmpty()){
       return Optional.empty();
@@ -246,7 +247,6 @@ public class ClientAPI {
   }
   
   public void whisper(UUID recipientId, String message) {
-    
     var dm = getPrivateDiscussionByRecipientId(recipientId);
     if (dm.isEmpty()) {
       logger.warning(STR."(whisper) whispering to id \{recipientId}, but was not found");
@@ -367,7 +367,10 @@ public class ClientAPI {
     //var userId = UUID.randomUUID();
     //this.directMessages.put(userId, new DirectMessages(userId, "Alan1"));
     // test codex
-    codexController.createFromPath("my codex", "/home/alan1/Pictures");
+    if(login.equals("Alan1")) {
+      codexController.createFromPath("my codex", "/home/alan1/Pictures");
+    }
+    
   }
   
   public int numberOfMessages() {

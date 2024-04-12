@@ -508,6 +508,9 @@ public class ClientController {
         logger.severe(STR."Error while retrieving codex.\{e.getMessage()}");
         mustClose = true;
       }
+      if(codex.isEmpty()){
+        return Optional.of(true);
+      }
       selectedCodexForDetails = codex.orElseThrow();
       mode = Mode.CODEX_DETAILS;
       setCurrentView(codexView(selectedCodexForDetails));
@@ -618,7 +621,6 @@ public class ClientController {
       Arrays.stream(infoFiles)
               .collect(Collectors.groupingBy(Codex.FileInfo::absolutePath))
               .forEach((dir, files) -> {
-                logger.info(STR."dir: \{dir}");
                 sb.append(colorize(CLIColor.BOLD, STR."[\{dir}]\n"));
                 files.forEach(file -> sb.append("\t- ")
                         .append(CLIColor.BOLD)
