@@ -12,6 +12,7 @@ import java.util.logging.Logger;
 
 public class GlobalReader<T extends Record> implements Reader<T> {
   private static final Logger logger = Logger.getLogger(GlobalReader.class.getName());
+
   private enum State {
     DONE, WAITING, ERROR
   }
@@ -41,9 +42,6 @@ public class GlobalReader<T extends Record> implements Reader<T> {
         readerMap.put(byte.class, new ByteReader());
       } else if (type.equals(Codex.class)) {
         readerMap.put(Codex.class, new GlobalReader<>(Codex.class));
-      } else if (type.equals(DiscoveryResponse.Username.class)) {
-        readerMap.put(DiscoveryResponse.Username.class, new GlobalReader<>(DiscoveryResponse.Username.class));
-      } else if (type.equals(Codex.FileInfo.class)) {
       } else if (type.isArray()) {
         var componentType = type.getComponentType();
         if (componentType.equals(DiscoveryResponse.Username.class)) {
@@ -53,7 +51,6 @@ public class GlobalReader<T extends Record> implements Reader<T> {
         } else {
           throw new IllegalArgumentException(STR."Unsupported type: \{type}");
         }
-        
       } else {
         throw new IllegalArgumentException(STR."Unsupported type: \{type}");
       }
@@ -66,8 +63,12 @@ public class GlobalReader<T extends Record> implements Reader<T> {
       throw new IllegalStateException();
     }
     while (currentIndex != recordInstanceValues.length) {
-      logger.info(STR."\{recordComponents[currentIndex].getType()}");
-      var reader = readerMap.get(recordComponents[currentIndex].getType());
+      Reader<?> reader;
+      if (recordComponents[currentIndex].getType().isArray()) {
+        reader = readerMap.get(recordComponents[currentIndex].getType().getComponentType());
+      } else {
+        reader = readerMap.get(recordComponents[currentIndex].getType());
+      }
       var result = reader.process(bb);
       if (result != ProcessStatus.DONE) {
         return result;
@@ -78,8 +79,7 @@ public class GlobalReader<T extends Record> implements Reader<T> {
     }
     state = State.DONE;
     try {
-      @SuppressWarnings("unchecked")
-      T instance = (T) recordClass.getConstructors()[0].newInstance(recordInstanceValues);
+      @SuppressWarnings("unchecked") T instance = (T) recordClass.getConstructors()[0].newInstance(recordInstanceValues);
       value = instance;
     } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
       throw new IllegalStateException(e);
