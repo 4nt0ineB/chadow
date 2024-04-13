@@ -56,7 +56,7 @@ public class FrameReader implements Reader<Frame> {
       }
     }
 
-    logger.info("Opcode: " + opcode);
+    logger.info(STR."Opcode: \{opcode}");
     ProcessStatus frameStatus = readers.get(opcode).process(bb);
     if (frameStatus != ProcessStatus.DONE) {
       return frameStatus;

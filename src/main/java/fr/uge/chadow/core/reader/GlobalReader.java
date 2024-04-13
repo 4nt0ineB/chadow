@@ -52,7 +52,7 @@ public class GlobalReader<T extends Record> implements Reader<T> {
         } else if (componentType.equals(SocketField.class)) {
           readerMap.put(SocketField.class, new ArrayReader<>(SocketField.class));
         } else {
-          throw new IllegalArgumentException(STR."Unsupported type: \{type}");
+          throw new IllegalArgumentException(STR."Unsupported array type: \{type}");
         }
       } else {
         throw new IllegalArgumentException(STR."Unsupported type: \{type}");
