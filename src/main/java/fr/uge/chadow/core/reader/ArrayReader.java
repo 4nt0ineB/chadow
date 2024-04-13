@@ -2,25 +2,24 @@ package fr.uge.chadow.core.reader;
 
 import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 
-public class ArrayReader<T extends Record> implements Reader<T[]> {
+public class ArrayReader<T> implements Reader<T[]> {
   private enum State {
     DONE, WAITING, ERROR
   }
 
   private final IntReader intReader = new IntReader();
-  private final GlobalReader<T> reader;
-  private final Class<T> recordClass;
+  private final Reader<T> elementReader;
+  private final Class<T> elementClass;
 
   private State state = State.WAITING;
   private int size = -1;
   private int currentIndex;
   private T[] value;
 
-  public ArrayReader(Class<T> recordClass) {
-    this.recordClass = recordClass;
-    reader = new GlobalReader<>(recordClass);
+  public ArrayReader(Reader<T> elementReader, Class<T> elementClass) {
+    this.elementReader = elementReader;
+    this.elementClass = elementClass;
   }
 
   @Override
@@ -39,18 +38,17 @@ public class ArrayReader<T extends Record> implements Reader<T[]> {
         return ProcessStatus.ERROR;
       }
       @SuppressWarnings("unchecked")
-      T[] obj = (T[]) Array.newInstance(recordClass, size);
-
-      value = obj;
+      T[] array = (T[]) Array.newInstance(elementClass, size);
+      value = array;
     }
 
     while (currentIndex != size) {
-      var result = reader.process(bb);
+      var result = elementReader.process(bb);
       if (result != ProcessStatus.DONE) {
         return result;
       }
-      value[currentIndex] = reader.get();
-      reader.reset();
+      value[currentIndex] = elementReader.get();
+      elementReader.reset();
       currentIndex++;
     }
     state = State.DONE;
@@ -62,7 +60,7 @@ public class ArrayReader<T extends Record> implements Reader<T[]> {
     if (state != State.DONE) {
       throw new IllegalStateException();
     }
-    return Arrays.copyOf(value, size);
+    return value;
   }
 
   @Override
@@ -71,6 +69,6 @@ public class ArrayReader<T extends Record> implements Reader<T[]> {
     size = -1;
     currentIndex = 0;
     intReader.reset();
-    reader.reset();
+    elementReader.reset();
   }
 }
