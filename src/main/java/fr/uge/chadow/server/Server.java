@@ -22,11 +22,14 @@ import fr.uge.chadow.core.protocol.server.RequestOpenDownload;
 import fr.uge.chadow.core.protocol.server.RequestResponse;
 
 public class Server {
+  public record SocketInfo(SocketChannel socketChannel, InetSocketAddress address) {
+  }
+
   private static final Logger logger = Logger.getLogger(Server.class.getName());
 
   private final ServerSocketChannel serverSocketChannel;
   private final Selector selector;
-  private final Map<String, SocketChannel> clients = new HashMap<>();
+  private final Map<String, SocketInfo> clients = new HashMap<>();
   private final Map<Codex, List<String>> codexes = new HashMap<>(); // codex -> list of usernames
 
   public Server(int port) throws IOException {
@@ -100,7 +103,7 @@ public class Server {
    * @return the server context associated with the given username
    */
   private ServerContext getServerContext(String username) {
-    var sc = clients.get(username);
+    var sc = clients.get(username).socketChannel;
     return (ServerContext) sc.keyFor(selector).attachment();
   }
 
@@ -149,32 +152,26 @@ public class Server {
   }
 
   public void requestOpenDownload(String codexId, ServerContext serverContext) {
-    var sharersList = codexes.entrySet().stream().filter(e -> e.getKey().id().equals(codexId)).map(Map.Entry::getValue).findFirst().orElseThrow();
+    var sharersList = codexes.entrySet().stream()
+            .filter(e -> e.getKey().id().equals(codexId))
+            .map(Map.Entry::getValue)
+            .findFirst()
+            .orElseThrow();
 
-    var sharersSocketFieldArray = sharersList.stream().map(clients::get).map(sc -> {
-      try {
-        var inetSocketAddress = (InetSocketAddress) sc.getRemoteAddress();
-
-        // Get the IP address and port of the client
-        var ipString = inetSocketAddress.getAddress().getHostAddress();
-        var port = inetSocketAddress.getPort();
-
-        return null;
-      } catch (IOException e) {
-        logger.warning(STR."Error while getting remote address of \{sc}");
-        silentlyClose(sc.keyFor(selector));
-        return null;
-      }
-    }).toArray(SocketField[]::new);
+    var sharersSocketFieldArray = sharersList.stream()
+            .map(clients::get)
+            .map(SocketInfo::address)
+            .map(address -> new SocketField(address.getAddress().getAddress(), address.getPort()))
+            .toArray(SocketField[]::new);
 
     serverContext.queueFrame(new RequestOpenDownload(sharersSocketFieldArray));
   }
 
-  public boolean addClient(String login, SocketChannel sc) {
+  public boolean addClient(String login, SocketChannel sc, InetSocketAddress address) {
     if (clients.containsKey(login)) {
       return false;
     }
-    clients.put(login, sc);
+    clients.put(login, new SocketInfo(sc, address));
     return true;
   }
 
