@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
-import fr.uge.chadow.core.context.ClientContext;
 import fr.uge.chadow.core.context.ContextHandler;
 import fr.uge.chadow.core.context.ServerContext;
 import fr.uge.chadow.core.protocol.Frame;
