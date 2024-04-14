@@ -432,12 +432,10 @@ public class ClientAPI {
     addMessage(new YellMessage("<--", STR."\{username} left", System.currentTimeMillis()));
   }
   
-  public void addUserFromDiscovery(List<DiscoveryResponse.Username> usernames) {
+  public void addUserFromDiscovery(List<String> usernames) {
     lock.lock();
     try {
-      for (var username : usernames) {
-        users.add(username.username());
-      }
+      users.addAll(usernames);
     } finally {
       lock.unlock();
     }

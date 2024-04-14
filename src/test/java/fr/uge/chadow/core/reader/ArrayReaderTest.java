@@ -14,20 +14,6 @@ import static org.junit.Assert.assertThrows;
 
 public class ArrayReaderTest {
   @Test
-  public void simple() {
-    DiscoveryResponse.Username[] usernames = new DiscoveryResponse.Username[]{new DiscoveryResponse.Username("username1"), new DiscoveryResponse.Username("username2"), new DiscoveryResponse.Username("username3")};
-    DiscoveryResponse discoveryResponse = new DiscoveryResponse(usernames);
-    var bb = discoveryResponse.toByteBuffer();
-    bb.flip();
-    bb.get(); // Skip opcode
-    bb.compact();
-    var reader = new ArrayReader<>(new GlobalReader<>(DiscoveryResponse.Username.class), DiscoveryResponse.Username.class);
-    assertEquals(Reader.ProcessStatus.DONE, reader.process(bb));
-    var res = reader.get();
-    assertEquals(Arrays.stream(usernames).toList(), Arrays.stream(res).toList());
-  }
-
-  @Test
   public void simple2() {
     String[] strings = new String[]{"string1", "string2", "string3"};
     ByteBuffer[] byteBuffers = new ByteBuffer[strings.length];

@@ -17,7 +17,6 @@ import fr.uge.chadow.core.protocol.WhisperMessage;
 import fr.uge.chadow.core.protocol.field.Codex;
 import fr.uge.chadow.core.protocol.field.SocketField;
 import fr.uge.chadow.core.protocol.server.DiscoveryResponse;
-import fr.uge.chadow.core.protocol.server.DiscoveryResponse.Username;
 import fr.uge.chadow.core.protocol.server.Event;
 import fr.uge.chadow.core.protocol.server.RequestOpenDownload;
 import fr.uge.chadow.core.protocol.server.RequestResponse;
@@ -107,7 +106,7 @@ public class Server {
 
   public void discovery(ServerContext serverContext) {
     var username = serverContext.login();
-    var usernames = clients.keySet().stream().filter(client -> !client.equals(username)).map(Username::new).toArray(Username[]::new);
+    var usernames = clients.keySet().stream().filter(client -> !client.equals(username)).toArray(String[]::new);
     serverContext.queueFrame(new DiscoveryResponse(usernames));
   }
 
@@ -141,10 +140,7 @@ public class Server {
 
   public void request(String codexId, ServerContext serverContext) {
     logger.info("map : " + codexes);
-    var codex = codexes.keySet().stream()
-            .filter(c -> c.id().equals(codexId))
-            .findFirst()
-            .orElse(null);
+    var codex = codexes.keySet().stream().filter(c -> c.id().equals(codexId)).findFirst().orElse(null);
     if (codex == null) {
       logger.warning(STR."Codex \{codexId} not found");
       return;
@@ -155,23 +151,21 @@ public class Server {
   public void requestOpenDownload(String codexId, ServerContext serverContext) {
     var sharersList = codexes.entrySet().stream().filter(e -> e.getKey().id().equals(codexId)).map(Map.Entry::getValue).findFirst().orElseThrow();
 
-    var sharersSocketFieldArray = sharersList.stream()
-            .map(clients::get)
-            .map(sc -> {
-              try {
-                var inetSocketAddress = (InetSocketAddress) sc.getRemoteAddress();
+    var sharersSocketFieldArray = sharersList.stream().map(clients::get).map(sc -> {
+      try {
+        var inetSocketAddress = (InetSocketAddress) sc.getRemoteAddress();
 
-                // Get the IP address and port of the client
-                var ipString = inetSocketAddress.getAddress().getHostAddress();
-                var port = inetSocketAddress.getPort();
+        // Get the IP address and port of the client
+        var ipString = inetSocketAddress.getAddress().getHostAddress();
+        var port = inetSocketAddress.getPort();
 
-                return null;
-              } catch (IOException e) {
-                logger.warning(STR."Error while getting remote address of \{sc}");
-                silentlyClose(sc.keyFor(selector));
-                return null;
-              }
-            }).toArray(SocketField[]::new);
+        return null;
+      } catch (IOException e) {
+        logger.warning(STR."Error while getting remote address of \{sc}");
+        silentlyClose(sc.keyFor(selector));
+        return null;
+      }
+    }).toArray(SocketField[]::new);
 
     serverContext.queueFrame(new RequestOpenDownload(sharersSocketFieldArray));
   }
