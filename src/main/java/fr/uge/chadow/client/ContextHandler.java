@@ -1,6 +1,7 @@
 package fr.uge.chadow.client;
 
 import fr.uge.chadow.core.context.Context;
+import fr.uge.chadow.core.context.ServerContext;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -13,18 +14,21 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Function;
 import java.util.logging.Logger;
 
-public class ClientContextHandler {
-  private static final Logger logger = Logger.getLogger(ClientContextHandler.class.getName());
+public class ContextHandler {
+  private static final Logger logger = Logger.getLogger(ContextHandler.class.getName());
   
   public record ConnectionData(Context context, InetSocketAddress address) {}
   private final Selector selector;
   private final LinkedBlockingQueue<Function<SelectionKey, ConnectionData>> contextQueue = new LinkedBlockingQueue<>();
   private final ServerSocketChannel serverSocketChannel;
+  private final Function<SelectionKey, Context> sharerContextFactory;
   
-  public ClientContextHandler() throws IOException {
+  public ContextHandler(Function<SelectionKey, Context> sharerContextFactory) throws IOException {
     this.selector = Selector.open();
     this.serverSocketChannel = ServerSocketChannel.open();
-    serverSocketChannel.socket().getLocalPort();
+    this.serverSocketChannel.bind(new InetSocketAddress(0));
+    logger.info("Port opened: " + serverSocketChannel.socket().getLocalPort());
+    this.sharerContextFactory = sharerContextFactory;
   }
   
   public void supplyConnectionData(Function<SelectionKey, ConnectionData> connectionDataSupplier) {
@@ -58,6 +62,14 @@ public class ClientContextHandler {
   
   private void treatKey(SelectionKey key) {
     try {
+      if (key.isValid() && key.isAcceptable()) {
+        doAccept(key);
+      }
+    } catch (IOException ioe) {
+      // lambda call in select requires to tunnel IOException
+      throw new UncheckedIOException(ioe);
+    }
+    try {
       if (key.isValid() && key.isConnectable()) {
         ((Context) key.attachment()).doConnect();
       }
@@ -69,11 +81,24 @@ public class ClientContextHandler {
       }
     } catch (IOException ioe) {
       // lambda call in select requires to tunnel IOException
-      throw new UncheckedIOException(ioe);
+      // throw new UncheckedIOException(ioe);
+      logger.info("Connection closed with client due to IOException");
+      ((Context) key.attachment()).silentlyClose();
     }
   }
   
-  public int getLocalPort() {
+  private void doAccept(SelectionKey key) throws IOException {
+    var sc = serverSocketChannel.accept();
+    if (sc == null) {
+      logger.warning("selector gave wrong hint for accept");
+      return;
+    }
+    sc.configureBlocking(false);
+    var sckey = sc.register(selector, SelectionKey.OP_READ);
+    sckey.attach(sharerContextFactory.apply(sckey));
+  }
+  
+  public int listeningPort() {
     return serverSocketChannel.socket().getLocalPort();
   }
 }

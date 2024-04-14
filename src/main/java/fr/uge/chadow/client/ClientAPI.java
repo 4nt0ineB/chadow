@@ -1,19 +1,15 @@
 package fr.uge.chadow.client;
 
 
-import fr.uge.chadow.cli.InputReader;
-import fr.uge.chadow.cli.display.Display;
-import fr.uge.chadow.cli.display.InfoBar;
-import fr.uge.chadow.cli.display.view.CantConnectScreenView;
 import fr.uge.chadow.core.context.ClientContext;
 import fr.uge.chadow.core.context.DownloaderContext;
+import fr.uge.chadow.core.context.SharerContext;
 import fr.uge.chadow.core.protocol.client.Propose;
 import fr.uge.chadow.core.protocol.client.Request;
 import fr.uge.chadow.core.protocol.client.RequestDownload;
 import fr.uge.chadow.core.protocol.WhisperMessage;
 import fr.uge.chadow.core.protocol.YellMessage;
 import fr.uge.chadow.core.protocol.field.Codex;
-import fr.uge.chadow.core.protocol.server.DiscoveryResponse;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -35,7 +31,7 @@ public class ClientAPI {
   
   
   private static final Logger logger = Logger.getLogger(ClientAPI.class.getName());
-  private final ClientContextHandler contextHandler;
+  private final ContextHandler contextHandler;
   private final InetSocketAddress serverAddress;
   private final String login;
   private final CodexController codexController = new CodexController();
@@ -55,7 +51,7 @@ public class ClientAPI {
     Objects.requireNonNull(login);
     this.login = login;
     this.serverAddress = serverAddress;
-    this.contextHandler = new ClientContextHandler();
+    this.contextHandler = new ContextHandler(key -> new SharerContext(key, this));
     try {
       fillWithFakeData();
     } catch (IOException e) {
@@ -73,7 +69,7 @@ public class ClientAPI {
     // make a loop to manage downloads
     while(!Thread.interrupted()) {
       var codexes = requestCodexResponseQueue.poll(1, java.util.concurrent.TimeUnit.SECONDS);
-      if(codexes.isPresent()){
+      if(codexes != null && codexes.isPresent()){
         var codexId = codexIdOfAskedDownload.pollFirst();
         //createDownloaders(codexes);
       }
@@ -87,7 +83,7 @@ public class ClientAPI {
             .start(() -> {
               try {
                 logger.info("Client starts");
-                contextHandler.supplyConnectionData(key -> new ClientContextHandler.ConnectionData(new ClientContext(key, this), serverAddress));
+                contextHandler.supplyConnectionData(key -> new ContextHandler.ConnectionData(new ClientContext(key, this), serverAddress));
                 contextHandler.launch();
               } catch (IOException e) {
                 logger.severe(STR."The client was interrupted. \{e.getMessage()}");
@@ -117,7 +113,7 @@ public class ClientAPI {
   private void createDownloaders(String codexId) {
     codexController.getCodexStatus(codexId).ifPresent(codexStatus -> {
       var downloaderContext = new DownloaderContext(null, this, codexStatus);
-      contextHandler.supplyConnectionData(key -> new ClientContextHandler.ConnectionData(downloaderContext, serverAddress));
+      contextHandler.supplyConnectionData(key -> new ContextHandler.ConnectionData(downloaderContext, serverAddress));
     });
   }
   
@@ -513,6 +509,10 @@ public class ClientAPI {
     } finally {
       lock.unlock();
     }
+  }
+  
+  public int listeningPort() {
+    return contextHandler.listeningPort();
   }
   
   enum STATUS {

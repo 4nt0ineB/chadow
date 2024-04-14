@@ -13,7 +13,7 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
 import java.util.logging.Logger;
 
-public sealed abstract class Context permits ClientContext, DownloaderContext, ServerContext {
+public sealed abstract class Context permits ClientContext, DownloaderContext, ServerContext, SharerContext {
   
   private static final Logger logger = Logger.getLogger(Context.class.getName());
   private final ArrayDeque<Frame> queue = new ArrayDeque<>();
@@ -153,7 +153,7 @@ public sealed abstract class Context permits ClientContext, DownloaderContext, S
     }
   }
   
-  void silentlyClose() {
+  public void silentlyClose() {
     try {
       closed = true;
       sc.close();

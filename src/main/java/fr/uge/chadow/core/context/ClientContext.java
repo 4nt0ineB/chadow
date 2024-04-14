@@ -1,6 +1,6 @@
 package fr.uge.chadow.core.context;
 
-import fr.uge.chadow.client.ClientContextHandler;
+import fr.uge.chadow.client.ContextHandler;
 import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.core.protocol.*;
 import fr.uge.chadow.core.protocol.client.Discovery;
@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.logging.Logger;
 
 public final class ClientContext extends Context {
-  private static final Logger logger = Logger.getLogger(ClientContextHandler.class.getName());
+  private static final Logger logger = Logger.getLogger(ContextHandler.class.getName());
   private static final int BUFFER_SIZE = 1024;
   private final ClientAPI api;
   
@@ -71,7 +71,7 @@ public final class ClientContext extends Context {
       api.close();
     }
     var add = (InetSocketAddress) getSocket().getLocalAddress();
-    super.addFrame(new Register(api.login()));
+    super.addFrame(new Register(api.login(), api.listeningPort()));
     getKey().interestOps(SelectionKey.OP_WRITE);
     super.processOut();
   }

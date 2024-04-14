@@ -8,18 +8,16 @@ import java.io.IOException;
 import java.nio.channels.SelectionKey;
 
 /**
- * Context for when the app is downloading files from another client
+ * Context for when the app is sharing files to another client
  */
-public final class DownloaderContext extends Context {
+public final class SharerContext extends Context {
   private static final int BUFFER_SIZE = 1024;
   private final ClientAPI api;
-  private final CodexController.CodexStatus codexStatus;
   
   
-  public DownloaderContext(SelectionKey key, ClientAPI api, CodexController.CodexStatus codexStatus) {
+  public SharerContext(SelectionKey key, ClientAPI api) {
     super(key, BUFFER_SIZE);
     this.api = api;
-    this.codexStatus = codexStatus;
     // addFrame(new HandShake());
   }
   
@@ -27,11 +25,11 @@ public final class DownloaderContext extends Context {
   void processCurrentOpcodeAction(Frame frame) throws IOException {
     /*
       switch
+        HANDSHAKE,
         DENIED,
-        HERECHUNK,
+        NEEDCHUNK,
+        CANCEL,
         etc...
      */
   }
-  
-  
 }
