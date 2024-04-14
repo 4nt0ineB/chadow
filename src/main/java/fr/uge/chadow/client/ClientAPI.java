@@ -58,7 +58,7 @@ public class ClientAPI {
     Objects.requireNonNull(login);
     this.login = login;
     this.serverAddress = serverAddress;
-    this.contextHandler = new ContextHandler(key -> new SharerContext(key, this), 0);
+    this.contextHandler = new ContextHandler(0, key -> new SharerContext(key, this));
     try {
       fillWithFakeData();
     } catch (IOException e) {

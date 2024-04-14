@@ -31,11 +31,10 @@ public class Server {
   private final Map<Codex, List<String>> codexes = new HashMap<>(); // codex -> list of usernames
 
   public Server(int port) throws IOException {
-    this.contextHandler = new ContextHandler(key -> new ServerContext(this, key), port);
+    this.contextHandler = new ContextHandler(port, key -> new ServerContext(this, key));
   }
 
   public void start() throws IOException {
-    logger.info("STARTS");
     contextHandler.launch();
   }
   

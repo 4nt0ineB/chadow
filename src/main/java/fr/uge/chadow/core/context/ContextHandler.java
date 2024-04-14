@@ -22,7 +22,15 @@ public class ContextHandler {
   private final ServerSocketChannel serverSocketChannel;
   private final Function<SelectionKey, Context> sharerContextFactory;
   
-  public ContextHandler(Function<SelectionKey, Context> sharerContextFactory, int serverPort) throws IOException {
+  /**
+   * Create a new ContextHandler
+   * @param serverPort the port to listen to
+   * @param sharerContextFactory the factory to create a new context
+   *                             when the server socket receive a new connection
+   *                             // @Todo change the name
+   * @throws IOException
+   */
+  public ContextHandler(int serverPort, Function<SelectionKey, Context> sharerContextFactory) throws IOException {
     this.selector = Selector.open();
     this.serverSocketChannel = ServerSocketChannel.open();
     this.serverSocketChannel.bind(new InetSocketAddress(serverPort));
@@ -30,6 +38,10 @@ public class ContextHandler {
     this.sharerContextFactory = sharerContextFactory;
   }
   
+  /**
+   * Supply ConnectionData, being a socket to connect to and a context to attach to it
+   * @param connectionDataSupplier
+   */
   public void supplyConnectionData(Function<SelectionKey, ConnectionData> connectionDataSupplier) {
     contextQueue.add(connectionDataSupplier);
     selector.wakeup();
