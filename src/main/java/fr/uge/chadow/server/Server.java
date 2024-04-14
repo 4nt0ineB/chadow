@@ -36,16 +36,7 @@ public class Server {
 
   public void start() throws IOException {
     logger.info("STARTS");
-    
-    Thread.ofPlatform()
-          .start(() -> {
-            try {
-              logger.info("Client starts");
-              contextHandler.launch();
-            } catch (IOException e) {
-              logger.severe(STR."The client was interrupted. \{e.getMessage()}");
-            }
-          });
+    contextHandler.launch();
   }
   
   /**

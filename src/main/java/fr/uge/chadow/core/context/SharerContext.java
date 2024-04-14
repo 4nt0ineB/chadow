@@ -3,9 +3,14 @@ package fr.uge.chadow.core.context;
 import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.client.CodexController;
 import fr.uge.chadow.core.protocol.Frame;
+import fr.uge.chadow.core.protocol.WhisperMessage;
+import fr.uge.chadow.core.protocol.YellMessage;
+import fr.uge.chadow.core.protocol.client.Discovery;
+import fr.uge.chadow.core.protocol.server.*;
 
 import java.io.IOException;
 import java.nio.channels.SelectionKey;
+import java.util.List;
 import java.util.logging.Logger;
 
 /**
@@ -25,6 +30,15 @@ public final class SharerContext extends Context {
   
   @Override
   void processCurrentOpcodeAction(Frame frame) throws IOException {
+    switch (frame) {
+      case OK ok -> {
+        logger.info("Sharer has received a OK from the client");
+      }
+      default -> {
+        logger.warning("No action for the received frame");
+        super.silentlyClose();
+      }
+    }
     /*
       switch
         HANDSHAKE,

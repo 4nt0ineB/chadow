@@ -32,9 +32,12 @@ public class ContextHandler {
   
   public void supplyConnectionData(Function<SelectionKey, ConnectionData> connectionDataSupplier) {
     contextQueue.add(connectionDataSupplier);
+    selector.wakeup();
   }
   
   public void launch() throws IOException {
+    serverSocketChannel.configureBlocking(false);
+    serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
     while (!Thread.interrupted()) {
       try {
         processContexts();

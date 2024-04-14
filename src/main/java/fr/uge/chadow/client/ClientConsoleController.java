@@ -215,6 +215,7 @@ public class ClientConsoleController {
   
   private Optional<Boolean> globalCommandDraw(String input) {
     if (input.equals(":d")) {
+      logger.info("Redrawing display");
       drawDisplay();
       return Optional.of(!viewCanRefresh.get());
     }

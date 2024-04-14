@@ -209,8 +209,4 @@ public sealed abstract class Context permits ClientContext, DownloaderContext, S
     return sc;
   }
   
-  public void getServerHostname() {
-  
-  }
-  
 }

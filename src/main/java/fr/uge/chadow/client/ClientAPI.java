@@ -69,6 +69,9 @@ public class ClientAPI {
     }
   }
   
+  // 33769
+  // 35495
+  
   /**
    * Create a splash screen logo with a list of messages
    * showing le title "Chadow" in ascii art and the version
@@ -92,6 +95,7 @@ public class ClientAPI {
         var codexId = codexIdOfAskedDownload.pollFirst();
         // create downloader for each sharer
         for(var socket: sockets) {
+          logger.info(STR."(startService) adding downloader context for codex \{codexId} (sharer: \{socket.ip()}:\{socket.port()})");
           addDownloaderContext(codexId, socket);
         }
       }
