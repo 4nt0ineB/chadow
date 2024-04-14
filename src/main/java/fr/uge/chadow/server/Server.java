@@ -15,17 +15,21 @@ import fr.uge.chadow.core.context.ServerContext;
 import fr.uge.chadow.core.protocol.Frame;
 import fr.uge.chadow.core.protocol.WhisperMessage;
 import fr.uge.chadow.core.protocol.field.Codex;
+import fr.uge.chadow.core.protocol.field.SocketField;
 import fr.uge.chadow.core.protocol.server.DiscoveryResponse;
-import fr.uge.chadow.core.protocol.server.DiscoveryResponse.Username;
 import fr.uge.chadow.core.protocol.server.Event;
+import fr.uge.chadow.core.protocol.server.RequestOpenDownload;
 import fr.uge.chadow.core.protocol.server.RequestResponse;
 
 public class Server {
+  public record SocketInfo(SocketChannel socketChannel, InetSocketAddress address) {
+  }
+
   private static final Logger logger = Logger.getLogger(Server.class.getName());
 
   private final ServerSocketChannel serverSocketChannel;
   private final Selector selector;
-  private final Map<String, SocketChannel> clients = new HashMap<>();
+  private final Map<String, SocketInfo> clients = new HashMap<>();
   private final Map<Codex, List<String>> codexes = new HashMap<>(); // codex -> list of usernames
 
   public Server(int port) throws IOException {
@@ -99,16 +103,13 @@ public class Server {
    * @return the server context associated with the given username
    */
   private ServerContext getServerContext(String username) {
-    var sc = clients.get(username);
+    var sc = clients.get(username).socketChannel;
     return (ServerContext) sc.keyFor(selector).attachment();
   }
 
   public void discovery(ServerContext serverContext) {
     var username = serverContext.login();
-    var usernames = clients.keySet().stream()
-            .filter(client -> !client.equals(username))
-            .map(Username::new)
-            .toArray(Username[]::new);
+    var usernames = clients.keySet().stream().filter(client -> !client.equals(username)).toArray(String[]::new);
     serverContext.queueFrame(new DiscoveryResponse(usernames));
   }
 
@@ -142,9 +143,7 @@ public class Server {
 
   public void request(String codexId, ServerContext serverContext) {
     logger.info("map : " + codexes);
-    var codex = codexes.keySet().stream()
-            .filter(c -> c.id().equals(codexId))
-            .findFirst().orElse(null);
+    var codex = codexes.keySet().stream().filter(c -> c.id().equals(codexId)).findFirst().orElse(null);
     if (codex == null) {
       logger.warning(STR."Codex \{codexId} not found");
       return;
@@ -152,11 +151,27 @@ public class Server {
     serverContext.queueFrame(new RequestResponse(codex));
   }
 
-  public boolean addClient(String login, SocketChannel sc) {
+  public void requestOpenDownload(String codexId, ServerContext serverContext) {
+    var sharersList = codexes.entrySet().stream()
+            .filter(e -> e.getKey().id().equals(codexId))
+            .map(Map.Entry::getValue)
+            .findFirst()
+            .orElseThrow();
+
+    var sharersSocketFieldArray = sharersList.stream()
+            .map(clients::get)
+            .map(SocketInfo::address)
+            .map(address -> new SocketField(address.getAddress().getAddress(), address.getPort()))
+            .toArray(SocketField[]::new);
+
+    serverContext.queueFrame(new RequestOpenDownload(sharersSocketFieldArray));
+  }
+
+  public boolean addClient(String login, SocketChannel sc, InetSocketAddress address) {
     if (clients.containsKey(login)) {
       return false;
     }
-    clients.put(login, sc);
+    clients.put(login, new SocketInfo(sc, address));
     return true;
   }
 
@@ -165,7 +180,7 @@ public class Server {
     clients.remove(login);
     broadcast(new Event((byte) 0, login));
   }
-  
+
   public static void main(String[] args) {
     if (args.length != 1) {
       usage();

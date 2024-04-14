@@ -1,11 +1,13 @@
 package fr.uge.chadow.core.reader;
 
 import fr.uge.chadow.core.protocol.field.Codex;
+import fr.uge.chadow.core.protocol.field.SocketField;
 import fr.uge.chadow.core.protocol.server.DiscoveryResponse;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.RecordComponent;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -44,12 +46,16 @@ public class GlobalReader<T extends Record> implements Reader<T> {
         readerMap.put(Codex.class, new GlobalReader<>(Codex.class));
       } else if (type.isArray()) {
         var componentType = type.getComponentType();
-        if (componentType.equals(DiscoveryResponse.Username.class)) {
-          readerMap.put(DiscoveryResponse.Username.class, new ArrayReader<>(DiscoveryResponse.Username.class));
+        if (componentType.equals(String.class)) {
+          readerMap.put(type, new ArrayReader<>(new StringReader(), String.class));
+        } else if (componentType.equals(byte.class)) {
+          readerMap.put(type, new ArrayByteReader());
         } else if (componentType.equals(Codex.FileInfo.class)) {
-          readerMap.put(Codex.FileInfo.class, new ArrayReader<>(Codex.FileInfo.class));
+          readerMap.put(type, new ArrayReader<>(new GlobalReader<>(Codex.FileInfo.class), Codex.FileInfo.class));
+        } else if (componentType.equals(SocketField.class)) {
+          readerMap.put(type, new ArrayReader<>(new GlobalReader<>(SocketField.class), SocketField.class));
         } else {
-          throw new IllegalArgumentException(STR."Unsupported type: \{type}");
+          throw new IllegalArgumentException(STR."Unsupported array type: \{type}");
         }
       } else {
         throw new IllegalArgumentException(STR."Unsupported type: \{type}");
@@ -63,12 +69,8 @@ public class GlobalReader<T extends Record> implements Reader<T> {
       throw new IllegalStateException();
     }
     while (currentIndex != recordInstanceValues.length) {
-      Reader<?> reader;
-      if (recordComponents[currentIndex].getType().isArray()) {
-        reader = readerMap.get(recordComponents[currentIndex].getType().getComponentType());
-      } else {
-        reader = readerMap.get(recordComponents[currentIndex].getType());
-      }
+      var reader = readerMap.get(recordComponents[currentIndex].getType());
+
       var result = reader.process(bb);
       if (result != ProcessStatus.DONE) {
         return result;
@@ -79,7 +81,8 @@ public class GlobalReader<T extends Record> implements Reader<T> {
     }
     state = State.DONE;
     try {
-      @SuppressWarnings("unchecked") T instance = (T) recordClass.getConstructors()[0].newInstance(recordInstanceValues);
+      @SuppressWarnings("unchecked")
+      T instance = (T) recordClass.getConstructors()[0].newInstance(recordInstanceValues);
       value = instance;
     } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
       throw new IllegalStateException(e);

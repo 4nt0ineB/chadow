@@ -8,33 +8,20 @@ import java.util.Arrays;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-public record DiscoveryResponse(Username[] usernames) implements Frame {
-  public record Username(String username) {
-    public ByteBuffer toByteBuffer() {
-      var bbUsername = UTF_8.encode(username);
-      var bbMsg = ByteBuffer.allocate(bbUsername.remaining() + Integer.BYTES);
-      return bbMsg.putInt(bbUsername.remaining()).put(bbUsername);
-    }
-  }
-
+public record DiscoveryResponse(String[] usernames) implements Frame {
   @Override
   public ByteBuffer toByteBuffer() {
     var usernamesByteBuffersArray = new ByteBuffer[usernames.length];
-    for (int i = 0; i < usernames.length; i++) {
-      usernamesByteBuffersArray[i] = usernames[i].toByteBuffer().flip();
-    }
-
     int bufferCapacity = 0;
-    for (var usernameByteBuffer : usernamesByteBuffersArray) {
-      bufferCapacity += usernameByteBuffer.remaining();
+    for (int i = 0; i < usernames.length; i++) {
+      usernamesByteBuffersArray[i] = UTF_8.encode(usernames[i]);
+      bufferCapacity += Integer.BYTES + usernamesByteBuffersArray[i].remaining();
     }
 
     var bbDiscovery = ByteBuffer.allocate(Byte.BYTES + Integer.BYTES + bufferCapacity);
 
     bbDiscovery.put(Opcode.DISCOVERY_RESPONSE.toByte()).putInt(usernames.length);
-    Arrays.stream(usernamesByteBuffersArray).forEach(usernameByteBuffer -> {
-      bbDiscovery.put(usernameByteBuffer);
-    });
+    Arrays.stream(usernamesByteBuffersArray).forEach(bbUsername -> bbDiscovery.putInt(bbUsername.remaining()).put(bbUsername));
     return bbDiscovery;
   }
 }

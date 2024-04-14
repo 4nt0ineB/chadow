@@ -2,42 +2,42 @@ package fr.uge.chadow.core.reader;
 
 
 import fr.uge.chadow.core.protocol.*;
-import fr.uge.chadow.core.protocol.client.Discovery;
-import fr.uge.chadow.core.protocol.client.Propose;
-import fr.uge.chadow.core.protocol.client.Register;
-import fr.uge.chadow.core.protocol.client.Request;
-import fr.uge.chadow.core.protocol.server.DiscoveryResponse;
-import fr.uge.chadow.core.protocol.server.Event;
-import fr.uge.chadow.core.protocol.server.OK;
-import fr.uge.chadow.core.protocol.server.RequestResponse;
+import fr.uge.chadow.core.protocol.client.*;
+import fr.uge.chadow.core.protocol.server.*;
 
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
 
 public class FrameReader implements Reader<Frame> {
   private static final Logger logger = Logger.getLogger(FrameReader.class.getName());
+
   private enum State {
     DONE, WAITING, ERROR
   }
 
   private final ByteReader byteReader = new ByteReader();
-  private final Map<Opcode, GlobalReader<? extends Frame>> readers = Map.of(
-          Opcode.REGISTER, new GlobalReader<>(Register.class),
-          Opcode.YELL, new GlobalReader<>(YellMessage.class),
-          Opcode.WHISPER, new GlobalReader<>(WhisperMessage.class),
-          Opcode.OK, new GlobalReader<>(OK.class),
-          Opcode.DISCOVERY, new GlobalReader<>(Discovery.class),
-          Opcode.PROPOSE, new GlobalReader<>(Propose.class),
-          Opcode.REQUEST, new GlobalReader<>(Request.class),
-          Opcode.DISCOVERY_RESPONSE, new GlobalReader<>(DiscoveryResponse.class),
-          Opcode.EVENT, new GlobalReader<>(Event.class),
-          Opcode.REQUEST_RESPONSE, new GlobalReader<>(RequestResponse.class)
-  );
+  private final Map<Opcode, GlobalReader<? extends Frame>> readers = new HashMap<>();
 
   private State state = State.WAITING;
   private Opcode opcode;
   private Frame frame;
+
+  public FrameReader() {
+    readers.put(Opcode.REGISTER, new GlobalReader<>(Register.class));
+    readers.put(Opcode.OK, new GlobalReader<>(OK.class));
+    readers.put(Opcode.DISCOVERY, new GlobalReader<>(Discovery.class));
+    readers.put(Opcode.DISCOVERY_RESPONSE, new GlobalReader<>(DiscoveryResponse.class));
+    readers.put(Opcode.EVENT, new GlobalReader<>(Event.class));
+    readers.put(Opcode.YELL, new GlobalReader<>(YellMessage.class));
+    readers.put(Opcode.WHISPER, new GlobalReader<>(WhisperMessage.class));
+    readers.put(Opcode.PROPOSE, new GlobalReader<>(Propose.class));
+    readers.put(Opcode.REQUEST, new GlobalReader<>(Request.class));
+    readers.put(Opcode.REQUEST_RESPONSE, new GlobalReader<>(RequestResponse.class));
+    readers.put(Opcode.REQUEST_DOWNLOAD, new GlobalReader<>(RequestDownload.class));
+    readers.put(Opcode.REQUEST_OPEN_DOWNLOAD_RESPONSE, new GlobalReader<>(RequestOpenDownload.class));
+  }
 
   @Override
   public ProcessStatus process(ByteBuffer bb) {
@@ -55,8 +55,8 @@ public class FrameReader implements Reader<Frame> {
         return ProcessStatus.ERROR;
       }
     }
-  
-    logger.info("Opcode: " + opcode);
+
+    logger.info(STR."Opcode: \{opcode}");
     ProcessStatus frameStatus = readers.get(opcode).process(bb);
     if (frameStatus != ProcessStatus.DONE) {
       return frameStatus;

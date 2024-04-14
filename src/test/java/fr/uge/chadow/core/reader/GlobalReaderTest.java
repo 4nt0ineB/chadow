@@ -4,14 +4,15 @@ import fr.uge.chadow.client.CodexController;
 import fr.uge.chadow.core.protocol.YellMessage;
 import fr.uge.chadow.core.protocol.TestPacket;
 import fr.uge.chadow.core.protocol.client.Propose;
-import fr.uge.chadow.core.protocol.server.DiscoveryResponse;
+import fr.uge.chadow.core.protocol.field.Codex;
+import fr.uge.chadow.core.protocol.field.SocketField;
+import fr.uge.chadow.core.protocol.server.RequestOpenDownload;
 import org.junit.Test;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
-import java.util.logging.Logger;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
@@ -139,7 +140,7 @@ public class GlobalReaderTest {
     }
     assertEquals(new TestPacket(testString, testInt, testLong, testString2), reader.get());
   }
-  
+
   @Test
   public void proposeCodex() {
     var codexController = new CodexController();
@@ -160,5 +161,40 @@ public class GlobalReaderTest {
     bb.compact();
     assertEquals(Reader.ProcessStatus.DONE, reader.process(bb));
     System.out.println(reader.get().codex());
+  }
+
+  @Test
+  public void proposeTest() {
+    var propose = new Propose(new Codex("id", "name", new Codex.FileInfo[]{new Codex.FileInfo("id", "filename", 42, "absolutePath")}));
+    var reader = new GlobalReader<>(Propose.class);
+    var bb = propose.toByteBuffer();
+    bb.flip();
+    bb.get(); // Skip opcode
+    bb.compact();
+    assertEquals(Reader.ProcessStatus.DONE, reader.process(bb));
+    assertEquals(propose.codex().id(), reader.get().codex().id());
+    assertEquals(propose.codex().name(), reader.get().codex().name());
+    assertEquals(propose.codex().files()[0].id(), reader.get().codex().files()[0].id());
+    assertEquals(propose.codex().files()[0].filename(), reader.get().codex().files()[0].filename());
+    assertEquals(propose.codex().files()[0].length(), reader.get().codex().files()[0].length());
+    assertEquals(propose.codex().files()[0].absolutePath(), reader.get().codex().files()[0].absolutePath());
+  }
+
+  @Test
+  public void requestOpenDownloadTest() {
+    var request = new RequestOpenDownload(new SocketField[]{new SocketField(new byte[]{127, 0, 0, 1}, 4242), new SocketField(new byte[]{127, 0, 0, 1}, 4243),});
+    var reader = new GlobalReader<>(RequestOpenDownload.class);
+    var bb = request.toByteBuffer();
+    bb.flip();
+    bb.get(); // Skip opcode
+    bb.compact();
+    assertEquals(Reader.ProcessStatus.DONE, reader.process(bb));
+    for (int i = 0; i < request.sockets().length; i++) {
+      assertEquals(request.sockets()[i].ip()[0], reader.get().sockets()[i].ip()[0]);
+      assertEquals(request.sockets()[i].ip()[1], reader.get().sockets()[i].ip()[1]);
+      assertEquals(request.sockets()[i].ip()[2], reader.get().sockets()[i].ip()[2]);
+      assertEquals(request.sockets()[i].ip()[3], reader.get().sockets()[i].ip()[3]);
+      assertEquals(request.sockets()[i].port(), reader.get().sockets()[i].port());
+    }
   }
 }

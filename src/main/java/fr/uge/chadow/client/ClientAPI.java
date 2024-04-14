@@ -9,7 +9,7 @@ import fr.uge.chadow.core.context.ClientContext;
 import fr.uge.chadow.core.context.DownloaderContext;
 import fr.uge.chadow.core.protocol.client.Propose;
 import fr.uge.chadow.core.protocol.client.Request;
-import fr.uge.chadow.core.protocol.RequestDownload;
+import fr.uge.chadow.core.protocol.client.RequestDownload;
 import fr.uge.chadow.core.protocol.WhisperMessage;
 import fr.uge.chadow.core.protocol.YellMessage;
 import fr.uge.chadow.core.protocol.field.Codex;
@@ -506,12 +506,10 @@ public class ClientAPI {
     addMessage(new YellMessage("<--", STR."\{username} left", System.currentTimeMillis()));
   }
   
-  public void addUserFromDiscovery(List<DiscoveryResponse.Username> usernames) {
+  public void addUserFromDiscovery(List<String> usernames) {
     lock.lock();
     try {
-      for (var username : usernames) {
-        users.add(username.username());
-      }
+      users.addAll(usernames);
     } finally {
       lock.unlock();
     }

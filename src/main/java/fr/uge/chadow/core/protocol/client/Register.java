@@ -7,13 +7,12 @@ import java.nio.ByteBuffer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-public record Register(String username) implements Frame {
+public record Register(String username, int listenerPort) implements Frame {
   @Override
   public ByteBuffer toByteBuffer() {
     var opcode = Opcode.REGISTER.toByte();
     var bbUsername = UTF_8.encode(username);
-    var bbMsg = ByteBuffer.allocate(Byte.BYTES + bbUsername.remaining() + Integer.BYTES);
-    return bbMsg.put(opcode).putInt(bbUsername.remaining()).put(bbUsername);
+    var bbMsg = ByteBuffer.allocate(Byte.BYTES + Integer.BYTES + bbUsername.remaining() + Integer.BYTES);
+    return bbMsg.put(opcode).putInt(bbUsername.remaining()).put(bbUsername).putInt(listenerPort);
   }
-
 }
