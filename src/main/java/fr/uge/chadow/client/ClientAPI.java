@@ -4,19 +4,23 @@ package fr.uge.chadow.client;
 import fr.uge.chadow.core.context.ClientContext;
 import fr.uge.chadow.core.context.DownloaderContext;
 import fr.uge.chadow.core.context.SharerContext;
+import fr.uge.chadow.core.protocol.WhisperMessage;
+import fr.uge.chadow.core.protocol.YellMessage;
 import fr.uge.chadow.core.protocol.client.Propose;
 import fr.uge.chadow.core.protocol.client.Request;
 import fr.uge.chadow.core.protocol.client.RequestDownload;
-import fr.uge.chadow.core.protocol.WhisperMessage;
-import fr.uge.chadow.core.protocol.YellMessage;
 import fr.uge.chadow.core.protocol.field.Codex;
+import fr.uge.chadow.core.protocol.field.SocketField;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
@@ -39,6 +43,8 @@ public class ClientAPI {
   private final HashMap<UUID, DirectMessages> directMessages = new HashMap<>();
   private final SortedSet<String> users = new TreeSet<>();
   private final ArrayBlockingQueue<Optional<Codex>> requestCodexResponseQueue = new ArrayBlockingQueue<>(1);
+  
+  private final LinkedBlockingQueue<SocketField[]> sharersSocketQueue = new LinkedBlockingQueue<>();
   private final ArrayDeque<String> codexIdOfAskedDownload = new ArrayDeque<>();
   
   private final ReentrantLock lock = new ReentrantLock();
@@ -62,16 +68,31 @@ public class ClientAPI {
     }
   }
   
+  /**
+   * Create a splash screen logo with a list of messages
+   * showing le title "Chadow" in ascii art and the version
+   */
+  public static List<YellMessage> splashLogo() {
+    return List.of(
+        new YellMessage("", "┏┓┓    ┓", 0),
+        new YellMessage("", "┃ ┣┓┏┓┏┫┏┓┓┏┏", 0),
+        new YellMessage("", "┗┛┗┗┗┗┗┗┗┛┗┛┛ v1.0.0 - Bastos & Sebbah", 0)
+    );
+  }
+  
   public void startService() throws InterruptedException, IOException {
     // Starts the client thread
     startClient();
     
     // make a loop to manage downloads
-    while(!Thread.interrupted()) {
-      var codexes = requestCodexResponseQueue.poll(1, java.util.concurrent.TimeUnit.SECONDS);
-      if(codexes != null && codexes.isPresent()){
+    while (!Thread.interrupted()) {
+      var sockets = sharersSocketQueue.poll(1, java.util.concurrent.TimeUnit.SECONDS);
+      if (sockets != null) {
         var codexId = codexIdOfAskedDownload.pollFirst();
-        //createDownloaders(codexes);
+        // create downloader for each sharer
+        for(var socket: sockets) {
+          addDownloaderContext(codexId, socket);
+        }
       }
     }
   }
@@ -108,25 +129,24 @@ public class ClientAPI {
   
   /**
    * Create the contexts that will download the codex
-   *
    */
-  private void createDownloaders(String codexId) {
-    codexController.getCodexStatus(codexId).ifPresent(codexStatus -> {
-      var downloaderContext = new DownloaderContext(null, this, codexStatus);
-      contextHandler.supplyConnectionData(key -> new ContextHandler.ConnectionData(downloaderContext, serverAddress));
+  private void addDownloaderContext(String codexId, SocketField socket) {
+    var codexStatus = codexController.getCodexStatus(codexId);
+    if(codexStatus.isEmpty()) {
+      return;
+    }
+    InetAddress address = null;
+    try {
+      address = InetAddress.getByAddress(socket.ip());
+    } catch (UnknownHostException e) {
+      logger.warning("Could not resolve the address of the sharer");
+      return;
+    }
+    var add = new InetSocketAddress(address, socket.port());
+    contextHandler.supplyConnectionData(key -> {
+      var context = new DownloaderContext(key, this, codexStatus.orElseThrow());
+      return new ContextHandler.ConnectionData(context, add);
     });
-  }
-  
-  /**
-   * Create a splash screen logo with a list of messages
-   * showing le title "Chadow" in ascii art and the version
-   */
-  public static List<YellMessage> splashLogo() {
-    return List.of(
-        new YellMessage("", "┏┓┓    ┓", 0),
-        new YellMessage("", "┃ ┣┓┏┓┏┫┏┓┓┏┏", 0),
-        new YellMessage("", "┗┛┗┗┗┗┗┗┗┛┗┛┛ v1.0.0 - Bastos & Sebbah", 0)
-    );
   }
   
   public void close() {
@@ -204,13 +224,19 @@ public class ClientAPI {
     }
   }
   
+  /**
+   * Wait for the connection to be established and the client to be ready
+   * to interact with the server.
+   *
+   * @throws InterruptedException if the client could not connect to the server
+   */
   public void waitForConnection() throws InterruptedException {
     lock.lock();
     try {
       while (status.equals(STATUS.CONNECTING)) {
         connectionCondition.await();
       }
-      if(status.equals(STATUS.CLOSED)){
+      if (status.equals(STATUS.CLOSED)) {
         throw new InterruptedException("Could not connect to the server");
       }
     } finally {
@@ -258,11 +284,12 @@ public class ClientAPI {
   
   
   public void propose(String id) {
-    codexController.getCodexStatus(id).ifPresent(codexStatus -> {
-      var codex = codexStatus.codex();
-      logger.info(STR."(propose) codex \{codex.name()} (id: \{codex.id()}) queued");
-      clientContext.queueFrame(new Propose(codex));
-    });
+    codexController.getCodexStatus(id)
+                   .ifPresent(codexStatus -> {
+                     var codex = codexStatus.codex();
+                     logger.info(STR."(propose) codex \{codex.name()} (id: \{codex.id()}) queued");
+                     clientContext.queueFrame(new Propose(codex));
+                   });
   }
   
   public List<String> users() {
@@ -296,7 +323,7 @@ public class ClientAPI {
     clientContext.queueFrame(new Request(id));
     logger.info(STR."(getCodex) requesting codex (id: \{id})");
     var fetchedCodex = requestCodexResponseQueue.poll(5, java.util.concurrent.TimeUnit.SECONDS);
-    if(fetchedCodex.isEmpty()){
+    if (fetchedCodex == null || fetchedCodex.isEmpty()) {
       return Optional.empty();
     }
     return Optional.of(codexController.fromFetchedCodex(fetchedCodex.orElseThrow(), "/tmp"));
@@ -323,7 +350,7 @@ public class ClientAPI {
     }
     var recipientUsername = dm.orElseThrow()
                               .username();
-    if(!users.contains(recipientUsername)) {
+    if (!users.contains(recipientUsername)) {
       logger.warning(STR."(whisper) whispering to \{recipientUsername}, but this user is not connected");
       return;
     }
@@ -371,7 +398,7 @@ public class ClientAPI {
           r.addMessage(new WhisperMessage("(info)", STR."This is the beginning of your direct message history with \{username}", System.currentTimeMillis()));
         }
       });
-      if(recipient.isEmpty()){
+      if (recipient.isEmpty()) {
         var dm = DirectMessages.create(username);
         directMessages.put(dm.id(), dm);
         return Optional.of(dm);
@@ -393,16 +420,25 @@ public class ClientAPI {
   }
   
   public void stopDownloading(String id) {
-    codexController.stopDownloading(id);
-    // clientContext.queueFrame(new Cancel(id));
+    lock.lock();
+    try {
+      codexController.stopDownloading(id);
+      // clientContext.queueFrame(new Cancel(id));
+    } finally {
+      lock.unlock();
+    }
   }
   
   public void download(String id) {
-    codexController.download(id);
-    clientContext.queueFrame(new RequestDownload(id, (byte) 0));
-    codexIdOfAskedDownload.addLast(id);
+    lock.lock();
+    try {
+      codexController.download(id);
+      clientContext.queueFrame(new RequestDownload(id, (byte) 0));
+      codexIdOfAskedDownload.addLast(id);
+    } finally {
+      lock.unlock();
+    }
   }
-  
   
   public void addIncomingDM(WhisperMessage msg) {
     var dm = getDirectMessagesOf(msg.username());
@@ -413,34 +449,7 @@ public class ClientAPI {
       var newDM = DirectMessages.create(msg.username());
       directMessages.put(newDM.id(), newDM);
     });
-    logger.info(STR."\{msg.username()} is whispering a message of length \{msg.txt()
-                                                                              .length()}");
-  }
-  
-  
-  
-  private void fillWithFakeData() throws IOException, NoSuchAlgorithmException {
-    //var users = new String[]{"test", "Morpheus", "Trinity", "Neo", "Flynn", "Alan", "Lora", "Gandalf", "Bilbo", "SKIDROW", "Antoine"};
-    //this.users.addAll(Arrays.asList(users));
-    var messages = new YellMessage[]{
-        new YellMessage("test", "test", System.currentTimeMillis()),
-        new YellMessage("test", "hello how are you", System.currentTimeMillis()),
-        new YellMessage("Morpheus", "Wake up, Neo...", System.currentTimeMillis()),
-        new YellMessage("Morpheus", "The Matrix has you...", System.currentTimeMillis()),
-        new YellMessage("Neo", "what the hell is this", System.currentTimeMillis()),
-        new YellMessage("Alan1", "Master CONTROL PROGRAM\nRELEASE TRON JA 307020...\nI HAVE PRIORITY ACCESS 7", System.currentTimeMillis()),
-        new YellMessage("SKIDROW", "Here is the codex of the FOSS (.deb) : cdx:1eb49a28a0c02b47eed4d0b968bb9aec116a5a47", System.currentTimeMillis()),
-        new YellMessage("Antoine", "Le lien vers le sujet : http://igm.univ-mlv.fr/coursprogreseau/tds/projet2024.html", System.currentTimeMillis())
-    };
-    this.publicMessages.addAll(splashLogo());
-    this.publicMessages.addAll(Arrays.asList(messages));
-    //var userId = UUID.randomUUID();
-    //this.directMessages.put(userId, new DirectMessages(userId, "Alan1"));
-    // test codex
-    if(login.equals("Alan1")) {
-      codexController.createFromPath("my codex", "/home/alan1/Pictures");
-    }
-    
+    logger.info(STR."\{msg.username()} is whispering a message of length \{msg.txt().length()}");
   }
   
   public int numberOfMessages() {
@@ -470,8 +479,13 @@ public class ClientAPI {
   }
   
   public void stopSharing(String codexId) {
-    codexController.stopSharing(codexId);
-    // clientContext.queueFrame(new Cancel(codexId)); @Todo
+    lock.lock();
+    try {
+      codexController.stopSharing(codexId);
+      // clientContext.queueFrame(new Cancel(codexId)); @Todo
+    } finally {
+      lock.unlock();
+    }
   }
   
   public void share(String codexId) {
@@ -490,16 +504,21 @@ public class ClientAPI {
   }
   
   public void removeUser(String username) {
-    users.remove(username);
-    getDirectMessagesOf(username)
-        .ifPresent(dm -> {
-          var random = new Random();
-          var newUsername = STR."\{dm.username()}[\{random.nextInt(1000)}]";
-          dm.changeUsername(newUsername);
-          dm.addMessage(new WhisperMessage("<--", STR."User \{username} left", System.currentTimeMillis()));
-          dm.addMessage(new WhisperMessage("<--", STR."\{username} renamed as \{newUsername}", System.currentTimeMillis()));
-        });
-    addMessage(new YellMessage("<--", STR."\{username} left", System.currentTimeMillis()));
+    lock.lock();
+    try {
+      users.remove(username);
+      getDirectMessagesOf(username)
+          .ifPresent(dm -> {
+            var random = new Random();
+            var newUsername = STR."\{dm.username()}[\{random.nextInt(1000)}]";
+            dm.changeUsername(newUsername);
+            dm.addMessage(new WhisperMessage("<--", STR."User \{username} left", System.currentTimeMillis()));
+            dm.addMessage(new WhisperMessage("<--", STR."\{username} renamed as \{newUsername}", System.currentTimeMillis()));
+          });
+      addMessage(new YellMessage("<--", STR."\{username} left", System.currentTimeMillis()));
+    } finally {
+      lock.unlock();
+    }
   }
   
   public void addUserFromDiscovery(List<String> usernames) {
@@ -515,11 +534,36 @@ public class ClientAPI {
     return contextHandler.listeningPort();
   }
   
+  public void addSocketsOpenDownload(SocketField[] sockets) {
+    sharersSocketQueue.add(sockets);
+  }
+  
   enum STATUS {
     CONNECTING,
     CONNECTED,
     CLOSED,
   }
   
-  
+  private void fillWithFakeData() throws IOException, NoSuchAlgorithmException {
+    //var users = new String[]{"test", "Morpheus", "Trinity", "Neo", "Flynn", "Alan", "Lora", "Gandalf", "Bilbo", "SKIDROW", "Antoine"};
+    //this.users.addAll(Arrays.asList(users));
+    var messages = new YellMessage[]{
+        new YellMessage("test", "test", System.currentTimeMillis()),
+        new YellMessage("test", "hello how are you", System.currentTimeMillis()),
+        new YellMessage("Morpheus", "Wake up, Neo...", System.currentTimeMillis()),
+        new YellMessage("Morpheus", "The Matrix has you...", System.currentTimeMillis()),
+        new YellMessage("Neo", "what the hell is this", System.currentTimeMillis()),
+        new YellMessage("Alan1", "Master CONTROL PROGRAM\nRELEASE TRON JA 307020...\nI HAVE PRIORITY ACCESS 7", System.currentTimeMillis()),
+        new YellMessage("SKIDROW", "Here is the codex of the FOSS (.deb) : cdx:1eb49a28a0c02b47eed4d0b968bb9aec116a5a47", System.currentTimeMillis()),
+        new YellMessage("Antoine", "Le lien vers le sujet : http://igm.univ-mlv.fr/coursprogreseau/tds/projet2024.html", System.currentTimeMillis())
+    };
+    this.publicMessages.addAll(splashLogo());
+    this.publicMessages.addAll(Arrays.asList(messages));
+    //var userId = UUID.randomUUID();
+    //this.directMessages.put(userId, new DirectMessages(userId, "Alan1"));
+    // test codex
+    if (login.equals("Alan1")) {
+      codexController.createFromPath("my codex", "/home/alan1/Pictures");
+    }
+  }
 }

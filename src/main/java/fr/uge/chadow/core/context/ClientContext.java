@@ -5,13 +5,9 @@ import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.core.protocol.*;
 import fr.uge.chadow.core.protocol.client.Discovery;
 import fr.uge.chadow.core.protocol.client.Register;
-import fr.uge.chadow.core.protocol.server.DiscoveryResponse;
-import fr.uge.chadow.core.protocol.server.Event;
-import fr.uge.chadow.core.protocol.server.OK;
-import fr.uge.chadow.core.protocol.server.RequestResponse;
+import fr.uge.chadow.core.protocol.server.*;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.util.List;
 import java.util.logging.Logger;
@@ -47,6 +43,10 @@ public final class ClientContext extends Context {
         logger.info(STR."Received discovery response (\{discoveryResponse.usernames().length} users)");
         api.addUserFromDiscovery(List.of(discoveryResponse.usernames()));
       }
+      case RequestOpenDownload requestOpenDownload -> {
+        logger.info(STR."Received request open download  \{requestOpenDownload.sockets().length} sockets");
+        api.addSocketsOpenDownload(requestOpenDownload.sockets());
+      }
       case Event event -> {
         if(event.code() == (byte) 0) {
           logger.info("Received event 0");
@@ -64,13 +64,12 @@ public final class ClientContext extends Context {
   }
   
   @Override
-  public void doConnect() throws IOException {
+  public void doConnect() {
     try {
       super.doConnect();
     } catch (IOException e) {
       api.close();
     }
-    var add = (InetSocketAddress) getSocket().getLocalAddress();
     super.addFrame(new Register(api.login(), api.listeningPort()));
     getKey().interestOps(SelectionKey.OP_WRITE);
     super.processOut();

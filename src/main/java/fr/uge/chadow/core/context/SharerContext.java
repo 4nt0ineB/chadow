@@ -6,11 +6,13 @@ import fr.uge.chadow.core.protocol.Frame;
 
 import java.io.IOException;
 import java.nio.channels.SelectionKey;
+import java.util.logging.Logger;
 
 /**
  * Context for when the app is sharing files to another client
  */
 public final class SharerContext extends Context {
+  private static final Logger logger = Logger.getLogger(SharerContext.class.getName());
   private static final int BUFFER_SIZE = 1024;
   private final ClientAPI api;
   
@@ -31,5 +33,11 @@ public final class SharerContext extends Context {
         CANCEL,
         etc...
      */
+  }
+  
+  @Override
+  public void doConnect() throws IOException {
+    super.doConnect();
+    logger.info("Received connection from a client");
   }
 }
