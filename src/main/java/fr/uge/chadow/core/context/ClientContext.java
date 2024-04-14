@@ -1,6 +1,5 @@
 package fr.uge.chadow.core.context;
 
-import fr.uge.chadow.client.ContextHandler;
 import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.core.protocol.*;
 import fr.uge.chadow.core.protocol.client.Discovery;

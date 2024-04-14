@@ -20,7 +20,7 @@ public class Main {
       usage();
       return;
     }
-    new Server(Integer.parseInt(args[1])).launch();
+    new Server(Integer.parseInt(args[1])).start();
   }
   
   private static void client(String[] args) throws IOException, InterruptedException {

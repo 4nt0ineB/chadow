@@ -1,7 +1,6 @@
-package fr.uge.chadow.client;
+package fr.uge.chadow.core.context;
 
-import fr.uge.chadow.core.context.Context;
-import fr.uge.chadow.core.context.ServerContext;
+import fr.uge.chadow.core.protocol.Frame;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -23,11 +22,11 @@ public class ContextHandler {
   private final ServerSocketChannel serverSocketChannel;
   private final Function<SelectionKey, Context> sharerContextFactory;
   
-  public ContextHandler(Function<SelectionKey, Context> sharerContextFactory) throws IOException {
+  public ContextHandler(Function<SelectionKey, Context> sharerContextFactory, int serverPort) throws IOException {
     this.selector = Selector.open();
     this.serverSocketChannel = ServerSocketChannel.open();
-    this.serverSocketChannel.bind(new InetSocketAddress(0));
-    logger.info("Port opened: " + serverSocketChannel.socket().getLocalPort());
+    this.serverSocketChannel.bind(new InetSocketAddress(serverPort));
+    logger.info(STR."Port opened: \{serverSocketChannel.socket().getLocalPort()}");
     this.sharerContextFactory = sharerContextFactory;
   }
   
@@ -94,6 +93,7 @@ public class ContextHandler {
       return;
     }
     sc.configureBlocking(false);
+    logger.info(STR."Connection accepted from: \{sc.getRemoteAddress()}");
     var sckey = sc.register(selector, SelectionKey.OP_READ);
     sckey.attach(sharerContextFactory.apply(sckey));
   }
@@ -101,4 +101,20 @@ public class ContextHandler {
   public int listeningPort() {
     return serverSocketChannel.socket().getLocalPort();
   }
+  
+  /**
+   * Broadcast a frame to all contexts
+   *
+   * @param frame the frame to broadcast
+   */
+  public void broadcast(Frame frame) {
+    for (var key : selector.keys()) {
+      var session = ((Context) key.attachment());
+      if (session != null) {
+        session.queueFrame(frame);
+        logger.info(STR."Broadcasting frame \{frame}");
+      }
+    }
+  }
+  
 }

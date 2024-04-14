@@ -37,7 +37,7 @@ public final class ServerContext extends Context {
         var remoteInetSocketAddress = (InetSocketAddress) super.getSocket().getRemoteAddress();
         var listeningAddress = new InetSocketAddress(remoteInetSocketAddress.getAddress(), register.listenerPort());
 
-        if (!server.addClient(login, super.getSocket(), listeningAddress)) {
+        if (!server.addClient(login, super.getSocket(), listeningAddress, this)) {
           logger.warning(STR."Login \{login} already in use");
           silentlyClose();
           return;
@@ -124,7 +124,13 @@ public final class ServerContext extends Context {
   private boolean isAuthenticated() {
     return login != null;
   }
-
+  
+  @Override
+  public void doConnect() throws IOException {
+    super.doConnect();
+    logger.info(STR."client is connecting");
+  }
+  
   @Override
   public void silentlyClose() {
     server.removeClient(login);

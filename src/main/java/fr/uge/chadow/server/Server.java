@@ -1,16 +1,16 @@
 package fr.uge.chadow.server;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import fr.uge.chadow.core.context.ClientContext;
+import fr.uge.chadow.core.context.ContextHandler;
 import fr.uge.chadow.core.context.ServerContext;
 import fr.uge.chadow.core.protocol.Frame;
 import fr.uge.chadow.core.protocol.WhisperMessage;
@@ -22,80 +22,32 @@ import fr.uge.chadow.core.protocol.server.RequestOpenDownload;
 import fr.uge.chadow.core.protocol.server.RequestResponse;
 
 public class Server {
-  public record SocketInfo(SocketChannel socketChannel, InetSocketAddress address) {
+  public record SocketInfo(SocketChannel socketChannel, InetSocketAddress address, ServerContext serverContext){
   }
 
   private static final Logger logger = Logger.getLogger(Server.class.getName());
-
-  private final ServerSocketChannel serverSocketChannel;
-  private final Selector selector;
+  private final ContextHandler contextHandler;
   private final Map<String, SocketInfo> clients = new HashMap<>();
   private final Map<Codex, List<String>> codexes = new HashMap<>(); // codex -> list of usernames
 
   public Server(int port) throws IOException {
-    serverSocketChannel = ServerSocketChannel.open();
-    serverSocketChannel.bind(new InetSocketAddress(port));
-    selector = Selector.open();
+    this.contextHandler = new ContextHandler(key -> new ServerContext(this, key), port);
   }
 
-  public void launch() throws IOException {
-    serverSocketChannel.configureBlocking(false);
-    serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
-    while (!Thread.interrupted()) {
-      //Helpers.printKeys(selector); // for debug
-      System.out.println("Starting select");
-      try {
-        selector.select(this::treatKey);
-      } catch (UncheckedIOException tunneled) {
-        throw tunneled.getCause();
-      }
-      System.out.println("Select finished");
-    }
+  public void start() throws IOException {
+    logger.info("STARTS");
+    
+    Thread.ofPlatform()
+          .start(() -> {
+            try {
+              logger.info("Client starts");
+              contextHandler.launch();
+            } catch (IOException e) {
+              logger.severe(STR."The client was interrupted. \{e.getMessage()}");
+            }
+          });
   }
-
-  private void treatKey(SelectionKey key) {
-    // Helpers.printSelectedKey(key); // for debug
-    try {
-      if (key.isValid() && key.isAcceptable()) {
-        doAccept(key);
-      }
-    } catch (IOException ioe) {
-      // lambda call in select requires to tunnel IOException
-      throw new UncheckedIOException(ioe);
-    }
-    try {
-      if (key.isValid() && key.isWritable()) {
-        ((ServerContext) key.attachment()).doWrite();
-      }
-      if (key.isValid() && key.isReadable()) {
-        ((ServerContext) key.attachment()).doRead();
-      }
-    } catch (IOException e) {
-      logger.log(Level.INFO, "Connection closed with client due to IOException", e);
-      silentlyClose(key);
-    }
-  }
-
-  private void doAccept(SelectionKey key) throws IOException {
-    var sc = serverSocketChannel.accept();
-    if (sc == null) {
-      logger.warning("selector gave wrong hint for accept");
-      return;
-    }
-    sc.configureBlocking(false);
-    var sckey = sc.register(selector, SelectionKey.OP_READ);
-    sckey.attach(new ServerContext(this, sckey));
-  }
-
-  private void silentlyClose(SelectionKey key) {
-    Channel sc = (Channel) key.channel();
-    try {
-      sc.close();
-    } catch (IOException e) {
-      // ignore exception
-    }
-  }
-
+  
   /**
    * Get the server context associated with the given username
    *
@@ -103,8 +55,7 @@ public class Server {
    * @return the server context associated with the given username
    */
   private ServerContext getServerContext(String username) {
-    var sc = clients.get(username).socketChannel;
-    return (ServerContext) sc.keyFor(selector).attachment();
+    return clients.get(username).serverContext;
   }
 
   public void discovery(ServerContext serverContext) {
@@ -112,20 +63,9 @@ public class Server {
     var usernames = clients.keySet().stream().filter(client -> !client.equals(username)).toArray(String[]::new);
     serverContext.queueFrame(new DiscoveryResponse(usernames));
   }
-
-  /**
-   * Broadcast a frame to all connected clients
-   *
-   * @param frame the frame to broadcast
-   */
+  
   public void broadcast(Frame frame) {
-    for (var key : selector.keys()) {
-      var session = ((ServerContext) key.attachment());
-      if (session != null) {
-        session.queueFrame(frame);
-        logger.info(STR."Broadcasting frame \{frame}");
-      }
-    }
+    contextHandler.broadcast(frame);
   }
 
   public void whisper(WhisperMessage message, String username_sender) {
@@ -137,12 +77,12 @@ public class Server {
 
   public void propose(Codex codex, String username) {
     var clientCodexes = codexes.computeIfAbsent(codex, k -> new ArrayList<>());
-    logger.info("Proposing: " + codex);
+    logger.info(STR."Proposing: \{codex}");
     clientCodexes.add(username);
   }
 
   public void request(String codexId, ServerContext serverContext) {
-    logger.info("map : " + codexes);
+    logger.info(STR."map : \{codexes}");
     var codex = codexes.keySet().stream().filter(c -> c.id().equals(codexId)).findFirst().orElse(null);
     if (codex == null) {
       logger.warning(STR."Codex \{codexId} not found");
@@ -167,11 +107,11 @@ public class Server {
     serverContext.queueFrame(new RequestOpenDownload(sharersSocketFieldArray));
   }
 
-  public boolean addClient(String login, SocketChannel sc, InetSocketAddress address) {
+  public boolean addClient(String login, SocketChannel sc, InetSocketAddress address, ServerContext serverContext) {
     if (clients.containsKey(login)) {
       return false;
     }
-    clients.put(login, new SocketInfo(sc, address));
+    clients.put(login, new SocketInfo(sc, address, serverContext));
     return true;
   }
 
@@ -187,7 +127,7 @@ public class Server {
       return;
     }
     try {
-      new Server(Integer.parseInt(args[0])).launch();
+      new Server(Integer.parseInt(args[0])).start();
     } catch (IOException e) {
       logger.severe(STR."Error while launching server: \{e.getMessage()}");
     }
@@ -196,4 +136,6 @@ public class Server {
   private static void usage() {
     System.out.println("Usage : ServerSumBetter port");
   }
+  
+  
 }

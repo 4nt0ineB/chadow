@@ -2,6 +2,7 @@ package fr.uge.chadow.client;
 
 
 import fr.uge.chadow.core.context.ClientContext;
+import fr.uge.chadow.core.context.ContextHandler;
 import fr.uge.chadow.core.context.DownloaderContext;
 import fr.uge.chadow.core.context.SharerContext;
 import fr.uge.chadow.core.protocol.WhisperMessage;
@@ -57,7 +58,7 @@ public class ClientAPI {
     Objects.requireNonNull(login);
     this.login = login;
     this.serverAddress = serverAddress;
-    this.contextHandler = new ContextHandler(key -> new SharerContext(key, this));
+    this.contextHandler = new ContextHandler(key -> new SharerContext(key, this), 0);
     try {
       fillWithFakeData();
     } catch (IOException e) {
