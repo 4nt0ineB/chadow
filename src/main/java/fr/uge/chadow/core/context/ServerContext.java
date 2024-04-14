@@ -7,7 +7,6 @@ import fr.uge.chadow.core.protocol.server.OK;
 import fr.uge.chadow.server.Server;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.util.logging.Logger;
@@ -35,10 +34,10 @@ public final class ServerContext extends Context {
         }
 
         login = register.username();
-        var socketField = register.socketField();
-        var address = new InetSocketAddress(InetAddress.getByAddress(socketField.ip()), socketField.port());
+        var remoteInetSocketAddress = (InetSocketAddress) super.getSocket().getRemoteAddress();
+        var listeningAddress = new InetSocketAddress(remoteInetSocketAddress.getAddress(), register.listenerPort());
 
-        if (!server.addClient(login, super.getSocket(), address)) {
+        if (!server.addClient(login, super.getSocket(), listeningAddress)) {
           logger.warning(STR."Login \{login} already in use");
           silentlyClose();
           return;
