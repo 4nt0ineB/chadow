@@ -13,7 +13,7 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
 import java.util.logging.Logger;
 
-public sealed abstract class Context permits ClientContext, ServerContext {
+public sealed abstract class Context permits ClientContext, DownloaderContext, ServerContext {
   
   private static final Logger logger = Logger.getLogger(Context.class.getName());
   private final ArrayDeque<Frame> queue = new ArrayDeque<>();
@@ -75,7 +75,6 @@ public sealed abstract class Context permits ClientContext, ServerContext {
   private void processCurrentOpcodeActionImpl() throws IOException {
     processCurrentOpcodeAction(frameReader.get());
   }
-  
   
   public void queueFrame(Frame frame) {
     queue.addFirst(frame);

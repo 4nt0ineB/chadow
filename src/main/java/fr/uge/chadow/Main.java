@@ -1,6 +1,7 @@
 package fr.uge.chadow;
 
-import fr.uge.chadow.client.ClientController;
+import fr.uge.chadow.client.ClientAPI;
+import fr.uge.chadow.client.ClientConsoleController;
 import fr.uge.chadow.server.Server;
 
 import java.io.IOException;
@@ -37,7 +38,9 @@ public class Main {
       usage();
       return;
     }
-    new ClientController(args[0], socket, lines, cols).start();
+    var login = args[0];
+    var api = new ClientAPI(login, socket);
+    new ClientConsoleController(lines, cols, api).start();
   }
   
   public static void main(String[] args) throws IOException, InterruptedException {

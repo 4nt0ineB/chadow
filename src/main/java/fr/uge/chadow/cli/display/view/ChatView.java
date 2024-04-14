@@ -4,7 +4,7 @@ import fr.uge.chadow.cli.CLIColor;
 import fr.uge.chadow.cli.display.Scroller;
 import fr.uge.chadow.cli.display.View;
 import fr.uge.chadow.client.ClientAPI;
-import fr.uge.chadow.client.ClientController;
+import fr.uge.chadow.client.ClientConsoleController;
 import fr.uge.chadow.core.protocol.YellMessage;
 
 import java.io.IOException;
@@ -26,7 +26,7 @@ public class ChatView implements View {
   private final ReentrantLock lock = new ReentrantLock();
   private int lines;
   private int cols;
-  private ClientController.Mode mode = ClientController.Mode.CHAT_LIVE_REFRESH;
+  private ClientConsoleController.Mode mode = ClientConsoleController.Mode.CHAT_LIVE_REFRESH;
   
   public ChatView(int lines, int cols, ClientAPI controller) {
     Objects.requireNonNull(controller);
@@ -72,7 +72,7 @@ public class ChatView implements View {
     clear();
     System.out.print(chatHeader());
     System.out.print(chatDisplay());
-    if (mode == ClientController.Mode.CHAT_LIVE_REFRESH) {
+    if (mode == ClientConsoleController.Mode.CHAT_LIVE_REFRESH) {
       messageScroller.setLines(clientAPI.numberOfMessages());
     }
   }
@@ -202,7 +202,7 @@ public class ChatView implements View {
     if (messages.size() <= View.maxLinesView(lines)) {
       return messages;
     }
-    if (mode == ClientController.Mode.CHAT_LIVE_REFRESH) {
+    if (mode == ClientConsoleController.Mode.CHAT_LIVE_REFRESH) {
       return messages.subList(Math.max(0, messages.size() - View.maxLinesView(lines)), messages.size());
     }
     return messages.subList(messageScroller.getA(), messageScroller.getB());
@@ -214,7 +214,7 @@ public class ChatView implements View {
     if (users.size() <= View.maxLinesView(lines)) {
       return new ArrayList<>(users);
     }
-    if (mode == ClientController.Mode.CHAT_LIVE_REFRESH) {
+    if (mode == ClientConsoleController.Mode.CHAT_LIVE_REFRESH) {
       return users.stream()
                   .toList();
     }
@@ -245,11 +245,11 @@ public class ChatView implements View {
     
   }
   
-  public ClientController.Mode getMode() {
+  public ClientConsoleController.Mode getMode() {
     return mode;
   }
   
-  public void setMode(ClientController.Mode mode) {
+  public void setMode(ClientConsoleController.Mode mode) {
     this.mode = mode;
   }
   

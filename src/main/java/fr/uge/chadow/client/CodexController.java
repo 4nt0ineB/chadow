@@ -12,6 +12,8 @@ import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Logger;
 
 public class CodexController {
@@ -26,8 +28,8 @@ public class CodexController {
     return existing == null ? codexStatus : existing;
   }
   
-  public CodexStatus getCodexStatus(String id) {
-    return codexes.get(id);
+  public Optional<CodexStatus> getCodexStatus(String id) {
+    return Optional.ofNullable(codexes.get(id));
   }
   
   public boolean isComplete(String id) {
@@ -204,6 +206,7 @@ public class CodexController {
     }
     
     public boolean isComplete() {
+      
       return chunks.values().stream().allMatch(bitSet -> bitSet.cardinality() == bitSet.size());
     }
     

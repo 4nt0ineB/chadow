@@ -1,7 +1,12 @@
 package fr.uge.chadow.client;
 
 
+import fr.uge.chadow.cli.InputReader;
+import fr.uge.chadow.cli.display.Display;
+import fr.uge.chadow.cli.display.InfoBar;
+import fr.uge.chadow.cli.display.view.CantConnectScreenView;
 import fr.uge.chadow.core.context.ClientContext;
+import fr.uge.chadow.core.context.DownloaderContext;
 import fr.uge.chadow.core.protocol.client.Propose;
 import fr.uge.chadow.core.protocol.client.Request;
 import fr.uge.chadow.core.protocol.RequestDownload;
@@ -11,6 +16,8 @@ import fr.uge.chadow.core.protocol.field.Codex;
 import fr.uge.chadow.core.protocol.server.DiscoveryResponse;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.InetSocketAddress;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -28,20 +35,27 @@ public class ClientAPI {
   
   
   private static final Logger logger = Logger.getLogger(ClientAPI.class.getName());
+  private final ClientContextHandler contextHandler;
+  private final InetSocketAddress serverAddress;
   private final String login;
   private final CodexController codexController = new CodexController();
   private final ArrayList<YellMessage> publicMessages = new ArrayList<>();
   private final HashMap<UUID, DirectMessages> directMessages = new HashMap<>();
   private final SortedSet<String> users = new TreeSet<>();
   private final ArrayBlockingQueue<Optional<Codex>> requestCodexResponseQueue = new ArrayBlockingQueue<>(1);
+  private final ArrayDeque<String> codexIdOfAskedDownload = new ArrayDeque<>();
+  
   private final ReentrantLock lock = new ReentrantLock();
   private final Condition connectionCondition = lock.newCondition();
   private ClientContext clientContext;
   private STATUS status = STATUS.CONNECTING;
   
-  public ClientAPI(String login) {
+  
+  public ClientAPI(String login, InetSocketAddress serverAddress) throws IOException {
     Objects.requireNonNull(login);
     this.login = login;
+    this.serverAddress = serverAddress;
+    this.contextHandler = new ClientContextHandler();
     try {
       fillWithFakeData();
     } catch (IOException e) {
@@ -50,6 +64,61 @@ public class ClientAPI {
       throw new RuntimeException(e);
       // just die
     }
+  }
+  
+  public void startService() throws InterruptedException, IOException {
+    // Starts the client thread
+    startClient();
+    
+    // make a loop to manage downloads
+    while(!Thread.interrupted()) {
+      var codexes = requestCodexResponseQueue.poll(1, java.util.concurrent.TimeUnit.SECONDS);
+      if(codexes.isPresent()){
+        var codexId = codexIdOfAskedDownload.pollFirst();
+        //createDownloaders(codexes);
+      }
+    }
+  }
+  
+  private void startClient() throws InterruptedException, IOException {
+    try {
+      Thread.ofPlatform()
+            .daemon()
+            .start(() -> {
+              try {
+                logger.info("Client starts");
+                contextHandler.supplyConnectionData(key -> new ClientContextHandler.ConnectionData(new ClientContext(key, this), serverAddress));
+                contextHandler.launch();
+              } catch (IOException e) {
+                logger.severe(STR."The client was interrupted. \{e.getMessage()}");
+              }
+            });
+    } catch (UncheckedIOException e) {
+      logger.severe(STR."The client was interrupted while starting.\{e.getCause()}");
+      return;
+    }
+    try {
+      waitForConnection();
+    } catch (InterruptedException e) {
+      logger.severe(STR."The client was interrupted while waiting for connection.\{e.getCause()}");
+      throw e;
+    }
+    if (!isConnected()) {
+      logger.severe("The client was not able to connect to the server.");
+      
+      throw new IOException();
+    }
+  }
+  
+  /**
+   * Create the contexts that will download the codex
+   *
+   */
+  private void createDownloaders(String codexId) {
+    codexController.getCodexStatus(codexId).ifPresent(codexStatus -> {
+      var downloaderContext = new DownloaderContext(null, this, codexStatus);
+      contextHandler.supplyConnectionData(key -> new ClientContextHandler.ConnectionData(downloaderContext, serverAddress));
+    });
   }
   
   /**
@@ -145,6 +214,9 @@ public class ClientAPI {
       while (status.equals(STATUS.CONNECTING)) {
         connectionCondition.await();
       }
+      if(status.equals(STATUS.CLOSED)){
+        throw new InterruptedException("Could not connect to the server");
+      }
     } finally {
       lock.unlock();
     }
@@ -190,10 +262,11 @@ public class ClientAPI {
   
   
   public void propose(String id) {
-    var codex = codexController.getCodexStatus(id)
-                               .codex();
-    logger.info(STR."(propose) codex \{codex.name()} (id: \{codex.id()}) queued");
-    clientContext.queueFrame(new Propose(codex));
+    codexController.getCodexStatus(id).ifPresent(codexStatus -> {
+      var codex = codexStatus.codex();
+      logger.info(STR."(propose) codex \{codex.name()} (id: \{codex.id()}) queued");
+      clientContext.queueFrame(new Propose(codex));
+    });
   }
   
   public List<String> users() {
@@ -219,8 +292,8 @@ public class ClientAPI {
   
   public Optional<CodexController.CodexStatus> getCodex(String id) throws InterruptedException {
     var codex = codexController.getCodexStatus(id);
-    if (codex != null) {
-      return Optional.of(codex);
+    if (codex.isPresent()) {
+      return Optional.of(codex.orElseThrow());
     }
     // didn't find the codex, request it
     requestCodexResponseQueue.clear();
@@ -331,6 +404,7 @@ public class ClientAPI {
   public void download(String id) {
     codexController.download(id);
     clientContext.queueFrame(new RequestDownload(id, (byte) 0));
+    codexIdOfAskedDownload.addLast(id);
   }
   
   

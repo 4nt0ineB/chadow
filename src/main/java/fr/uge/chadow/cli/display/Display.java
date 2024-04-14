@@ -2,18 +2,17 @@ package fr.uge.chadow.cli.display;
 
 import fr.uge.chadow.cli.CLIColor;
 import fr.uge.chadow.client.ClientAPI;
-import fr.uge.chadow.client.ClientController;
+import fr.uge.chadow.client.ClientConsoleController;
 
 import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.logging.Logger;
 
 /**
  * Display class is responsible for drawing the view in the console
  */
 public class Display {
-  private final ClientController controller;
+  private final ClientConsoleController controller;
   private final ClientAPI api;
   private final ReentrantLock lock = new ReentrantLock();
   private final InfoBar infoBar;
@@ -21,7 +20,7 @@ public class Display {
   private int cols;
   private View currentView;
   
-  public Display(int lines, int cols, ClientController  controller, InfoBar infoBar, ClientAPI api) {
+  public Display(int lines, int cols, ClientConsoleController controller, InfoBar infoBar, ClientAPI api) {
     Objects.requireNonNull(controller);
     Objects.requireNonNull(api);
     if (lines <= 0 || cols <= 0) {
