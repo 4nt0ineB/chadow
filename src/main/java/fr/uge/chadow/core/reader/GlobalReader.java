@@ -7,6 +7,7 @@ import fr.uge.chadow.core.protocol.server.DiscoveryResponse;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.RecordComponent;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -48,7 +49,7 @@ public class GlobalReader<T extends Record> implements Reader<T> {
         if (componentType.equals(String.class)) {
           readerMap.put(type, new ArrayReader<>(new StringReader(), String.class));
         } else if (componentType.equals(byte.class)) {
-          readerMap.put(type, new ArrayReader<>(new ByteReader(), Byte.class));
+          readerMap.put(type, new ArrayByteReader());
         } else if (componentType.equals(Codex.FileInfo.class)) {
           readerMap.put(type, new ArrayReader<>(new GlobalReader<>(Codex.FileInfo.class), Codex.FileInfo.class));
         } else if (componentType.equals(SocketField.class)) {
@@ -80,7 +81,8 @@ public class GlobalReader<T extends Record> implements Reader<T> {
     }
     state = State.DONE;
     try {
-      @SuppressWarnings("unchecked") T instance = (T) recordClass.getConstructors()[0].newInstance(recordInstanceValues);
+      @SuppressWarnings("unchecked")
+      T instance = (T) recordClass.getConstructors()[0].newInstance(recordInstanceValues);
       value = instance;
     } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
       throw new IllegalStateException(e);

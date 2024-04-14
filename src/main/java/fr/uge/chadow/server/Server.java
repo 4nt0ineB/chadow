@@ -165,7 +165,7 @@ public class Server {
                 var ipString = inetSocketAddress.getAddress().getHostAddress();
                 var port = inetSocketAddress.getPort();
 
-                return new SocketField(ipString, port);
+                return null;
               } catch (IOException e) {
                 logger.warning(STR."Error while getting remote address of \{sc}");
                 silentlyClose(sc.keyFor(selector));

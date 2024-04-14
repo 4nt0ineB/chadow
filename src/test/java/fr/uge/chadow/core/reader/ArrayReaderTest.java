@@ -1,5 +1,6 @@
 package fr.uge.chadow.core.reader;
 
+import fr.uge.chadow.core.protocol.field.SocketField;
 import fr.uge.chadow.core.protocol.server.DiscoveryResponse;
 import fr.uge.chadow.core.protocol.server.Event;
 import org.junit.Test;
@@ -95,5 +96,31 @@ public class ArrayReaderTest {
     assertEquals(Reader.ProcessStatus.DONE, reader.process(bb));
     var res = reader.get();
     assertEquals(Arrays.stream(events).toList(), Arrays.stream(res).toList());
+  }
+
+  @Test
+  public void simple6() {
+    SocketField[] socketFields = new SocketField[]{new SocketField(new byte[]{127, 0, 0, 1}, 4242)};
+    ByteBuffer[] byteBuffers = new ByteBuffer[socketFields.length];
+    int totalSize = 0;
+    for (int i = 0; i < socketFields.length; i++) {
+      byteBuffers[i] = socketFields[i].toByteBuffer();
+      totalSize += byteBuffers[i].flip().remaining();
+    }
+    ByteBuffer bb = ByteBuffer.allocate(Integer.BYTES + totalSize);
+    bb.putInt(socketFields.length);
+    for (int i = 0; i < socketFields.length; i++) {
+      bb.put(byteBuffers[i]);
+    }
+
+    var reader = new ArrayReader<>(new GlobalReader<>(SocketField.class), SocketField.class);
+    assertEquals(Reader.ProcessStatus.DONE, reader.process(bb));
+    var res = reader.get();
+    for (int i = 0; i < socketFields.length; i++) {
+      for (int j = 0; j < socketFields[i].ip().length; j++) {
+        assertEquals(socketFields[i].ip()[j], res[i].ip()[j]);
+      }
+      assertEquals(socketFields[i].port(), res[i].port());
+    }
   }
 }
