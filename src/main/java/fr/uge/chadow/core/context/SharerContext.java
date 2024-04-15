@@ -39,7 +39,7 @@ public final class SharerContext extends Context {
         wantedCodexId = handshake.codexId();
         if(allowedToShare()) {
           introduced = true;
-          logger.info("Ready to share codex " + wantedCodexId);
+          logger.info(STR."Ready to share codex \{wantedCodexId}");
           clientAddress = (InetSocketAddress) getSocket().getRemoteAddress();
         }else {
           logger.warning("Client wants to download a codex that is not shared");
@@ -56,8 +56,6 @@ public final class SharerContext extends Context {
         try {
           var chunkPayload = api.getChunk(wantedCodexId, needChunk.offset(), needChunk.length());
           queueFrame(new HereChunk(needChunk.offset(), chunkPayload));
-          logger.info(STR."Sent chunk (\{needChunk.offset()},\{chunkPayload.length})");
-          
         } catch (IOException e) {
           logger.warning(e.getMessage());
           silentlyClose();
@@ -71,14 +69,6 @@ public final class SharerContext extends Context {
         silentlyClose();
       }
     }
-    /*
-      switch
-        HANDSHAKE,
-        DENIED,
-        NEEDCHUNK,
-        CANCEL,
-        etc...
-     */
   }
   
   private boolean allowedToShare() {

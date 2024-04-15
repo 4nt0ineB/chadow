@@ -36,7 +36,6 @@ public class ClientAPI {
   
   
   private static final Logger logger = Logger.getLogger(ClientAPI.class.getName());
-  private final ContextHandler contextHandler;
   private final InetSocketAddress serverAddress;
   private final String login;
   private final CodexController codexController = new CodexController();
@@ -50,27 +49,24 @@ public class ClientAPI {
   
   private final ReentrantLock lock = new ReentrantLock();
   private final Condition connectionCondition = lock.newCondition();
+  private ContextHandler contextHandler;
   private ClientContext clientContext;
   private STATUS status = STATUS.CONNECTING;
   
   
-  public ClientAPI(String login, InetSocketAddress serverAddress) throws IOException {
+  public ClientAPI(String login, InetSocketAddress serverAddress) {
     Objects.requireNonNull(login);
     this.login = login;
     this.serverAddress = serverAddress;
-    this.contextHandler = new ContextHandler(0, key -> new SharerContext(key, this));
-    try {
+    /*try {
       fillWithFakeData();
     } catch (IOException e) {
       throw new RuntimeException(e);
     } catch (NoSuchAlgorithmException e) {
       throw new RuntimeException(e);
       // just die
-    }
+    }*/
   }
-  
-  // 33769
-  // 35495
   
   /**
    * Create a splash screen logo with a list of messages
@@ -85,6 +81,7 @@ public class ClientAPI {
   }
   
   public void startService() throws InterruptedException, IOException {
+    this.contextHandler = new ContextHandler(0, key -> new SharerContext(key, this));
     // Starts the client thread
     startClient();
     
@@ -96,8 +93,8 @@ public class ClientAPI {
         // create downloader for each sharer
         for(var socket: sockets) {
           logger.info(STR."(startService) adding downloader context for codex \{codexId} (sharer: \{socket.ip()}:\{socket.port()})");
-          addDownloaderContext(codexId, socket);
           codexController.createFileTree(codexId);
+          addDownloaderContext(codexId, socket);
         }
       }
     }
@@ -197,7 +194,7 @@ public class ClientAPI {
    * The connection is supposed to be alive when
    * a context is bound to the API
    *
-   * @param context
+   * @param context the client context
    */
   public void bindContext(ClientContext context) {
     lock.lock();
@@ -276,7 +273,7 @@ public class ClientAPI {
   /**
    * Send instructions to the selector via a BlockingQueue and wake it up
    *
-   * @param msg
+   * @param msg the message to send
    */
   public void sendPublicMessage(String msg) {
     lock.lock();
@@ -301,7 +298,7 @@ public class ClientAPI {
   public List<String> users() {
     lock.lock();
     try {
-      return Collections.unmodifiableList(new ArrayList<>(users));
+      return List.copyOf(users);
     } finally {
       lock.unlock();
     }
@@ -332,7 +329,7 @@ public class ClientAPI {
     if (fetchedCodex == null || fetchedCodex.isEmpty()) {
       return Optional.empty();
     }
-    return Optional.of(codexController.fromFetchedCodex(fetchedCodex.orElseThrow(), "/tmp"));
+    return Optional.of(codexController.addFromFetchedCodex(fetchedCodex.orElseThrow(), "/tmp"));
   }
   
   public void saveFetchedCodex(Codex codex) {
@@ -515,10 +512,10 @@ public class ClientAPI {
   
   /**
    * Get a chunk of a codex
-   * @param wantedCodexId
-   * @param offset
-   * @param length
-   * @return
+   * @param wantedCodexId the id of the codex
+   * @param offset the offset of the chunk
+   * @param length the length of the chunk
+   * @return the chunk of data
    * @throws IllegalArgumentException if the codex does not exist
    */
   public byte[] getChunk(String wantedCodexId, long offset, int length) throws IOException {
@@ -568,13 +565,17 @@ public class ClientAPI {
     sharersSocketQueue.add(sockets);
   }
   
-  public void writeChunk(String id, long offset, byte[] payload) throws Throwable {
+  /**
+   * Write a chunk of data in a codex
+   * @param id the id of the codex
+   * @param offset the offset of the chunk
+   * @param payload the data to write
+   * @throws IOException if the codex does not exist
+   */
+  public void writeChunk(String id, long offset, byte[] payload) throws IOException {
     lock.lock();
     try {
       codexController.writeChunk(id, offset, payload);
-    } catch (IOException e) {
-      logger.warning(STR."Could not write chunk to codex \{id}");
-      throw new IOException(e);
     } finally {
       lock.unlock();
     }
@@ -588,8 +589,8 @@ public class ClientAPI {
   }
   
   private void fillWithFakeData() throws IOException, NoSuchAlgorithmException {
-    //var users = new String[]{"test", "Morpheus", "Trinity", "Neo", "Flynn", "Alan", "Lora", "Gandalf", "Bilbo", "SKIDROW", "Antoine"};
-    //this.users.addAll(Arrays.asList(users));
+    var users = new String[]{"test", "Morpheus", "Trinity", "Neo", "Flynn", "Alan", "Lora", "Gandalf", "Bilbo", "SKIDROW", "Antoine"};
+    this.users.addAll(Arrays.asList(users));
     var messages = new YellMessage[]{
         new YellMessage("test", "test", System.currentTimeMillis()),
         new YellMessage("test", "hello how are you", System.currentTimeMillis()),
@@ -598,7 +599,7 @@ public class ClientAPI {
         new YellMessage("Neo", "what the hell is this", System.currentTimeMillis()),
         new YellMessage("Alan1", "Master CONTROL PROGRAM\nRELEASE TRON JA 307020...\nI HAVE PRIORITY ACCESS 7", System.currentTimeMillis()),
         new YellMessage("SKIDROW", "Here is the codex of the FOSS (.deb) : cdx:1eb49a28a0c02b47eed4d0b968bb9aec116a5a47", System.currentTimeMillis()),
-        new YellMessage("Antoine", "Le lien vers le sujet : http://igm.univ-mlv.fr/coursprogreseau/tds/projet2024.html", System.currentTimeMillis())
+        new YellMessage("Antoine", "Le lien vers le sujet : https://igm.univ-mlv.fr/coursprogreseau/tds/projet2024.html", System.currentTimeMillis())
     };
     this.publicMessages.addAll(splashLogo());
     this.publicMessages.addAll(Arrays.asList(messages));
@@ -606,8 +607,8 @@ public class ClientAPI {
     //this.directMessages.put(userId, new DirectMessages(userId, "Alan1"));
     // test codex
     if (login.equals("Alan1")) {
-      //codexController.createFromPath("my codex", "/home/alan1/Pictures");
-      codexController.createFromPath("my codex", "/home/alan1/Pictures/test");
+      codexController.createFromPath("my codex", "/home/alan1/Pictures");
+      //codexController.createFromPath("my codex", "/home/alan1/Pictures/test");
       
     }
   }

@@ -59,12 +59,9 @@ public class FrameReader implements Reader<Frame> {
         return ProcessStatus.ERROR;
       }
     }
-
     
     ProcessStatus frameStatus = readers.get(opcode).process(bb);
     if (frameStatus != ProcessStatus.DONE) {
-      logger.info(STR."Opcode: \{opcode}");
-      logger.info(STR."Frame status: \{frameStatus}");
       return frameStatus;
     }
 

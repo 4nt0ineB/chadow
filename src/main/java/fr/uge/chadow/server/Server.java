@@ -25,15 +25,17 @@ public class Server {
   }
 
   private static final Logger logger = Logger.getLogger(Server.class.getName());
-  private final ContextHandler contextHandler;
   private final Map<String, SocketInfo> clients = new HashMap<>();
   private final Map<Codex, List<String>> codexes = new HashMap<>(); // codex -> list of usernames
+  private ContextHandler contextHandler;
+  private final int port;
 
   public Server(int port) throws IOException {
-    this.contextHandler = new ContextHandler(port, key -> new ServerContext(this, key));
+    this.port = port;
   }
 
   public void start() throws IOException {
+    this.contextHandler = new ContextHandler(port, key -> new ServerContext(this, key));
     contextHandler.launch();
   }
   

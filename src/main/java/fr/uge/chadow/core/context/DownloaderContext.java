@@ -47,38 +47,25 @@ public final class DownloaderContext extends Context {
         try {
           api.writeChunk(codexStatus.id(), hereChunk.offset(), hereChunk.payload());
         } catch (IOException e) {
-          e.printStackTrace();
+          logger.severe(STR."Error while writing chunk \{hereChunk.offset()} for codex \{codexStatus.codex().id()} : \{e.getCause()}");
           silentlyClose();
           return;
-        } catch (Throwable e) {
-          throw new RuntimeException(e);
         }
         if(codexStatus.isComplete()) {
           silentlyClose();
           return;
         }
+        // request next chunk
         var chunk = codexStatus.nextRandomChunk();
-        if (chunk == null) {
-          logger.info(STR."Downloaded all chunks for codex \{codexStatus.codex().id()}");
-          addFrame(new OK());
-          processOut();
-          getKey().interestOps(SelectionKey.OP_WRITE);
-          return;
+        if (chunk != null) {
+          queueFrame(new NeedChunk(chunk.offset(), chunk.length()));
         }
-        queueFrame(new NeedChunk(chunk.offset(), chunk.length()));
-        
       }
       default -> {
         logger.warning("No action for the received frame");
         silentlyClose();
       }
     }
-    /*
-      switch
-        DENIED,
-        HERECHUNK,
-        etc...
-     */
   }
   
   private boolean canDownload() {
