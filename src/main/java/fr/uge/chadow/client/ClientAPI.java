@@ -97,6 +97,7 @@ public class ClientAPI {
         for(var socket: sockets) {
           logger.info(STR."(startService) adding downloader context for codex \{codexId} (sharer: \{socket.ip()}:\{socket.port()})");
           addDownloaderContext(codexId, socket);
+          codexController.createFileTree(codexId);
         }
       }
     }
@@ -140,7 +141,7 @@ public class ClientAPI {
     if(codexStatus.isEmpty()) {
       return;
     }
-    InetAddress address = null;
+    InetAddress address;
     try {
       address = InetAddress.getByAddress(socket.ip());
     } catch (UnknownHostException e) {
@@ -310,15 +311,15 @@ public class ClientAPI {
   /**
    * Add a codex to the client
    */
-  public CodexController.CodexStatus addCodex(String name, String path) throws IOException, NoSuchAlgorithmException {
+  public CodexStatus addCodex(String name, String path) throws IOException, NoSuchAlgorithmException {
     return codexController.createFromPath(name, path);
   }
   
-  public List<CodexController.CodexStatus> codexes() {
+  public List<CodexStatus> codexes() {
     return List.copyOf(codexController.codexesStatus());
   }
   
-  public Optional<CodexController.CodexStatus> getCodex(String id) throws InterruptedException {
+  public Optional<CodexStatus> getCodex(String id) throws InterruptedException {
     var codex = codexController.getCodexStatus(id);
     if (codex.isPresent()) {
       return Optional.of(codex.orElseThrow());
@@ -508,6 +509,30 @@ public class ClientAPI {
     }
   }
   
+  public boolean codexExists(String id) {
+    return codexController.codexExists(id);
+  }
+  
+  /**
+   * Get a chunk of a codex
+   * @param wantedCodexId
+   * @param offset
+   * @param length
+   * @return
+   * @throws IllegalArgumentException if the codex does not exist
+   */
+  public byte[] getChunk(String wantedCodexId, long offset, int length) throws IOException {
+    lock.lock();
+    try {
+      if(!codexController.codexExists(wantedCodexId)) {
+        throw new IllegalArgumentException("The codex does not exist");
+      }
+      return codexController.getChunk(wantedCodexId, offset, length);
+    } finally {
+      lock.unlock();
+    }
+  }
+  
   public void removeUser(String username) {
     lock.lock();
     try {
@@ -543,6 +568,19 @@ public class ClientAPI {
     sharersSocketQueue.add(sockets);
   }
   
+  public void writeChunk(String id, long offset, byte[] payload) throws Throwable {
+    lock.lock();
+    try {
+      codexController.writeChunk(id, offset, payload);
+    } catch (IOException e) {
+      logger.warning(STR."Could not write chunk to codex \{id}");
+      throw new IOException(e);
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  
   enum STATUS {
     CONNECTING,
     CONNECTED,
@@ -568,7 +606,9 @@ public class ClientAPI {
     //this.directMessages.put(userId, new DirectMessages(userId, "Alan1"));
     // test codex
     if (login.equals("Alan1")) {
-      codexController.createFromPath("my codex", "/home/alan1/Pictures");
+      //codexController.createFromPath("my codex", "/home/alan1/Pictures");
+      codexController.createFromPath("my codex", "/home/alan1/Pictures/test");
+      
     }
   }
 }

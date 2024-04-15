@@ -3,9 +3,8 @@ package fr.uge.chadow.client;
 import fr.uge.chadow.cli.display.View;
 import fr.uge.chadow.core.protocol.field.Codex;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -14,6 +13,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
 public class CodexController {
@@ -38,42 +38,42 @@ public class CodexController {
   
   public boolean isDownloading(String id) {
     var codexStatus = codexes.get(id);
-    return codexStatus.downloading;
+    return Optional.ofNullable(codexStatus.isDownloading()).orElse(false);
   }
   
   public boolean isSharing(String id) {
     var codexStatus = codexes.get(id);
-    return codexStatus.sharing;
+    return Optional.ofNullable(codexStatus.isSharing()).orElse(false);
   }
   
   public void share(String id) {
     var codexStatus = codexes.get(id);
-    if(codexStatus.downloading){
+    if(codexStatus.isDownloading()){
       throw new IllegalStateException("Codex is downloading, can't share it");
     }
-    codexStatus.sharing = true;
-    log(codexStatus.codex,"is now sharing");
+    codexStatus.share();
+    log(codexStatus.codex(),"is now sharing");
   }
   
   public void download(String id) {
     var codexStatus = codexes.get(id);
-    if(codexStatus.sharing){
+    if(codexStatus.isSharing()){
       throw new IllegalStateException("Codex is sharing, can't download it");
     }
-    codexStatus.downloading = true;
-    log(codexStatus.codex,"is now downloading");
+    codexStatus.download();
+    log(codexStatus.codex(),"is now downloading");
   }
   
   public void stopSharing(String id) {
     var codexStatus = codexes.get(id);
-    codexStatus.sharing = false;
-    log(codexStatus.codex,"stops sharing");
+    codexStatus.stopSharing();
+    log(codexStatus.codex(),"stops sharing");
   }
   
   public void stopDownloading(String id) {
     var codexStatus = codexes.get(id);
-    codexStatus.downloading = false;
-    log(codexStatus.codex,"stops downloading");
+    codexStatus.stopDownloading();
+    log(codexStatus.codex(),"stops downloading");
   }
   
   private void log(Codex codex, String message) {
@@ -83,6 +83,7 @@ public class CodexController {
   CodexStatus fromFetchedCodex(Codex codex, String root) {
     return addCodex(codex, root);
   }
+ 
   
   /**
    * Create a codex from a file or a directory
@@ -169,9 +170,10 @@ public class CodexController {
   private static Codex.FileInfo fileInfofromPath(String root, Path path) throws NoSuchAlgorithmException, IOException {
     var file = path.toFile();
     var id = View.bytesToHexadecimal(fingerprint(file));
-    var bitSet = new BitSet((int) Math.ceil((double) file.length() / CodexStatus.CHUNK_SIZE));
+    var size = (int) Math.ceil((double) file.length() / CodexStatus.chunkSize());
+    var bitSet = new BitSet(size);
     // creation of codex from local file, then all chunks are available
-    bitSet.flip(0, bitSet.size());
+    bitSet.flip(0, size);
     // logger.info(STR."Creating FileInfo for \{file.getName()} with parent \{file.getParent()} with removed root \{root} : \{file.getParent().replace(root, "")}");
     return new Codex.FileInfo(id, file.getName(), file.length(), file.getParent().substring(root.length()));
   }
@@ -180,64 +182,38 @@ public class CodexController {
     return codexes.values();
   }
   
-  public static class CodexStatus {
-    
-    public static int CHUNK_SIZE = 1024;
-    private boolean downloading = false;
-    private boolean sharing = false;
-    private final Codex codex;
-    private final HashMap<String, BitSet> chunks = new HashMap<>();
-    private final String root;
-    
-    public int numberOfChunks(Codex.FileInfo file) {
-      return (int) Math.ceil((double) file.length() / CHUNK_SIZE);
-    }
-    
-    private CodexStatus(Codex codex, String root) {
-      this.codex = codex;
-      this.root = root;
-      for (var file : codex.files()) {
-        chunks.put(file.id(), new BitSet(numberOfChunks(file)));
-      }
-    }
-    
-    public String root() {
-      return root;
-    }
-    
-    public boolean isComplete() {
-      
-      return chunks.values().stream().allMatch(bitSet -> bitSet.cardinality() == bitSet.size());
-    }
-    
-    public boolean isComplete(Codex.FileInfo file) {
-      return chunks.get(file.id()).cardinality() == numberOfChunks(file);
-    }
-    
-    public int completedChunks(Codex.FileInfo file) {
-      return chunks.get(file.id()).cardinality();
-    }
-    
-    public int totalChunks(Codex.FileInfo file) {
-      return chunks.get(file.id()).size();
-    }
-    
-    public double completionRate(Codex.FileInfo file) {
-      return (double) completedChunks(file) /totalChunks(file);
-    }
-    
-    public Codex codex() {
-      return codex;
-    }
-    
-    public String id() {
-      return codex.id();
-    }
-    
-    public void setAllComplete() {
-      chunks.values().forEach(bitSet -> bitSet.flip(0, bitSet.size()));
-    }
-    
-    
+  public boolean codexExists(String id) {
+    return codexes.containsKey(id);
   }
+  
+  /**
+   *
+   * @param wantedCodexId
+   * @param offset
+   * @param length
+   * @return a ByteBuffer in write mode
+   * @throws IllegalArgumentException if the codex is not found
+   */
+  public byte[] getChunk(String wantedCodexId, long offset, int length) throws IOException {
+    var codexStatus = codexes.get(wantedCodexId);
+    if(codexStatus == null){
+      throw new IllegalArgumentException("Codex not found");
+    }
+    return codexStatus.getChunk(offset, length);
+  }
+  
+  public void writeChunk(String id, long offsetInCodex, byte[] payload) throws IOException {
+    Objects.requireNonNull(id);
+    Objects.requireNonNull(payload);
+    var codexStatus = codexes.get(id);
+    if(codexStatus == null){
+      throw new IllegalArgumentException("Codex not found");
+    }
+    codexStatus.writeChunk(offsetInCodex, payload);
+  }
+  
+  public void createFileTree(String codexId) throws IOException {
+    codexes.get(codexId).createFileTree();
+  }
+  
 }

@@ -6,6 +6,8 @@ import fr.uge.chadow.server.Server;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class Main {
   private static void usage() {
@@ -48,10 +50,13 @@ public class Main {
       usage();
       return;
     }
+    /*Logger rootLogger = Logger.getLogger("");
+    rootLogger.setLevel(Level.OFF);*/
     if(args[0].equals("--server")) {
       server(args);
     } else {
       client(args);
     }
+    
   }
 }

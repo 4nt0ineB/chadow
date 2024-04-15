@@ -470,12 +470,9 @@ encodé de la manière suivante :
   +---------------------+
   | (denied) | codex_id |
   +---------------------+
-
   puis ferme la connexion.
 
   Autrement la connexion reste ouverte.
-  Le reste des trames échangées est préfixées par leur taille, afin de
-  facilter la lecture sur le socket par le client.
 
 
   8.2.1 Demande de chunk 
@@ -487,7 +484,7 @@ encodé de la manière suivante :
   | (needchunk) | offset | length |
   +-------------------------------+
                                                                
-  offset:      l'indice du byte dans le chunk (int).
+  offset:      l'indice du byte dans le chunk (long).
   length:      la taille du chunk (int).
 
   Le codex contenant plusieurs fichiers, 
@@ -503,7 +500,7 @@ encodé de la manière suivante :
   moitié du fichier 1). Ou bien le chunk <10><15> du fichier 2
 
   Pour simplification dans la réception et l'envoie on considérera toute 
-  demande de chunk qui chevauche deux fichiers comme erroné.  
+  demande de chunk qui chevauche deux fichiers comme erronée.
 
 
   8.2.2 Annulation
@@ -515,9 +512,9 @@ encodé de la manière suivante :
   
   Le sharer répond à une requête de chunk:
 
-  +--------------------------------+
-  | (herechunk) | offset | payload |
-  +--------------------------------+
+  +-----------------------------------------+
+  | (herechunk) | offset | length | payload |
+  +-----------------------------------------+
 
   offset:      l'indice du byte dans le chunk (int).
   payload:     la donnée

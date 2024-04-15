@@ -20,17 +20,17 @@ public record Codex(String id, String name, Codex.FileInfo[] files) {
   public record FileInfo(String id,
                          String filename,
                          long length,
-                         String absolutePath) {
+                         String relativePath) {
     public FileInfo {
       Objects.requireNonNull(id);
       Objects.requireNonNull(filename);
-      Objects.requireNonNull(absolutePath);
+      Objects.requireNonNull(relativePath);
     }
     
     private ByteBuffer toByteBuffer() {
       var bbId = UTF8.encode(id);
       var bbFilename = UTF8.encode(filename);
-      var bbAbsolutePath = UTF8.encode(absolutePath);
+      var bbAbsolutePath = UTF8.encode(relativePath);
       var bufferSize = Integer.BYTES + bbId.remaining() + Integer.BYTES + bbFilename.remaining() + Long.BYTES + Integer.BYTES + bbAbsolutePath.remaining();
       return ByteBuffer.allocate(bufferSize)
               .putInt(bbId.remaining())

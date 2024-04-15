@@ -4,6 +4,7 @@ import fr.uge.chadow.cli.CLIColor;
 import fr.uge.chadow.cli.display.view.ScrollableView;
 import fr.uge.chadow.cli.display.view.SelectorView;
 import fr.uge.chadow.client.CodexController;
+import fr.uge.chadow.client.CodexStatus;
 import fr.uge.chadow.client.DirectMessages;
 
 import java.io.IOException;
@@ -222,7 +223,7 @@ public interface View {
     return new SelectorView<>(title, lines, cols, linesByItem, new ScrollableView(title, lines, cols, linesToDisplay), mapper);
   }
   
-  static String codexShortDescription(CodexController.CodexStatus codexStatus) {
+  static String codexShortDescription(CodexStatus codexStatus) {
     var codex = codexStatus.codex();
     return STR."\{codex.name()} ─ \{codex.files().length} files \{bytesToHumanReadable(codex.totalSize())}";
   }

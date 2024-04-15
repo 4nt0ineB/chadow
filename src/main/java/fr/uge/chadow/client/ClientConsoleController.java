@@ -6,8 +6,6 @@ import fr.uge.chadow.cli.display.Display;
 import fr.uge.chadow.cli.display.InfoBar;
 import fr.uge.chadow.cli.display.View;
 import fr.uge.chadow.cli.display.view.*;
-import fr.uge.chadow.core.context.ClientContext;
-import fr.uge.chadow.core.context.DownloaderContext;
 import fr.uge.chadow.core.protocol.field.Codex;
 import fr.uge.chadow.core.protocol.WhisperMessage;
 
@@ -15,8 +13,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
-import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -53,7 +51,7 @@ public class ClientConsoleController {
   private Display display;
   private SelectorView<?> currentSelector;
   private View currentView;
-  private CodexController.CodexStatus selectedCodexForDetails;
+  private CodexStatus selectedCodexForDetails;
   private Mode mode;
   private int lines;
   private int cols;
@@ -115,7 +113,7 @@ public class ClientConsoleController {
     });
   }
   
-  public CodexController.CodexStatus currentCodex() {
+  public CodexStatus currentCodex() {
     return selectedCodexForDetails;
   }
   
@@ -279,7 +277,7 @@ public class ClientConsoleController {
       mainView.setMode(mode);
       setCurrentView(mainView);
       drawDisplay();
-      return Optional.of(true);
+      return Optional.of(false);
     }
     return Optional.empty();
   }
@@ -372,7 +370,7 @@ public class ClientConsoleController {
       case "h" -> currentSelector.selectorDown();
       case ":s", ":see" -> {
         mode = Mode.CODEX_DETAILS;
-        selectedCodexForDetails = (CodexController.CodexStatus) currentSelector.get();
+        selectedCodexForDetails = (CodexStatus) currentSelector.get();
         logger.info(STR."see cdx: \{selectedCodexForDetails.id()}");
         setCurrentView(codexView(selectedCodexForDetails));
         currentView.scrollTop();
@@ -501,7 +499,7 @@ public class ClientConsoleController {
     if (matcherRetrieve.find()) {
       var fingerprint = matcherRetrieve.group(1);
       logger.info(STR.":cdx: \{fingerprint}\n");
-      Optional<CodexController.CodexStatus> codex = null;
+      Optional<CodexStatus> codex = null;
       try {
         codex = api.getCodex(fingerprint);
       } catch (InterruptedException e) {
@@ -623,7 +621,7 @@ public class ClientConsoleController {
     return View.scrollableFromString("Help", lines, cols, txt);
   }
   
-  private ScrollableView codexView(CodexController.CodexStatus codexStatus) {
+  private ScrollableView codexView(CodexStatus codexStatus) {
     try {
       var codex = codexStatus.codex();
       var sb = new StringBuilder();
@@ -661,11 +659,11 @@ public class ClientConsoleController {
         .append(View.bytesToHumanReadable(codex.totalSize()))
         .append("\n");
       sb.append("Local Path: ")
-        .append(codexStatus.root())
+        .append(Path.of(codexStatus.root(), codexStatus.codex().name()))
         .append("\n\n");
       sb.append(colorize(CLIColor.BOLD, "Files:  \n"));
       Arrays.stream(infoFiles)
-            .collect(Collectors.groupingBy(Codex.FileInfo::absolutePath))
+            .collect(Collectors.groupingBy(Codex.FileInfo::relativePath))
             .forEach((dir, files) -> {
               sb.append(colorize(CLIColor.BOLD, STR."[\{dir}]\n"));
               files.forEach(file -> sb.append("\t- ")

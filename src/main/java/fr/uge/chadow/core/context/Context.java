@@ -83,9 +83,18 @@ public sealed abstract class Context permits ClientContext, DownloaderContext, S
     key.selector().wakeup();
   }
   
-  protected void addFrame(Frame frame) {
+  public void clearFrameQueue() {
+    queue.clear();
+    processOut();
+    updateInterestOps();
+  }
+  
+  void addFrame(Frame frame) {
     queue.addFirst(frame);
   }
+  
+  
+  
   
   /**
    * Try to fill bufferOut from the message queue
@@ -205,7 +214,7 @@ public sealed abstract class Context permits ClientContext, DownloaderContext, S
     return key;
   }
   
-  protected SocketChannel getSocket() {
+  SocketChannel getSocket() {
     return sc;
   }
   

@@ -34,6 +34,10 @@ public class FrameReader implements Reader<Frame> {
     readers.put(Opcode.WHISPER, new GlobalReader<>(WhisperMessage.class));
     readers.put(Opcode.PROPOSE, new GlobalReader<>(Propose.class));
     readers.put(Opcode.REQUEST, new GlobalReader<>(Request.class));
+    readers.put(Opcode.NEEDCHUNK, new GlobalReader<>(NeedChunk.class));
+    readers.put(Opcode.HERECHUNK, new GlobalReader<>(HereChunk.class));
+    readers.put(Opcode.DENIED, new GlobalReader<>(Denied.class));
+    readers.put(Opcode.HANDSHAKE, new GlobalReader<>(Handshake.class));
     readers.put(Opcode.REQUEST_RESPONSE, new GlobalReader<>(RequestResponse.class));
     readers.put(Opcode.REQUEST_DOWNLOAD, new GlobalReader<>(RequestDownload.class));
     readers.put(Opcode.REQUEST_OPEN_DOWNLOAD_RESPONSE, new GlobalReader<>(RequestOpenDownload.class));
@@ -56,9 +60,11 @@ public class FrameReader implements Reader<Frame> {
       }
     }
 
-    logger.info(STR."Opcode: \{opcode}");
+    
     ProcessStatus frameStatus = readers.get(opcode).process(bb);
     if (frameStatus != ProcessStatus.DONE) {
+      logger.info(STR."Opcode: \{opcode}");
+      logger.info(STR."Frame status: \{frameStatus}");
       return frameStatus;
     }
 

@@ -1,6 +1,7 @@
 package fr.uge.chadow.core.reader;
 
 import fr.uge.chadow.client.CodexController;
+import fr.uge.chadow.client.CodexStatus;
 import fr.uge.chadow.core.protocol.YellMessage;
 import fr.uge.chadow.core.protocol.TestPacket;
 import fr.uge.chadow.core.protocol.client.Propose;
@@ -144,7 +145,7 @@ public class GlobalReaderTest {
   @Test
   public void proposeCodex() {
     var codexController = new CodexController();
-    CodexController.CodexStatus codexStatus;
+    CodexStatus codexStatus;
     try {
       codexStatus = codexController.createFromPath("my codex", "/home/alan1/Pictures");
     } catch (IOException e) {
@@ -165,7 +166,7 @@ public class GlobalReaderTest {
 
   @Test
   public void proposeTest() {
-    var propose = new Propose(new Codex("id", "name", new Codex.FileInfo[]{new Codex.FileInfo("id", "filename", 42, "absolutePath")}));
+    var propose = new Propose(new Codex("id", "name", new Codex.FileInfo[]{new Codex.FileInfo("id", "filename", 42, "relativePath")}));
     var reader = new GlobalReader<>(Propose.class);
     var bb = propose.toByteBuffer();
     bb.flip();
@@ -177,7 +178,7 @@ public class GlobalReaderTest {
     assertEquals(propose.codex().files()[0].id(), reader.get().codex().files()[0].id());
     assertEquals(propose.codex().files()[0].filename(), reader.get().codex().files()[0].filename());
     assertEquals(propose.codex().files()[0].length(), reader.get().codex().files()[0].length());
-    assertEquals(propose.codex().files()[0].absolutePath(), reader.get().codex().files()[0].absolutePath());
+    assertEquals(propose.codex().files()[0].relativePath(), reader.get().codex().files()[0].relativePath());
   }
 
   @Test
