@@ -1,6 +1,6 @@
-package fr.uge.chadow.cli.display;
+package fr.uge.chadow.client.cli.display;
 
-import fr.uge.chadow.cli.CLIColor;
+import fr.uge.chadow.client.cli.CLIColor;
 import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.client.ClientConsoleController;
 
@@ -64,7 +64,7 @@ public class Display {
   public void startLoop() throws InterruptedException, IOException {
     System.out.print(CLIColor.CLEAR);
     System.out.flush();
-    while (!Thread.interrupted() && !controller.mustClose()) {
+    while (!Thread.interrupted() && controller.isAlive()) {
       var canRefresh = controller.viewCanRefresh().get();
       if (canRefresh) {
         draw();

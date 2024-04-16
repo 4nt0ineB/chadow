@@ -10,8 +10,10 @@ import fr.uge.chadow.core.protocol.YellMessage;
 import fr.uge.chadow.core.protocol.client.Propose;
 import fr.uge.chadow.core.protocol.client.Request;
 import fr.uge.chadow.core.protocol.client.RequestDownload;
+import fr.uge.chadow.core.protocol.client.Search;
 import fr.uge.chadow.core.protocol.field.Codex;
 import fr.uge.chadow.core.protocol.field.SocketField;
+import fr.uge.chadow.core.protocol.server.SearchResponse;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -22,6 +24,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
@@ -34,21 +37,30 @@ import java.util.logging.Logger;
  */
 public class ClientAPI {
   
-  
   private static final Logger logger = Logger.getLogger(ClientAPI.class.getName());
+  private final ReentrantLock lock = new ReentrantLock();
+  private final Condition connectionCondition = lock.newCondition();
+  private final CodexController codexController = new CodexController();
   private final InetSocketAddress serverAddress;
   private final String login;
-  private final CodexController codexController = new CodexController();
   private final ArrayList<YellMessage> publicMessages = new ArrayList<>();
   private final HashMap<UUID, DirectMessages> directMessages = new HashMap<>();
   private final SortedSet<String> users = new TreeSet<>();
+  
+  // Blocking Queue that will contain the fetched codex
+  private final long REQUEST_CODEX_TIMEOUT = 5;
   private final ArrayBlockingQueue<Optional<Codex>> requestCodexResponseQueue = new ArrayBlockingQueue<>(1);
   
+  // Manage request and answer of open download -- Maybe change the way to handle this
+  private final long DOWNLOAD_REQUEST_TIMEOUT = 5;
   private final LinkedBlockingQueue<SocketField[]> sharersSocketQueue = new LinkedBlockingQueue<>();
   private final ArrayDeque<String> codexIdOfAskedDownload = new ArrayDeque<>();
   
-  private final ReentrantLock lock = new ReentrantLock();
-  private final Condition connectionCondition = lock.newCondition();
+  // Manage request and response of search
+  private final long SEARCH_TIMEOUT = 5;
+  private final ArrayBlockingQueue<SearchResponse> searchResponseQueue = new ArrayBlockingQueue<>(1);
+  
+  // The context handler that will manage the client contexts
   private ContextHandler contextHandler;
   private ClientContext clientContext;
   private STATUS status = STATUS.CONNECTING;
@@ -58,14 +70,14 @@ public class ClientAPI {
     Objects.requireNonNull(login);
     this.login = login;
     this.serverAddress = serverAddress;
-    /*try {
+    try {
       fillWithFakeData();
     } catch (IOException e) {
       throw new RuntimeException(e);
     } catch (NoSuchAlgorithmException e) {
       throw new RuntimeException(e);
       // just die
-    }*/
+    }
   }
   
   /**
@@ -87,7 +99,7 @@ public class ClientAPI {
     
     // make a loop to manage downloads
     while (!Thread.interrupted()) {
-      var sockets = sharersSocketQueue.poll(1, java.util.concurrent.TimeUnit.SECONDS);
+      var sockets = sharersSocketQueue.poll(DOWNLOAD_REQUEST_TIMEOUT, java.util.concurrent.TimeUnit.SECONDS);
       if (sockets != null) {
         var codexId = codexIdOfAskedDownload.pollFirst();
         // create downloader for each sharer
@@ -316,7 +328,7 @@ public class ClientAPI {
     return List.copyOf(codexController.codexesStatus());
   }
   
-  public Optional<CodexStatus> getCodex(String id) throws InterruptedException {
+  public Optional<CodexStatus> getCodex(String id) {
     var codex = codexController.getCodexStatus(id);
     if (codex.isPresent()) {
       return Optional.of(codex.orElseThrow());
@@ -325,7 +337,13 @@ public class ClientAPI {
     requestCodexResponseQueue.clear();
     clientContext.queueFrame(new Request(id));
     logger.info(STR."(getCodex) requesting codex (id: \{id})");
-    var fetchedCodex = requestCodexResponseQueue.poll(5, java.util.concurrent.TimeUnit.SECONDS);
+    Optional<Codex> fetchedCodex = null;
+    try {
+      fetchedCodex = requestCodexResponseQueue.poll(REQUEST_CODEX_TIMEOUT, java.util.concurrent.TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      logger.severe(e.getMessage());
+      close();
+    }
     if (fetchedCodex == null || fetchedCodex.isEmpty()) {
       return Optional.empty();
     }
@@ -335,11 +353,9 @@ public class ClientAPI {
   public void saveFetchedCodex(Codex codex) {
     lock.lock();
     try {
-      try {
-        requestCodexResponseQueue.put(Optional.of(codex));
-      } catch (InterruptedException e) {
+      requestCodexResponseQueue.put(Optional.of(codex));
+    } catch (InterruptedException e) {
         close();
-      }
     } finally {
       lock.unlock();
     }
@@ -582,6 +598,35 @@ public class ClientAPI {
   }
   
   
+  public Optional<SearchResponse> searchCodexes(Search search) {
+    try {
+      searchResponseQueue.clear();
+      clientContext.queueFrame(search);
+      logger.info(STR."(searchCodexes) searching for codexes with name \{search.codexName()}");
+      SearchResponse response = null;
+      response = searchResponseQueue.poll(SEARCH_TIMEOUT, java.util.concurrent.TimeUnit.SECONDS);
+      if (response == null) {
+        return Optional.empty();
+      }
+      return Optional.of(response);
+    } catch (InterruptedException e) {
+      close();
+      return Optional.empty();
+    }
+  }
+  
+  public void saveSearchResponse(SearchResponse response) {
+    lock.lock();
+    try {
+      searchResponseQueue.put(response);
+    } catch (InterruptedException e) {
+      close();
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  
   enum STATUS {
     CONNECTING,
     CONNECTED,
@@ -589,8 +634,8 @@ public class ClientAPI {
   }
   
   private void fillWithFakeData() throws IOException, NoSuchAlgorithmException {
-    var users = new String[]{"test", "Morpheus", "Trinity", "Neo", "Flynn", "Alan", "Lora", "Gandalf", "Bilbo", "SKIDROW", "Antoine"};
-    this.users.addAll(Arrays.asList(users));
+    /*var users = new String[]{"test", "Morpheus", "Trinity", "Neo", "Flynn", "Alan", "Lora", "Gandalf", "Bilbo", "SKIDROW", "Antoine"};
+    this.users.addAll(Arrays.asList(users));*/
     var messages = new YellMessage[]{
         new YellMessage("test", "test", System.currentTimeMillis()),
         new YellMessage("test", "hello how are you", System.currentTimeMillis()),

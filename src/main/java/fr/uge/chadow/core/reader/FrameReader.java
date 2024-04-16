@@ -42,6 +42,7 @@ public class FrameReader implements Reader<Frame> {
         return opcodeStatus;
       }
       opcode = Opcode.values()[byteReader.get()];
+      logger.info(STR."Received opcode: \{opcode}");
       if (!readers.containsKey(opcode)) {
         return ProcessStatus.ERROR;
       }

@@ -1,13 +1,14 @@
 package fr.uge.chadow.client;
 
-import fr.uge.chadow.cli.CLIColor;
-import fr.uge.chadow.cli.InputReader;
-import fr.uge.chadow.cli.display.Display;
-import fr.uge.chadow.cli.display.InfoBar;
-import fr.uge.chadow.cli.display.View;
-import fr.uge.chadow.cli.display.view.*;
+import fr.uge.chadow.client.cli.CLIColor;
+import fr.uge.chadow.client.cli.display.Display;
+import fr.uge.chadow.client.cli.display.InfoBar;
+import fr.uge.chadow.client.cli.display.View;
+import fr.uge.chadow.client.cli.display.view.*;
+import fr.uge.chadow.core.protocol.client.Search;
 import fr.uge.chadow.core.protocol.field.Codex;
 import fr.uge.chadow.core.protocol.WhisperMessage;
+import fr.uge.chadow.core.protocol.server.SearchResponse;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -16,13 +17,16 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.NoSuchAlgorithmException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static fr.uge.chadow.cli.display.View.colorize;
+import static fr.uge.chadow.client.cli.display.View.colorize;
 
 public class ClientConsoleController {
   public enum Mode {
@@ -52,11 +56,13 @@ public class ClientConsoleController {
   private SelectorView<?> currentSelector;
   private View currentView;
   private CodexStatus selectedCodexForDetails;
+  private Search lastSearch;
+  private List<SearchResponse.Result> lastSearchResults;
   private Mode mode;
   private int lines;
   private int cols;
   
-  public ClientConsoleController(int lines, int cols, ClientAPI api) throws IOException {
+  public ClientConsoleController(int lines, int cols, ClientAPI api) {
     if (lines <= 0 || cols <= 0) {
       throw new IllegalArgumentException("lines and columns must be positive");
     }
@@ -77,7 +83,7 @@ public class ClientConsoleController {
         api.startService();
       } catch (IOException | InterruptedException e) {
         logger.severe(STR."Can't connect to the server.\{e.getMessage()}");
-        mustClose = true;
+        exitNicely();
       }
     });
     try {
@@ -85,12 +91,12 @@ public class ClientConsoleController {
     } catch (InterruptedException e) {
       var errorView = new CantConnectScreenView(lines, cols);
       errorView.draw();
-      throw new RuntimeException(e);
+      logger.info(e.getMessage());
+      return;
     }
     // Starts display thread
     infoBar = new InfoBar(cols, this::updateInfoBar);
     display = new Display(lines, cols, this, infoBar, api);
-    InputReader inputReader = new InputReader(this);
     setCurrentView(mainView);
     startDisplay();
     // start the input reader
@@ -127,7 +133,7 @@ public class ClientConsoleController {
             } catch (IOException | InterruptedException e) {
               logger.severe(STR."The console display was interrupted. \{e.getMessage()}");
             } finally {
-              mustClose = true;
+              exitNicely();
             }
           });
   }
@@ -138,7 +144,7 @@ public class ClientConsoleController {
       display.draw();
     } catch (IOException e) {
       logger.severe(STR."Error while drawing display.\{e.getMessage()}");
-      mustClose = true;
+      exitNicely();
     }
   }
   
@@ -146,7 +152,7 @@ public class ClientConsoleController {
     View.clearDisplayAndMore(lines, lines);
   }
   
-  public void stopAutoRefresh() throws IOException {
+  public void stopAutoRefresh() {
     viewCanRefresh.set(false);
     clearDisplayAndMore();
     drawDisplay();
@@ -156,8 +162,13 @@ public class ClientConsoleController {
     return viewCanRefresh;
   }
   
-  public boolean mustClose() {
-    return mustClose || !api.isConnected();
+  /**
+   * Is alive if not dead... duh
+   *
+   * @return true if the client can keep running, false otherwise
+   */
+  public boolean isAlive() {
+    return !mustClose && api.isConnected();
   }
   
   /**
@@ -179,6 +190,7 @@ public class ClientConsoleController {
         .or(() -> globalCommandCodexDetail(input))
         .or(() -> globalCommandWhisper(input))
         .or(() -> globalCommandDraw(input))
+        .or(() -> globalCommandSearch(input))
         .or(() -> Optional.of(processCommandInContext(input)));
     clearDisplayAndMore();
     viewCanRefresh.set(!canTypeAgain.orElse(false));
@@ -186,11 +198,8 @@ public class ClientConsoleController {
   }
   
   private void exitNicely() {
-    // just for now
     api.close();
     mustClose = true;
-    // client.shutdown();
-    System.exit(0);
   }
   
   private void setCurrentView(View view) {
@@ -202,13 +211,51 @@ public class ClientConsoleController {
     return switch (mode) {
       case CHAT_LIVE_REFRESH -> processInputModeLiveRefresh(input);
       case CHAT_SCROLLER, USERS_SCROLLER, HELP_SCROLLER -> processInputModeScroller(input);
-      case CODEX_SEARCH -> throw new Error("Not implemented");
       case CODEX_DETAILS -> processInputModeCodexDetails(input);
       case CODEX_LIST -> processInputModeCodexList(input);
       case DIRECT_MESSAGES_LIVE -> processInputModeDirectMessagesLive(input);
       case DIRECT_MESSAGES_SCROLLER -> processInputModeDMScroller(input);
       case DIRECT_MESSAGES_LIST -> processCommandDirectMessagesList(input);
+      case CODEX_SEARCH -> processCommandSearch(input);
     };
+  }
+  
+  private boolean processCommandSearch(String input) {
+    switch (input) {
+      // Search pagination : continue searching if bottom is displayed
+      case "s", "b", "d" -> {
+        if(currentSelector.isAtBottom()) {
+          var newSearch = lastSearch.nextPage(View.maxLinesView(lines));
+          var newResponse = api.searchCodexes(newSearch);
+          if(newResponse.isEmpty()){
+            return true;
+          }
+          var results = newResponse.orElseThrow();
+          lastSearch = newSearch;
+          lastSearchResults.addAll(Arrays.asList(results.results()));
+          var newSelector = View.selectorFromList("Search results", lines, cols, lastSearchResults, View::codexSearchResultShortDescription);
+          newSelector.setAtSamePosition(currentSelector);
+          currentSelector = newSelector;
+          setCurrentView(currentSelector);
+        }
+       return processInputModeSelector(input);
+      }
+      case ":s", ":see" -> {
+        mode = Mode.CODEX_DETAILS;
+        var selectedCodexFromSearch = (SearchResponse.Result) currentSelector.get();
+        var askCodexDetailsFromServer = api.getCodex(selectedCodexFromSearch.codexId());
+        if(askCodexDetailsFromServer.isEmpty()){
+          return true;
+        }
+        selectedCodexForDetails = askCodexDetailsFromServer.orElseThrow();
+        setCurrentView(codexView(selectedCodexForDetails));
+        currentView.scrollTop();
+        return true;
+      }
+      default -> {
+       return processInputModeSelector(input);
+      }
+    }
   }
   
   private Optional<Boolean> globalCommandDraw(String input) {
@@ -227,7 +274,7 @@ public class ClientConsoleController {
                     .stream()
                     .sorted(Comparator.comparingLong(dm -> dm.getLastMessage()
                                                              .map(WhisperMessage::epoch)
-                                                             .orElseGet(() -> Long.MIN_VALUE)))
+                                                             .orElse(Long.MIN_VALUE)))
                     .toList();
       currentSelector = View.selectorFromList("Direct messages", lines, cols, list, directMessages -> {
         var str = View.directMessageShortDescription(directMessages);
@@ -330,8 +377,6 @@ public class ClientConsoleController {
   
   private boolean processCommandDirectMessagesList(String input) {
     switch (input) {
-      case "y" -> currentSelector.selectorUp();
-      case "h" -> currentSelector.selectorDown();
       case ":s", ":see" -> {
         var selected = (DirectMessages) currentSelector.get();
         mode = Mode.DIRECT_MESSAGES_LIVE;
@@ -339,10 +384,12 @@ public class ClientConsoleController {
         privateMessageView.setMode(mode);
         setCurrentView(privateMessageView);
         currentView.scrollTop();
+        return true;
+      }
+      default -> {
+        return processInputModeSelector(input);
       }
     }
-    ;
-    return true;
   }
   
   private boolean processInputModeDirectMessagesLive(String input) {
@@ -366,8 +413,6 @@ public class ClientConsoleController {
   
   private boolean processInputModeCodexList(String input) {
     switch (input) {
-      case "y" -> currentSelector.selectorUp();
-      case "h" -> currentSelector.selectorDown();
       case ":s", ":see" -> {
         mode = Mode.CODEX_DETAILS;
         selectedCodexForDetails = (CodexStatus) currentSelector.get();
@@ -375,9 +420,12 @@ public class ClientConsoleController {
         setCurrentView(codexView(selectedCodexForDetails));
         currentView.scrollTop();
         logger.info(STR."see cdx: \{selectedCodexForDetails.id()}");
+        return true;
+      }
+      default -> {
+        return processInputModeSelector(input);
       }
     }
-    return true;
   }
   
   private boolean processInputModeLiveRefresh(String input) {
@@ -413,6 +461,15 @@ public class ClientConsoleController {
       case "b" -> currentView.scrollBottom();
       case "r" -> currentView.scrollLineUp();
       case "d" -> currentView.scrollLineDown();
+    }
+    return true;
+  }
+  
+  private boolean processInputModeSelector(String input) {
+    switch (input) {
+      case "y" -> currentSelector.selectorUp();
+      case "h" -> currentSelector.selectorDown();
+      default -> processInputModeScroller(input);
     }
     return true;
   }
@@ -485,10 +542,10 @@ public class ClientConsoleController {
       }
       return Optional.empty();
     } catch (IOException e) {
-      mustClose = true;
+      exitNicely();
     } catch (NoSuchAlgorithmException e) {
       logger.severe(STR."Error while creating new codex. The \{e.getMessage()}");
-      mustClose = true;
+      exitNicely();
     }
     return Optional.empty();
   }
@@ -499,13 +556,7 @@ public class ClientConsoleController {
     if (matcherRetrieve.find()) {
       var fingerprint = matcherRetrieve.group(1);
       logger.info(STR.":cdx: \{fingerprint}\n");
-      Optional<CodexStatus> codex = null;
-      try {
-        codex = api.getCodex(fingerprint);
-      } catch (InterruptedException e) {
-        logger.severe(STR."Error while retrieving codex.\{e.getMessage()}");
-        mustClose = true;
-      }
+      Optional<CodexStatus> codex = api.getCodex(fingerprint);
       if(codex.isEmpty()){
         return Optional.of(true);
       }
@@ -516,6 +567,73 @@ public class ClientConsoleController {
       return Optional.of(true);
     }
     return Optional.empty();
+  }
+  
+  private Optional<Boolean> globalCommandSearch(String input) {
+    var regex = ":(?>f|find)\\s+(?>(?<at>:at)?(?<range>:(?>before|after))?\\s+(?>(?<date>\\d{1,2}/\\d{1,2}/\\d{4})(?>\\s+(?<time>\\d{1,2}:\\d{1,2}))?))?(?>\\s+(?<field>date|name):(?<order>asc|desc))?(?<name>.*)";
+    var patternSearch = Pattern.compile(regex);
+    var matcher = patternSearch.matcher(input);
+    if (matcher.find()) {
+      var at = matcher.group("at");
+      var range = matcher.group("range");
+      var date = matcher.group("date");
+      var time = matcher.group("time");
+      var field = matcher.group("field"); // @Todo handle sorting
+      var order = matcher.group("order"); //
+      var name = matcher.group("name");
+      
+      var options = 0;
+      if (at != null) {
+        options |= Search.Option.AT_DATE.value();
+      }
+      if (range != null) {
+        if (range.equals(":before")) {
+          options |= Search.Option.BEFORE_DATE.value();
+        } else {
+          options |= Search.Option.AFTER_DATE.value();
+        }
+      }
+      var epoch = 0L;
+      if (date != null) {
+        var datetimeStr = time == null ? date : STR."\{date} \{time}";
+        var simpleFormatter = new SimpleDateFormat();
+        var dateFormats = getDateFormats(Locale.getDefault());
+        try {
+          for(var format : dateFormats){
+            simpleFormatter.applyPattern(format);
+            var parsedDate = simpleFormatter.parse(datetimeStr);
+            epoch = parsedDate.toInstant().getEpochSecond();
+            break;
+          }
+          logger.info(STR."Parsed date: \{epoch}");
+        } catch (DateTimeParseException | ParseException e) {
+          return Optional.of(false);
+        }
+      }
+      var search = new Search(name, options, epoch, View.maxLinesView(lines), 0);
+      var response = api.searchCodexes(search);
+      if(response.isEmpty()){
+        return Optional.of(false);
+      }
+      var results = response.orElseThrow();
+      lastSearch = search;
+      lastSearchResults = Arrays.asList(results.results());
+      mode = Mode.CODEX_SEARCH;
+      currentSelector = View.selectorFromList("Search results", lines, cols, lastSearchResults, View::codexSearchResultShortDescription);
+      setCurrentView(currentSelector);
+      return Optional.of(true);
+    }
+    return Optional.empty();
+  }
+  
+  public static String[] getDateFormats(Locale locale) {
+    String[] dateFormats;
+    if (locale.getLanguage().equals("fr")) {
+      dateFormats = new String[]{"dd/MM/yyyy HH:mm", "dd/MM/yyyy"};
+    } else {
+      dateFormats = new String[]{"MM/dd/yyyy HH:mm", "MM/dd/yyyy"};
+    }
+    return dateFormats;
   }
   
   /**
@@ -530,14 +648,14 @@ public class ClientConsoleController {
    * In writeMode (autoRefresh set to false), the user can escape a line with '\' followed by enter.
    * This is useful to write a multiline message.
    *
-   * @throws IOException
+   * @throws IOException if an I/O error occurs
    */
   public void startReader() throws IOException {
     var reader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
     StringBuilder inputField = new StringBuilder();
     var c = 0;
     var escape = false;
-    while ((c = reader.read()) != -1) {
+    while ((c = reader.read()) != -1 && isAlive()) {
       var canRefresh = viewCanRefresh().get();
       if (canRefresh) {
         if (c == '\n') {
@@ -594,10 +712,13 @@ public class ClientConsoleController {
               :r <lines> <columns> - Resize the view
               :new <codexName>, <path> - Create a codex from a file or directory
               \tand display the details of new created [CODEX] info (mind the space between , and <path>)
+              :f, :find [:at(:before|:after)) <date>] [(name|date):(asc|desc)] <name> - Interrogate the server for codexes
+              
+              
               
               :mycdx - Display the list of your codex (selectable)
               :cdx:<SHA-1> - Retrieves and display the [CODEX] info with the given SHA-1
-              \tif the codex is not present locally, the server will be interrogated        (TODO)
+              \tif the codex is not present locally, the server will be interrogated
               :exit - Exit the application                                                  (WIP)
               
             [CHAT]
@@ -615,6 +736,8 @@ public class ClientConsoleController {
             (scrollable)
             :share - Share/stop sharing the codex
             :download - Download/stop downloading the codex
+            
+            [CODEX SEARCH]
             
             """;
     
@@ -679,9 +802,7 @@ public class ClientConsoleController {
       return View.scrollableFromString(STR."[Codex] \{codex.name()}", lines, cols, sb.toString());
     } catch (Exception e) {
       logger.severe(STR."Error while creating codex view.\{e.getMessage()}");
-      mustClose = true;
       exitNicely();
-      System.exit(0);
     }
     return null;
   }

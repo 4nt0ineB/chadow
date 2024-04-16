@@ -1,6 +1,6 @@
-package fr.uge.chadow.cli.display.view;
+package fr.uge.chadow.client.cli.display.view;
 
-import fr.uge.chadow.cli.display.View;
+import fr.uge.chadow.client.cli.display.View;
 
 import java.util.List;
 

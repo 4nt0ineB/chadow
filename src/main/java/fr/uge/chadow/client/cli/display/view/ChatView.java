@@ -1,8 +1,8 @@
-package fr.uge.chadow.cli.display.view;
+package fr.uge.chadow.client.cli.display.view;
 
-import fr.uge.chadow.cli.CLIColor;
-import fr.uge.chadow.cli.display.Scroller;
-import fr.uge.chadow.cli.display.View;
+import fr.uge.chadow.client.cli.CLIColor;
+import fr.uge.chadow.client.cli.display.Scroller;
+import fr.uge.chadow.client.cli.display.View;
 import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.client.ClientConsoleController;
 import fr.uge.chadow.core.protocol.YellMessage;
@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import static fr.uge.chadow.cli.display.View.splitAndSanitize;
+import static fr.uge.chadow.client.cli.display.View.splitAndSanitize;
 
 public class ChatView implements View {
   private final ClientAPI clientAPI;

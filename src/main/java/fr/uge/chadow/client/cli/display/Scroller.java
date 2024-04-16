@@ -1,7 +1,6 @@
-package fr.uge.chadow.cli.display;
+package fr.uge.chadow.client.cli.display;
 
 
-import java.util.Objects;
 import java.util.logging.Logger;
 
 public class Scroller {
@@ -64,5 +63,21 @@ public class Scroller {
   
   public void moveToBottom() {
     currentLine = Math.max(0, lines - pageHeight);
+  }
+  
+  public boolean isAtBottom() {
+    return currentLine == Math.max(0, lines - pageHeight);
+  }
+  
+  public int getLines() {
+    return lines;
+  }
+  
+  public int getCurrentLine() {
+    return currentLine;
+  }
+  
+  public void setCurrentLine(int currentLine) {
+    this.currentLine = currentLine;
   }
 }

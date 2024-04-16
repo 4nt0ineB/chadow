@@ -1,11 +1,11 @@
-package fr.uge.chadow.cli.display;
+package fr.uge.chadow.client.cli.display;
 
-import fr.uge.chadow.cli.CLIColor;
-import fr.uge.chadow.cli.display.view.ScrollableView;
-import fr.uge.chadow.cli.display.view.SelectorView;
-import fr.uge.chadow.client.CodexController;
+import fr.uge.chadow.client.cli.CLIColor;
+import fr.uge.chadow.client.cli.display.view.ScrollableView;
+import fr.uge.chadow.client.cli.display.view.SelectorView;
 import fr.uge.chadow.client.CodexStatus;
 import fr.uge.chadow.client.DirectMessages;
+import fr.uge.chadow.core.protocol.server.SearchResponse;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
@@ -155,20 +155,20 @@ public interface View {
     if (bytes < 0) {
       throw new IllegalArgumentException("bytes must be positive");
     }
-    if (bytes < 1024) {
-      return STR."\{bytes} B";
+    if (bytes < 1000) {
+      return STR."\{bytes} o";
     }
-    if (bytes < 1024 * 1024) {
-      return String.format("%.2f KB", (bytes / 1024d));
+    if (bytes < 1000 * 1000) {
+      return String.format("%.2f Ko", (bytes / 1000d));
     }
-    if (bytes < 1024 * 1024 * 1024) {
-      return String.format("%.2f MB", ((bytes / (1024d * 1024))));
+    if (bytes < 1000 * 1000 * 1000) {
+      return String.format("%.2f Mo", ((bytes / (1000d * 1000))));
     }
-    if (bytes < 1024L * 1024 * 1024 * 1024) {
-      return String.format("%.2f GB", (bytes / (1024d * 1024 * 1024)));
+    if (bytes < 1000L * 1000 * 1000 * 1000) {
+      return String.format("%.2f Go", (bytes / (1000d * 1000 * 1000)));
     }
-    if (bytes < 1024L * 1024 * 1024 * 1024 * 1024) {
-      return String.format("%.2f TB", (bytes / (1024d * 1024 * 1024 * 1024)));
+    if (bytes < 1000L * 1000L * 1000L * 1000L * 1000L) {
+      return String.format("%.2f To", (bytes / (1000d * 1000d * 1000d * 1000d)));
     }
     return "+inf (╯°□°)╯︵ ┻━┻";
   }
@@ -221,6 +221,10 @@ public interface View {
       linesByItem.add(Map.entry(item, formattedDescription));
     }
     return new SelectorView<>(title, lines, cols, linesByItem, new ScrollableView(title, lines, cols, linesToDisplay), mapper);
+  }
+  
+  static String codexSearchResultShortDescription(SearchResponse.Result searchResult) {
+    return STR."\{searchResult.codexName()} ─ \{formatDate(searchResult.creationDate())} ─ \{searchResult.sharers()} sharers";
   }
   
   static String codexShortDescription(CodexStatus codexStatus) {

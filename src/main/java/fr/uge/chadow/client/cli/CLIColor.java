@@ -1,4 +1,4 @@
-package fr.uge.chadow.cli;
+package fr.uge.chadow.client.cli;
 
 import java.util.Objects;
 import java.util.Random;

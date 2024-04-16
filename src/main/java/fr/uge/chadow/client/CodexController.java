@@ -1,6 +1,6 @@
 package fr.uge.chadow.client;
 
-import fr.uge.chadow.cli.display.View;
+import fr.uge.chadow.client.cli.display.View;
 import fr.uge.chadow.core.protocol.field.Codex;
 
 import java.io.*;

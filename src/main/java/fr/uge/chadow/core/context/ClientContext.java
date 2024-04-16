@@ -28,8 +28,7 @@ public final class ClientContext extends Context {
       case OK ok -> {
         logger.info("Connected to the server");
         api.bindContext(this);
-        
-        super.addFrame(new Discovery());
+        super.addFrame(new Discovery()); // fetch all users
         super.processOut();
       }
       case YellMessage yellMessage -> api.addMessage(yellMessage);
@@ -45,6 +44,10 @@ public final class ClientContext extends Context {
       case RequestOpenDownload requestOpenDownload -> {
         logger.info(STR."Received request open download  \{requestOpenDownload.sockets().length} sockets");
         api.addSocketsOpenDownload(requestOpenDownload.sockets());
+      }
+      case SearchResponse searchResponse -> {
+        logger.info(STR."Received search response (\{searchResponse.results().length} results)");
+        api.saveSearchResponse(searchResponse);
       }
       case Event event -> {
         if(event.code() == (byte) 0) {

@@ -110,6 +110,18 @@ public final class ServerContext extends Context {
         }
       }
 
+      case Search search -> {
+        if (!isAuthenticated()) {
+          logger.warning(STR."Client \{super.getSocket().getRemoteAddress()} is not authenticated");
+          silentlyClose();
+          return;
+        }
+        logger.info(STR."Searching for \{search.codexName()}");
+        var result = server.search(search);
+        queueFrame(result);
+        logger.info(STR."Get \{result.results().length} results");
+      }
+      
       default -> {
         logger.warning("No action for the received frame ");
         silentlyClose();

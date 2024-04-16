@@ -128,4 +128,12 @@ public class SelectorView<T> implements Selectable<T>, View {
     scrollableView.clear();
   }
   
+  public boolean isAtBottom() {
+    return scrollableView.isAtBottom();
+  }
+  
+  public void setAtSamePosition(SelectorView other) {
+    this.scrollableView.setAsSamePosition(other.scrollableView);
+  }
+  
 }

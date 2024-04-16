@@ -1,8 +1,8 @@
-package fr.uge.chadow.cli.display.view;
+package fr.uge.chadow.client.cli.display.view;
 
-import fr.uge.chadow.cli.CLIColor;
-import fr.uge.chadow.cli.display.Scroller;
-import fr.uge.chadow.cli.display.View;
+import fr.uge.chadow.client.cli.CLIColor;
+import fr.uge.chadow.client.cli.display.Scroller;
+import fr.uge.chadow.client.cli.display.View;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -107,5 +107,14 @@ public class ScrollableView implements View {
   
   public Scroller getScroller() {
     return scroller;
+  }
+  
+  public void setAsSamePosition(ScrollableView other) {
+    scroller.setLines(other.scroller.getLines());
+    scroller.setCurrentLine(other.scroller.getCurrentLine());
+  }
+  
+  public boolean isAtBottom() {
+    return scroller.isAtBottom();
   }
 }

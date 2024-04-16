@@ -1,6 +1,6 @@
-package fr.uge.chadow.cli.display;
+package fr.uge.chadow.client.cli.display;
 
-import fr.uge.chadow.cli.CLIColor;
+import fr.uge.chadow.client.cli.CLIColor;
 
 import java.util.Comparator;
 import java.util.PriorityQueue;
