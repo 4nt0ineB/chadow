@@ -12,7 +12,7 @@ public record Propose(Codex codex) implements Frame {
   
   @Override
   public ByteBuffer toByteBuffer() {
-    var opcode = Opcode.PROPOSE.toByte();
+    var opcode = Opcode.toByte(this.getClass());
     var codexBuffer = codex.toByteBuffer().flip();
     var buffer = ByteBuffer.allocate(Byte.BYTES + codexBuffer.remaining());
     logger.info(STR."Propose frame created of size \{buffer.remaining()} bytes");

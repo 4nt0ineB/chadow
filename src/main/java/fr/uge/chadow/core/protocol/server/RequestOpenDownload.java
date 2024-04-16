@@ -12,17 +12,16 @@ public record RequestOpenDownload(SocketField[] sockets) implements Frame {
   public ByteBuffer toByteBuffer() {
     var socketsByteBuffersArray = new ByteBuffer[sockets.length];
     var bufferCapacity = 0;
-
     for (int i = 0; i < sockets.length; i++) {
-      socketsByteBuffersArray[i] = sockets[i].toByteBuffer().flip();
+      socketsByteBuffersArray[i] = sockets[i].toByteBuffer()
+                                             .flip();
       bufferCapacity += socketsByteBuffersArray[i].remaining();
     }
-
     var bbRequestOpenDownload = ByteBuffer.allocate(Byte.BYTES + Integer.BYTES + bufferCapacity);
-
-    bbRequestOpenDownload.put(Opcode.REQUEST_OPEN_DOWNLOAD_RESPONSE.toByte()).putInt(sockets.length);
-
-    Arrays.stream(socketsByteBuffersArray).forEach(bbRequestOpenDownload::put);
+    bbRequestOpenDownload.put(Opcode.toByte(this.getClass()))
+                         .putInt(sockets.length);
+    Arrays.stream(socketsByteBuffersArray)
+          .forEach(bbRequestOpenDownload::put);
     return bbRequestOpenDownload;
   }
 }

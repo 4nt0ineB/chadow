@@ -10,11 +10,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public record Request(String codexId) implements Frame {
   @Override
   public ByteBuffer toByteBuffer() {
-    var opcode = Opcode.REQUEST.toByte();
+    var opcode = Opcode.toByte(this.getClass());
     var codexIdBuffer = UTF_8.encode(codexId);
-    
     var bb = ByteBuffer.allocate(Byte.BYTES + Integer.BYTES + codexIdBuffer.remaining());
-
     return bb.put(opcode).putInt(codexIdBuffer.remaining()).put(codexIdBuffer);
   }
 }

@@ -10,12 +10,10 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public record RequestDownload(String codexId, byte mode) implements Frame {
   @Override
   public ByteBuffer toByteBuffer() {
-    var opcodeByte = Opcode.REQUEST_DOWNLOAD.toByte();
+    var opcodeByte = Opcode.toByte(this.getClass());
     var codexIdByteBuffer = UTF_8.encode(codexId);
     var bb = ByteBuffer.allocate(Byte.BYTES * 2 + Integer.BYTES + codexIdByteBuffer.remaining());
-
-    return bb
-            .put(opcodeByte)
+    return bb.put(opcodeByte)
             .putInt(codexIdByteBuffer.remaining())
             .put(codexIdByteBuffer)
             .put(mode);

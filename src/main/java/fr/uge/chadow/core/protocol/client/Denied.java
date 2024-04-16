@@ -14,7 +14,7 @@ public record Denied(String codexId) implements Frame {
   public ByteBuffer toByteBuffer() {
     var bbCodexId = UTF8.encode(codexId);
     var buffer = ByteBuffer.allocate(Byte.BYTES + Integer.BYTES + bbCodexId.remaining());
-    return buffer.put(Opcode.DENIED.toByte())
+    return buffer.put(Opcode.toByte(this.getClass()))
                  .putInt(bbCodexId.remaining())
                  .put(bbCodexId);
   }

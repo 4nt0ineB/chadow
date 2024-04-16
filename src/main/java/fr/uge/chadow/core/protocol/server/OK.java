@@ -8,6 +8,6 @@ import java.nio.ByteBuffer;
 public record OK() implements Frame {
   @Override
   public ByteBuffer toByteBuffer() {
-    return ByteBuffer.allocate(Byte.BYTES).put(Opcode.OK.toByte());
+    return ByteBuffer.allocate(Byte.BYTES).put(Opcode.toByte(this.getClass()));
   }
 }

@@ -9,10 +9,11 @@ import java.nio.ByteBuffer;
 public record RequestResponse(Codex codex) implements Frame {
   @Override
   public ByteBuffer toByteBuffer() {
-    var opcode = Opcode.REQUEST_RESPONSE.toByte();
-    var codexIdBuffer = codex.toByteBuffer().flip();
-
+    var opcode = Opcode.toByte(this.getClass());
+    var codexIdBuffer = codex.toByteBuffer()
+                             .flip();
     var bb = ByteBuffer.allocate(Byte.BYTES + codexIdBuffer.remaining());
-    return bb.put(opcode).put(codexIdBuffer);
+    return bb.put(opcode)
+             .put(codexIdBuffer);
   }
 }

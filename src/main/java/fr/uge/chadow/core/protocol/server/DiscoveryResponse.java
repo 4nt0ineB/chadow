@@ -20,7 +20,7 @@ public record DiscoveryResponse(String[] usernames) implements Frame {
 
     var bbDiscovery = ByteBuffer.allocate(Byte.BYTES + Integer.BYTES + bufferCapacity);
 
-    bbDiscovery.put(Opcode.DISCOVERY_RESPONSE.toByte()).putInt(usernames.length);
+    bbDiscovery.put(Opcode.toByte(this.getClass())).putInt(usernames.length);
     Arrays.stream(usernamesByteBuffersArray).forEach(bbUsername -> bbDiscovery.putInt(bbUsername.remaining()).put(bbUsername));
     return bbDiscovery;
   }

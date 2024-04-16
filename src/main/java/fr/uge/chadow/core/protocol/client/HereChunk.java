@@ -10,7 +10,7 @@ public record HereChunk(long offset, byte[] payload) implements Frame {
     @Override
     public ByteBuffer toByteBuffer() {
       var buffer = ByteBuffer.allocate(Byte.BYTES + Long.BYTES + Integer.BYTES + payload.length);
-      return buffer.put(Opcode.HERECHUNK.toByte())
+      return buffer.put(Opcode.toByte(this.getClass()))
                   .putLong(offset)
                   .putInt(payload.length)
                   .put(payload);

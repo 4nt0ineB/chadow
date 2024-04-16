@@ -25,22 +25,9 @@ public class FrameReader implements Reader<Frame> {
   private Frame frame;
 
   public FrameReader() {
-    readers.put(Opcode.REGISTER, new GlobalReader<>(Register.class));
-    readers.put(Opcode.OK, new GlobalReader<>(OK.class));
-    readers.put(Opcode.DISCOVERY, new GlobalReader<>(Discovery.class));
-    readers.put(Opcode.DISCOVERY_RESPONSE, new GlobalReader<>(DiscoveryResponse.class));
-    readers.put(Opcode.EVENT, new GlobalReader<>(Event.class));
-    readers.put(Opcode.YELL, new GlobalReader<>(YellMessage.class));
-    readers.put(Opcode.WHISPER, new GlobalReader<>(WhisperMessage.class));
-    readers.put(Opcode.PROPOSE, new GlobalReader<>(Propose.class));
-    readers.put(Opcode.REQUEST, new GlobalReader<>(Request.class));
-    readers.put(Opcode.NEEDCHUNK, new GlobalReader<>(NeedChunk.class));
-    readers.put(Opcode.HERECHUNK, new GlobalReader<>(HereChunk.class));
-    readers.put(Opcode.DENIED, new GlobalReader<>(Denied.class));
-    readers.put(Opcode.HANDSHAKE, new GlobalReader<>(Handshake.class));
-    readers.put(Opcode.REQUEST_RESPONSE, new GlobalReader<>(RequestResponse.class));
-    readers.put(Opcode.REQUEST_DOWNLOAD, new GlobalReader<>(RequestDownload.class));
-    readers.put(Opcode.REQUEST_OPEN_DOWNLOAD_RESPONSE, new GlobalReader<>(RequestOpenDownload.class));
+    for(var opcode : Opcode.values()) {
+      readers.put(opcode, opcode.getReader());
+    }
   }
 
   @Override
@@ -54,7 +41,7 @@ public class FrameReader implements Reader<Frame> {
       if (opcodeStatus != ProcessStatus.DONE) {
         return opcodeStatus;
       }
-      opcode = Opcode.from(byteReader.get());
+      opcode = Opcode.values()[byteReader.get()];
       if (!readers.containsKey(opcode)) {
         return ProcessStatus.ERROR;
       }

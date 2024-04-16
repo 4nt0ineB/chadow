@@ -7,7 +7,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public record YellMessage(String login, String txt, long epoch) implements Frame {
 
   public ByteBuffer toByteBuffer() {
-    var opcode = Opcode.YELL.toByte();
+    var opcode = Opcode.toByte(this.getClass());
     var bbLogin = UTF_8.encode(login);
     var bbTxt = UTF_8.encode(txt);
     var bbMsg = ByteBuffer.allocate(Byte.BYTES + bbLogin.remaining() + bbTxt.remaining() + 2 * Integer.BYTES +

@@ -9,7 +9,7 @@ public record Discovery() implements Frame {
   @Override
   public ByteBuffer toByteBuffer() {
     var bb = ByteBuffer.allocate(1);
-    bb.put(Opcode.DISCOVERY.toByte());
+    bb.put(Opcode.toByte(this.getClass()));
     return bb;
   }
 }
