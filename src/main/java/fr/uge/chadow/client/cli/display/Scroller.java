@@ -40,7 +40,6 @@ public class Scroller {
   
   public void scrollDown(int n) {
     currentLine = Math.min(maxPosition(), n + currentLine);
-    logger.info("currentLine: " + currentLine + " maxPosition: " + maxPosition() + " n: " + " " + n);
     logger.info("scroll down");
   }
   
@@ -68,7 +67,7 @@ public class Scroller {
   }
   
   public boolean isAtBottom() {
-    return currentLine == Math.max(0, lines - pageHeight);
+    return currentLine == maxPosition();
   }
   
   public int getLines() {
@@ -89,7 +88,6 @@ public class Scroller {
   }
 
   private int maxPosition() {
-    logger.info("lines: " + lines + " pageHeight: " + pageHeight);
     return Math.max(0, lines - pageHeight);
   }
 }

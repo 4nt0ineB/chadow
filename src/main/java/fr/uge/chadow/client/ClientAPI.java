@@ -98,7 +98,7 @@ public class ClientAPI {
       // just die
     }
     // make a loop to manage downloads
-    while (!Thread.interrupted()) {
+    while (!Thread.interrupted() && status.equals(STATUS.CONNECTED)) {
       var sockets = sharersSocketQueue.poll(DOWNLOAD_REQUEST_TIMEOUT, java.util.concurrent.TimeUnit.SECONDS);
       if (sockets != null) {
         var codexId = codexIdOfAskedDownload.pollFirst();

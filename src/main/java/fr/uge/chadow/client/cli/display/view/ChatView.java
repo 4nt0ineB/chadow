@@ -191,31 +191,25 @@ public class ChatView implements View {
    * @return
    */
   private List<YellMessage> getFormattedMessages() {
-    
     var list = getMessagesToDisplay();
-    
     return list.subList(Math.max(0, list.size() - View.maxLinesView(lines)), list.size());
     
   }
   
   
   private List<YellMessage> getMessagesToDisplay() {
-    
     if (formattedMessages.size() <= View.maxLinesView(lines) && !formattedMessages.isEmpty()) {
       return formattedMessages;
     }
-    
     if (mode == ClientConsoleController.Mode.CHAT_LIVE_REFRESH) {
       var messages = clientAPI.getPublicMessages();
       var list = messages.stream()
                          .flatMap(msg -> formatMessage(msg, msgLineLength()))
                          .toList();
       formattedMessages = list;
-      logger.info("ICI");
       messageScroller.setLines(list.size());
       return list.subList(Math.max(0, messages.size() - View.maxLinesView(lines)), list.size());
     }
-    logger.info("A: "+ messageScroller.getA() + " B: "+ messageScroller.getB() + " List: "+ formattedMessages.size());
     return formattedMessages.subList(messageScroller.getA(), messageScroller.getB()).stream().toList();
   }
   

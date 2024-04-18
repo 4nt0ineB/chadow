@@ -7,10 +7,10 @@ import fr.uge.chadow.client.cli.display.View;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.logging.Logger;
 
 public class SelectorView<T> implements Selectable<T>, View {
-  
-  
+  private static final Logger logger = Logger.getLogger(SelectorView.class.getName());
   private final List<Map.Entry<T, List<String>>> linesByItem;
   private final String title;
   private final int lines;
@@ -23,18 +23,28 @@ public class SelectorView<T> implements Selectable<T>, View {
                       ScrollableView scrollableView, Function<? super T, String> mapper) {
     this.linesByItem = linesByItem;
     this.scrollableView = scrollableView;
+    scrollableView.scrollTop();
     this.title = title;
     this.lines = lines;
     this.cols = cols;
     this.mapper = mapper;
   }
+
   
-  public void selectorUp() {
-    itemPointerIndex = Math.max(0, itemPointerIndex - 1);
+  public void selectorFirst() {
+    itemPointerIndex = 0;
   }
   
-  public void selectorDown() {
-    itemPointerIndex = Math.min(linesByItem.size() - 1, itemPointerIndex + 1);
+  public void selectorLast() {
+    itemPointerIndex = linesByItem.size() - 1;
+  }
+  
+  private void selectFirstInPage() {
+    itemPointerIndex = scrollableView.getScroller().getA();
+  }
+  
+  private void selectLastInPage() {
+    itemPointerIndex = scrollableView.getScroller().getB() - 1;
   }
   
   @Override
@@ -46,31 +56,51 @@ public class SelectorView<T> implements Selectable<T>, View {
   @Override
   public void scrollPageUp() {
     scrollableView.scrollPageUp();
+    selectLastInPage();
   }
   
   @Override
   public void scrollPageDown() {
     scrollableView.scrollPageDown();
+    // select first item of the page
+    selectFirstInPage();
   }
   
   @Override
   public void scrollBottom() {
     scrollableView.scrollBottom();
+    selectorLast();
   }
   
   @Override
   public void scrollTop() {
     scrollableView.scrollTop();
+    selectorFirst();
   }
   
   @Override
   public void scrollLineDown() {
-    scrollableView.scrollLineDown();
+    selectorDown();
   }
   
   @Override
   public void scrollLineUp() {
-    scrollableView.scrollLineUp();
+    selectorUp();
+  }
+  
+  
+  public void selectorUp() {
+    if(itemPointerIndex <= scrollableView.getScroller().getA()){
+      scrollableView.scrollLineUp();
+    }
+    itemPointerIndex = Math.max(0, itemPointerIndex - 1);
+  }
+  
+  public void selectorDown() {
+    if(itemPointerIndex >= scrollableView.getScroller().getB()-1){
+      scrollableView.scrollLineDown();
+    }
+    itemPointerIndex = Math.min(linesByItem.size() - 1, itemPointerIndex + 1);
   }
   
   @Override
@@ -94,21 +124,20 @@ public class SelectorView<T> implements Selectable<T>, View {
     if (linesByItem.isEmpty()) {
       return;
     }
-    var lineIndex = 1 + itemPointerIndex;
+    var lineIndex = 1 + itemPointerIndex - scrollableView.getScroller().getA();
+    logger.info("Cursor is at position: " + itemPointerIndex);
+    logger.info("A: " + scrollableView.getScroller().getA() + " B: " + scrollableView.getScroller().getB());
     if (!selectedItemIsVisible()) {
       return;
     }
-    
+    logger.info("Cursor is at position: " + itemPointerIndex);
     // Not extacly it, but it's a good start we must use A() and B() to get the visible part of the scrollable view
-    /*for (var line : linesByItem.get(itemPointerIndex)
+    for (var line : linesByItem.get(itemPointerIndex)
                                .getValue()) {
       View.moveCursorToPosition(1, 1 + lineIndex);
       System.out.printf(STR."\{STR."\{CLIColor.ORANGE}\{CLIColor.BOLD}%-\{cols}s\{CLIColor.RESET}"}%n", line);
       lineIndex++;
-    }*/
-
-    
-    
+    }
     // Get the cursor back to the end of the scrollable view
     View.moveCursorToPosition(1, lines - 2);
   }
