@@ -130,9 +130,10 @@ public class Server {
       return result;
     };
     
+    logger.info(STR."Searching for \{search.codexName()}");
     var filteredCodexes = codexes.keySet().stream()
         .filter(dateFilter)
-        .filter(c -> c.codex().name().contains(search.codexName()))
+        .filter(c ->  c.codex().name().contains(search.codexName()))
         .skip(search.offset())
         .limit(search.results())
         .map(codexRegistration -> {

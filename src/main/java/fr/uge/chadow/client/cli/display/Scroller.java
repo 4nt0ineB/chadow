@@ -5,15 +5,18 @@ import java.util.logging.Logger;
 
 public class Scroller {
   private static final Logger logger = Logger.getLogger(Scroller.class.getName());
-  private final int pageHeight;
+  private int pageHeight;
   private int currentLine;
   private int lines;
+  
   
   public Scroller(int lines, int pageHeight) {
     this.pageHeight = pageHeight;
     this.lines = lines;
     currentLine = Math.max(lines - pageHeight, 0);
   }
+  
+
   
   /**
    * Reset the scroller
@@ -22,7 +25,7 @@ public class Scroller {
    */
   public void setLines(int lines) {
     this.lines = lines;
-    currentLine = Math.max(lines - pageHeight, 0);
+    moveToBottom();
   }
   
   public void scrollPageUp() {
@@ -36,10 +39,9 @@ public class Scroller {
   }
   
   public void scrollDown(int n) {
-    if (currentLine < lines) {
-      currentLine = Math.min(lines - pageHeight, currentLine + n);
-      logger.info("scroll down");
-    }
+    currentLine = Math.min(maxPosition(), n + currentLine);
+    logger.info("currentLine: " + currentLine + " maxPosition: " + maxPosition() + " n: " + " " + n);
+    logger.info("scroll down");
   }
   
   public void scrollUp(int n) {
@@ -62,7 +64,7 @@ public class Scroller {
   }
   
   public void moveToBottom() {
-    currentLine = Math.max(0, lines - pageHeight);
+    scrollDown(maxPosition());
   }
   
   public boolean isAtBottom() {
@@ -79,5 +81,15 @@ public class Scroller {
   
   public void setCurrentLine(int currentLine) {
     this.currentLine = currentLine;
+  }
+  
+  public void setPageHeight(int i) {
+    currentLine = Math.max(0, currentLine - pageHeight + i);
+    pageHeight = i;
+  }
+
+  private int maxPosition() {
+    logger.info("lines: " + lines + " pageHeight: " + pageHeight);
+    return Math.max(0, lines - pageHeight);
   }
 }

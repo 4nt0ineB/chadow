@@ -83,6 +83,11 @@ public class SelectorView<T> implements Selectable<T>, View {
     this.linesByItem.addAll(select.linesByItem);
   }
   
+  /**
+   * Draw the selector view.
+   * We draw the scrollable view.
+   * Then we overlay the selected item with a different color.
+   */
   @Override
   public void draw() {
     scrollableView.draw();
@@ -93,12 +98,18 @@ public class SelectorView<T> implements Selectable<T>, View {
     if (!selectedItemIsVisible()) {
       return;
     }
-    for (var line : linesByItem.get(itemPointerIndex)
+    
+    // Not extacly it, but it's a good start we must use A() and B() to get the visible part of the scrollable view
+    /*for (var line : linesByItem.get(itemPointerIndex)
                                .getValue()) {
       View.moveCursorToPosition(1, 1 + lineIndex);
       System.out.printf(STR."\{STR."\{CLIColor.ORANGE}\{CLIColor.BOLD}%-\{cols}s\{CLIColor.RESET}"}%n", line);
       lineIndex++;
-    }
+    }*/
+
+    
+    
+    // Get the cursor back to the end of the scrollable view
     View.moveCursorToPosition(1, lines - 2);
   }
   
@@ -132,7 +143,7 @@ public class SelectorView<T> implements Selectable<T>, View {
     return scrollableView.isAtBottom();
   }
   
-  public void setAtSamePosition(SelectorView other) {
+  public void setAtSamePosition(SelectorView<?> other) {
     this.scrollableView.setAsSamePosition(other.scrollableView);
   }
   

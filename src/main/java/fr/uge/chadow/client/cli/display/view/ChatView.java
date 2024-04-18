@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -19,6 +20,7 @@ import java.util.stream.Stream;
 import static fr.uge.chadow.client.cli.display.View.splitAndSanitize;
 
 public class ChatView implements View {
+  private static final Logger logger = Logger.getLogger(ChatView.class.getName());
   private final ClientAPI clientAPI;
   private final Scroller messageScroller;
   private final Scroller userScroller;
@@ -27,6 +29,8 @@ public class ChatView implements View {
   private int lines;
   private int cols;
   private ClientConsoleController.Mode mode = ClientConsoleController.Mode.CHAT_LIVE_REFRESH;
+  private List<YellMessage> formattedMessages = new ArrayList<>();
+  
   
   public ChatView(int lines, int cols, ClientAPI controller) {
     Objects.requireNonNull(controller);
@@ -54,6 +58,8 @@ public class ChatView implements View {
     try {
       this.lines = lines;
       this.cols = cols;
+      messageScroller.setPageHeight(View.maxLinesView(lines));
+      userScroller.setPageHeight(View.maxLinesView(lines));
     } finally {
       lock.unlock();
     }
@@ -73,7 +79,7 @@ public class ChatView implements View {
     System.out.print(chatHeader());
     System.out.print(chatDisplay());
     if (mode == ClientConsoleController.Mode.CHAT_LIVE_REFRESH) {
-      messageScroller.setLines(clientAPI.numberOfMessages());
+      //messageScroller.setLines(formattedMessages.size());
     }
   }
   
@@ -186,10 +192,8 @@ public class ChatView implements View {
    */
   private List<YellMessage> getFormattedMessages() {
     
-    var subList = getMessagesToDisplay();
-    var list = subList.stream()
-                      .flatMap(message -> formatMessage(message, msgLineLength()))
-                      .collect(Collectors.toList());
+    var list = getMessagesToDisplay();
+    
     return list.subList(Math.max(0, list.size() - View.maxLinesView(lines)), list.size());
     
   }
@@ -197,16 +201,22 @@ public class ChatView implements View {
   
   private List<YellMessage> getMessagesToDisplay() {
     
-    var messages = clientAPI.getPublicMessages();
-    
-    if (messages.size() <= View.maxLinesView(lines)) {
-      return messages;
+    if (formattedMessages.size() <= View.maxLinesView(lines) && !formattedMessages.isEmpty()) {
+      return formattedMessages;
     }
+    
     if (mode == ClientConsoleController.Mode.CHAT_LIVE_REFRESH) {
-      return messages.subList(Math.max(0, messages.size() - View.maxLinesView(lines)), messages.size());
+      var messages = clientAPI.getPublicMessages();
+      var list = messages.stream()
+                         .flatMap(msg -> formatMessage(msg, msgLineLength()))
+                         .toList();
+      formattedMessages = list;
+      logger.info("ICI");
+      messageScroller.setLines(list.size());
+      return list.subList(Math.max(0, messages.size() - View.maxLinesView(lines)), list.size());
     }
-    return messages.subList(messageScroller.getA(), messageScroller.getB());
-    
+    logger.info("A: "+ messageScroller.getA() + " B: "+ messageScroller.getB() + " List: "+ formattedMessages.size());
+    return formattedMessages.subList(messageScroller.getA(), messageScroller.getB()).stream().toList();
   }
   
   private List<String> getUsersToDisplay() {
@@ -251,6 +261,9 @@ public class ChatView implements View {
   
   public void setMode(ClientConsoleController.Mode mode) {
     this.mode = mode;
+    if(mode == ClientConsoleController.Mode.CHAT_SCROLLER) {
+      messageScroller.moveToBottom();
+    }
   }
   
   @Override
@@ -272,8 +285,8 @@ public class ChatView implements View {
   @Override
   public void scrollBottom() {
     switch (mode) {
-      case CHAT_SCROLLER -> messageScroller.setLines(clientAPI.numberOfMessages());
-      case USERS_SCROLLER -> userScroller.setLines(clientAPI.users().size());
+      case CHAT_SCROLLER -> messageScroller.moveToBottom();
+      case USERS_SCROLLER -> userScroller.moveToBottom();
     }
   }
   

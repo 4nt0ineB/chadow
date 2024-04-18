@@ -70,14 +70,6 @@ public class ClientAPI {
     Objects.requireNonNull(login);
     this.login = login;
     this.serverAddress = serverAddress;
-    try {
-      fillWithFakeData();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    } catch (NoSuchAlgorithmException e) {
-      throw new RuntimeException(e);
-      // just die
-    }
   }
   
   /**
@@ -96,7 +88,15 @@ public class ClientAPI {
     this.contextHandler = new ContextHandler(0, key -> new SharerContext(key, this));
     // Starts the client thread
     startClient();
-    
+    waitForConnection();
+    try {
+      fillWithFakeData();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } catch (NoSuchAlgorithmException e) {
+      throw new RuntimeException(e);
+      // just die
+    }
     // make a loop to manage downloads
     while (!Thread.interrupted()) {
       var sockets = sharersSocketQueue.poll(DOWNLOAD_REQUEST_TIMEOUT, java.util.concurrent.TimeUnit.SECONDS);
@@ -276,7 +276,7 @@ public class ClientAPI {
   public List<YellMessage> getPublicMessages() {
     lock.lock();
     try {
-      return Collections.unmodifiableList(publicMessages);
+      return List.copyOf(publicMessages);
     } finally {
       lock.unlock();
     }
@@ -634,8 +634,8 @@ public class ClientAPI {
   }
   
   private void fillWithFakeData() throws IOException, NoSuchAlgorithmException {
-    /*var users = new String[]{"test", "Morpheus", "Trinity", "Neo", "Flynn", "Alan", "Lora", "Gandalf", "Bilbo", "SKIDROW", "Antoine"};
-    this.users.addAll(Arrays.asList(users));*/
+    var users = new String[]{"test", "Morpheus", "Trinity", "Neo", "Flynn", "Alan", "Lora", "Gandalf", "Bilbo", "SKIDROW", "Antoine"};
+    this.users.addAll(Arrays.asList(users));
     var messages = new YellMessage[]{
         new YellMessage("test", "test", System.currentTimeMillis()),
         new YellMessage("test", "hello how are you", System.currentTimeMillis()),
@@ -653,6 +653,43 @@ public class ClientAPI {
     // test codex
     if (login.equals("Alan1")) {
       codexController.createFromPath("my codex", "/home/alan1/Pictures");
+      var paths = new String[]{
+          "lau-ardelean-wallpaper",
+          "lau-ardelean-wallpaper/Ephemeral-Echoes-Landscape.jpg",
+          "lau-ardelean-wallpaper/Lonely-Wavelengths-Landscape.jpg",
+          "lau-ardelean-wallpaper/the-beauty-of-identity-and-circuitry-v0-3q6rocbvslib1.jpg",
+          "lau-ardelean-wallpaper/Intersecting-Human-Form-Landscape.jpg",
+          "lau-ardelean-wallpaper/The-Tree-Landscape.jpg",
+          "lau-ardelean-wallpaper/Luminous-Horizon-Landscape.jpg",
+          "lau-ardelean-wallpaper/Fluidity-and-Repetition-in-the-Bay-Landscape.jpg",
+          "lau-ardelean-wallpaper/Branches-of-Restraint-Ladscape.jpg",
+          "lau-ardelean-wallpaper/Retro-Ascent-Landscape.jpg",
+          "lau-ardelean-wallpaper/Lone-Island-Landscape.jpg",
+          "lau-ardelean-wallpaper/Stormy-Seascape-Feather-Landscape.jpg",
+          "lau-ardelean-wallpaper/Dark-Sunset-Landscape.jpg",
+          "CV_Bastos_Antoine.pdf",
+          "Screenshot from 2024-04-16 01-10-38.png",
+          "questions-reponses.pdf",
+          "Screenshot from 2024-04-14 22-58-42.png",
+          "STScI-01HM9W90RSHFHAEAW5FKGVJCTH.png",
+          "test",
+          "test/2.txt",
+          "test/1.txt",
+          "test/Black-Panthers-in-Chicago-010.avif",
+          "Black-Panthers-in-Chicago-010.avif",
+          "Black-Panthers-in-Chicago-010.jpg",
+          "smplayer_screenshots",
+          "Screenshot from 2023-11-10 22-27-56.png",
+          "170189868287888.jpeg",
+          "Screenshot from 2023-10-11 20-52-51.png",
+          "an7qgBo_700b.jpg",
+          "Screenshot from 2023-10-11 18-11-22.png"
+      };
+      var random = new Random();
+      for (var path : paths) {
+        var status = codexController.createFromPath(STR."my codex (\{random.nextInt(100)})", "/home/alan1/Pictures/" + path);
+        share(status.id());
+      }
       //codexController.createFromPath("my codex", "/home/alan1/Pictures/test");
       
     }

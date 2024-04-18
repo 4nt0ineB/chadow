@@ -254,8 +254,7 @@ public class CodexController {
   private static Codex.FileInfo fileInfofromPath(String root, Path path) throws NoSuchAlgorithmException, IOException {
     var file = path.toFile();
     var id = View.bytesToHexadecimal(fingerprint(file));
-    var size = (int) Math.ceil((double) file.length() / CodexStatus.chunkSize());
-    return new Codex.FileInfo(id, file.getName(), file.length(), file.getParent().substring(root.length()));
+    return new Codex.FileInfo(id, file.getName(), file.length(), file.getParent().substring(Math.min(root.length(), file.getParent().length())));
   }
   
   
