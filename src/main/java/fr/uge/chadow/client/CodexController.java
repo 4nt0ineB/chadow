@@ -257,6 +257,13 @@ public class CodexController {
     return new Codex.FileInfo(id, file.getName(), file.length(), file.getParent().substring(Math.min(root.length(), file.getParent().length())));
   }
   
-  
+  /**
+   * Close the codex controller
+   * Stops all sharing and downloading codexes
+   */
+  public void close() {
+    codexes.values().forEach(CodexStatus::stopSharing);
+    codexes.values().forEach(CodexStatus::stopDownloading);
+  }
   
 }

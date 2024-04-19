@@ -24,7 +24,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
@@ -169,6 +168,7 @@ public class ClientAPI {
     try {
       logger.severe("Closing the client API");
       status = STATUS.CLOSED;
+      codexController.close();
       connectionCondition.signalAll();
     } finally {
       lock.unlock();

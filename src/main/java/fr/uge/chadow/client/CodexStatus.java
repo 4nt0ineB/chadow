@@ -36,10 +36,6 @@ public class CodexStatus {
     sharedFiles = new RandomAccessFile[files.length];
   }
   
-  public static int chunkSize() {
-    return CHUNK_SIZE;
-  }
-  
   public int numberOfChunks(Codex.FileInfo file) {
     return (int) Math.ceil((double) file.length() / CHUNK_SIZE);
   }
@@ -176,7 +172,7 @@ public class CodexStatus {
   /**
    * Get the next random chunk to download
    *
-   * @return
+   * @return the chunk
    */
   public Chunk nextRandomChunk() {
     lock.lock();
@@ -222,6 +218,8 @@ public class CodexStatus {
     var data = new byte[length];
     var raf = sharedFiles[fileIndex];
     if (raf == null) {
+      // we cache the file reader, will be closed when the codex is complete
+      // or the sharing is stopped
       raf = new RandomAccessFile(path.toString(), "r");
       sharedFiles[fileIndex] = raf;
     }
@@ -263,24 +261,6 @@ public class CodexStatus {
       }
     } finally {
        lock.unlock();
-    }
-  }
-  
-  /**
-   * Get the index of a random non completed file
-   *
-   * @return the index of the file
-   */
-  private int randomNonCompletedFileIndex() {
-    lock.lock();
-    try {
-      var nonCompletedFiles = Arrays.stream(codex.files())
-                                    .filter(file -> !isComplete(file))
-                                    .toArray(Codex.FileInfo[]::new);
-      var random = new Random();
-      return random.nextInt(nonCompletedFiles.length);
-    } finally {
-      lock.unlock();
     }
   }
   
