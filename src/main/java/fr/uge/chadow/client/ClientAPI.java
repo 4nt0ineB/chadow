@@ -652,8 +652,9 @@ public class ClientAPI {
     //this.directMessages.put(userId, new DirectMessages(userId, "Alan1"));
     // test codex
     if (login.equals("Alan1")) {
-      codexController.createFromPath("my codex", "/home/alan1/Pictures");
-      var paths = new String[]{
+      var status = codexController.createFromPath("my codex", "/home/alan1/Pictures");
+      share(status.id());
+      /*var paths = new String[]{
           "lau-ardelean-wallpaper",
           "lau-ardelean-wallpaper/Ephemeral-Echoes-Landscape.jpg",
           "lau-ardelean-wallpaper/Lonely-Wavelengths-Landscape.jpg",
@@ -689,7 +690,7 @@ public class ClientAPI {
       for (var path : paths) {
         var status = codexController.createFromPath(STR."my codex (\{random.nextInt(100)})", "/home/alan1/Pictures/" + path);
         share(status.id());
-      }
+      }*/
       //codexController.createFromPath("my codex", "/home/alan1/Pictures/test");
       
     }

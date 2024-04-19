@@ -6,7 +6,6 @@ import fr.uge.chadow.client.cli.display.InfoBar;
 import fr.uge.chadow.client.cli.display.View;
 import fr.uge.chadow.client.cli.display.view.*;
 import fr.uge.chadow.core.protocol.client.Search;
-import fr.uge.chadow.core.protocol.field.Codex;
 import fr.uge.chadow.core.protocol.WhisperMessage;
 import fr.uge.chadow.core.protocol.server.SearchResponse;
 
@@ -15,7 +14,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.security.NoSuchAlgorithmException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -24,9 +22,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
-import static fr.uge.chadow.client.cli.display.View.colorize;
 
 public class ClientConsoleController {
   public enum Mode {
@@ -191,10 +187,22 @@ public class ClientConsoleController {
         .or(() -> globalCommandWhisper(input))
         .or(() -> globalCommandDraw(input))
         .or(() -> globalCommandSearch(input))
+        .or(() -> globalCommandLastSearch(input))
         .or(() -> Optional.of(processCommandInContext(input)));
     clearDisplayAndMore();
     viewCanRefresh.set(!canTypeAgain.orElse(false));
     drawDisplay();
+  }
+  
+  private Optional<Boolean> globalCommandLastSearch(String input) {
+    if(input.equals(":f")) {
+      if(lastSearch != null){
+        mode = Mode.CODEX_SEARCH;
+        setCurrentView(currentSelector);
+        return Optional.of(true);
+      }
+    }
+    return Optional.empty();
   }
   
   private void exitNicely() {
@@ -247,7 +255,7 @@ public class ClientConsoleController {
           return true;
         }
         selectedCodexForDetails = askCodexDetailsFromServer.orElseThrow();
-        setCurrentView(codexView(selectedCodexForDetails));
+        setCurrentView(new CodexView(selectedCodexForDetails, lines, cols));
         currentView.scrollTop();
         return true;
       }
@@ -277,10 +285,7 @@ public class ClientConsoleController {
                     .toList();
       currentSelector = View.selectorFromList("Direct messages", lines, cols, list, directMessages -> {
         var str = View.directMessageShortDescription(directMessages);
-        var lengthWithoutEscapeCodes = CLIColor.countLengthWithoutEscapeCodes(str);
-        var numberOfEscapeCodes = str.length() - lengthWithoutEscapeCodes;
-        var length = Math.min(str.length(), cols + numberOfEscapeCodes);
-        return str.substring(0, length) + CLIColor.RESET;
+        return View.responsiveCut(str, cols);
       });
       setCurrentView(currentSelector);
       logger.info("Displaying whispers");
@@ -339,9 +344,10 @@ public class ClientConsoleController {
             api.share(codexId);
           }
           mode = Mode.CODEX_DETAILS;
-          setCurrentView(codexView(currentCodex()));
+          setCurrentView(new CodexView(selectedCodexForDetails, lines, cols));
           currentView.scrollTop();
         }
+        return true;
       }
       case ":download" -> {
         var codexId = currentCodex().id();
@@ -352,9 +358,12 @@ public class ClientConsoleController {
             api.download(currentCodex().id());
           }
           mode = Mode.CODEX_DETAILS;
-          setCurrentView(codexView(currentCodex()));
+          setCurrentView(new CodexView(selectedCodexForDetails, lines, cols));
           currentView.scrollTop();
         }
+      }
+      case ":live" -> {
+        return false;
       }
       default -> {
         return processInputModeScroller(input);
@@ -416,7 +425,7 @@ public class ClientConsoleController {
         mode = Mode.CODEX_DETAILS;
         selectedCodexForDetails = (CodexStatus) currentSelector.get();
         logger.info(STR."see cdx: \{selectedCodexForDetails.id()}");
-        setCurrentView(codexView(selectedCodexForDetails));
+        setCurrentView(new CodexView(selectedCodexForDetails, lines, cols));
         currentView.scrollTop();
         logger.info(STR."see cdx: \{selectedCodexForDetails.id()}");
         return true;
@@ -534,7 +543,7 @@ public class ClientConsoleController {
         logger.info(STR.":create \{path}\n");
         selectedCodexForDetails = api.addCodex(codexName, path);
         mode = Mode.CODEX_DETAILS;
-        setCurrentView(codexView(selectedCodexForDetails));
+        setCurrentView(new CodexView(selectedCodexForDetails, lines, cols));
         currentView.scrollTop();
         logger.info(STR."Codex created with id: \{selectedCodexForDetails.id()}");
         return Optional.of(true);
@@ -561,7 +570,7 @@ public class ClientConsoleController {
       }
       selectedCodexForDetails = codex.orElseThrow();
       mode = Mode.CODEX_DETAILS;
-      setCurrentView(codexView(selectedCodexForDetails));
+      setCurrentView(new CodexView(selectedCodexForDetails, lines, cols));
       currentView.scrollTop();
       return Optional.of(true);
     }
@@ -596,7 +605,7 @@ public class ClientConsoleController {
       if (date != null) {
         var datetimeStr = time == null ? date : STR."\{date} \{time}";
         var simpleFormatter = new SimpleDateFormat();
-        var dateFormats = getDateFormats(Locale.getDefault());
+        var dateFormats = View.getDateFormats(Locale.getDefault());
         try {
           for(var format : dateFormats){
             simpleFormatter.applyPattern(format);
@@ -616,6 +625,7 @@ public class ClientConsoleController {
       }
       var results = response.orElseThrow();
       lastSearch = search;
+      lastSearchResults.clear();
       lastSearchResults.addAll(Arrays.asList(results.results()));
       mode = Mode.CODEX_SEARCH;
       currentSelector = View.selectorFromList("Search results", lines, cols, lastSearchResults, View::codexSearchResultShortDescription);
@@ -625,15 +635,7 @@ public class ClientConsoleController {
     return Optional.empty();
   }
   
-  public static String[] getDateFormats(Locale locale) {
-    String[] dateFormats;
-    if (locale.getLanguage().equals("fr")) {
-      dateFormats = new String[]{"dd/MM/yyyy HH:mm", "dd/MM/yyyy"};
-    } else {
-      dateFormats = new String[]{"MM/dd/yyyy HH:mm", "MM/dd/yyyy"};
-    }
-    return dateFormats;
-  }
+
   
   /**
    * Read user input from the console
@@ -712,7 +714,7 @@ public class ClientConsoleController {
               :new <codexName>, <path> - Create a codex from a file or directory
               \tand display the details of new created [CODEX] info (mind the space between , and <path>)
               :f, :find [:at(:before|:after)) <date>] [(name|date):(asc|desc)] <name> - Interrogate the server for codexes
-              
+              :f back to the last search results
               
               
               :mycdx - Display the list of your codex (selectable)
@@ -743,6 +745,7 @@ public class ClientConsoleController {
     return View.scrollableFromString("Help", lines, cols, txt);
   }
   
+  /*
   private ScrollableView codexView(CodexStatus codexStatus) {
     try {
       var codex = codexStatus.codex();
@@ -804,7 +807,7 @@ public class ClientConsoleController {
       exitNicely();
     }
     return null;
-  }
+  }*/
   
   
 }

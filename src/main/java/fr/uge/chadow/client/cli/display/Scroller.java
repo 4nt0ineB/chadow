@@ -19,7 +19,7 @@ public class Scroller {
   /**
    * Reset the scroller
    *
-   * @param lines
+   * @param lines the number of lines that the scroller will scroll
    */
   public void setLines(int lines) {
     this.lines = lines;

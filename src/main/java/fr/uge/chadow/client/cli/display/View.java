@@ -9,10 +9,7 @@ import fr.uge.chadow.core.protocol.server.SearchResponse;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
@@ -240,7 +237,11 @@ public interface View {
   }
   
   static String codexSearchResultShortDescription(SearchResponse.Result searchResult) {
-    return STR."\{searchResult.codexName()} ─ \{formatDate(searchResult.creationDate())} ─ \{searchResult.sharers()} sharers";
+    var formats = getDateFormats(Locale.getDefault());
+    var date = new Date(searchResult.creationDate());
+    var formatter = new SimpleDateFormat(formats[0]);
+    var formattedDate = formatter.format(date);
+    return STR."[\{formattedDate.substring(0, formattedDate.length()-6)}] \{CLIColor.BOLD}%-6s\{CLIColor.RESET} ─ \{searchResult.codexName()}".formatted(STR."(\{searchResult.sharers()}s)");
   }
   
   static String codexShortDescription(CodexStatus codexStatus) {
@@ -255,10 +256,25 @@ public interface View {
       return username;
     }
     var message = optLastMessage.orElseThrow();
-    return STR."\{username} ─ \{formatDate(message.epoch())} ─ \{message.txt()
-                                                                        .replace("\\s", "")}";
+    return STR."\{username} ─ \{formatDate(message.epoch())} ─ \{message.txt().replace("\\s", "")}";
   }
   
+  public static String[] getDateFormats(Locale locale) {
+    String[] dateFormats;
+    if (locale.getLanguage().equals("fr")) {
+      dateFormats = new String[]{"dd/MM/yyyy HH:mm", "dd/MM/yyyy"};
+    } else {
+      dateFormats = new String[]{"MM/dd/yyyy HH:mm", "MM/dd/yyyy"};
+    }
+    return dateFormats;
+  }
+  
+  /**
+   * Cut the string to the maximum number of characters without counting the escape codes (colors)
+   * @param str  the string to cut
+   * @param maxCharacters the maximum number of characters
+   * @return the cut string
+   */
   static String responsiveCut(String str, int maxCharacters) {
     var lengthWithoutEscapeCodes = CLIColor.countLengthWithoutEscapeCodes(str);
     var numberOfEscapeCodes = str.length() - lengthWithoutEscapeCodes;

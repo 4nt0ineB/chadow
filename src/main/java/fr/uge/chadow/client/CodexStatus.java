@@ -109,6 +109,16 @@ public class CodexStatus {
     return (double) completedChunks(file) / numberOfChunks(file);
   }
   
+  public double completionRate() {
+    return (double) chunks.values()
+                          .stream()
+                          .mapToInt(BitSet::cardinality)
+                          .sum() / chunks.keySet()
+                                         .stream()
+                                         .mapToInt(this::numberOfChunks)
+                                         .sum();
+  }
+  
   public Codex codex() {
     return codex;
   }

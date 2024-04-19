@@ -75,7 +75,7 @@ public class Server {
   }
 
   public void request(String codexId, ServerContext serverContext) {
-    logger.info(STR."map : \{codexes}");
+    //logger.info(STR."map : \{codexes}");
     var codex = codexes.keySet().stream()
                        .map(CodexRecord::codex)
                        .filter(c -> c.id().equals(codexId))

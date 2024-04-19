@@ -7,9 +7,10 @@ import fr.uge.chadow.client.cli.display.View;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.logging.Logger;
 
 public class ScrollableView implements View {
-  
+  private static final Logger logger = Logger.getLogger(ScrollableView.class.getName());
   
   private final ArrayList<String> textLines;
   private final Scroller scroller;
@@ -51,8 +52,8 @@ public class ScrollableView implements View {
     var maxLinesView = View.maxLinesView(lines);
     var start = scroller.getA();
     var end = scroller.getB();
+    logger.info("start %d end %d, numberoflines: %d".formatted(start, end, textLines.size()));
     var formattedLines = View.splitAndSanitize(textLines.subList(start, end), columns);
-    var digitsInNumberOfLines = String.valueOf(textLines.size()).length();
     for (; lineIndex < maxLinesView && lineIndex < formattedLines.size(); lineIndex++) {
       sb.append("%s".formatted(View.beautifyCodexLink(formattedLines.get(lineIndex))))
         .append("\n");
