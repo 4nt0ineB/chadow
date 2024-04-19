@@ -16,8 +16,6 @@ public class Scroller {
     currentLine = Math.max(lines - pageHeight, 0);
   }
   
-
-  
   /**
    * Reset the scroller
    *

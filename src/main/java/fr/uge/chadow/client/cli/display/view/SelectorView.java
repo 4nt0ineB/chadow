@@ -56,7 +56,7 @@ public class SelectorView<T> implements Selectable<T>, View {
   @Override
   public void scrollPageUp() {
     scrollableView.scrollPageUp();
-    selectLastInPage();
+    
   }
   
   @Override
@@ -125,15 +125,10 @@ public class SelectorView<T> implements Selectable<T>, View {
       return;
     }
     var lineIndex = 1 + itemPointerIndex - scrollableView.getScroller().getA();
-    logger.info("Cursor is at position: " + itemPointerIndex);
-    logger.info("A: " + scrollableView.getScroller().getA() + " B: " + scrollableView.getScroller().getB());
     if (!selectedItemIsVisible()) {
       return;
     }
-    logger.info("Cursor is at position: " + itemPointerIndex);
-    // Not extacly it, but it's a good start we must use A() and B() to get the visible part of the scrollable view
-    for (var line : linesByItem.get(itemPointerIndex)
-                               .getValue()) {
+    for (var line : linesByItem.get(itemPointerIndex).getValue()) {
       View.moveCursorToPosition(1, 1 + lineIndex);
       System.out.printf(STR."\{STR."\{CLIColor.ORANGE}\{CLIColor.BOLD}%-\{cols}s\{CLIColor.RESET}"}%n", line);
       lineIndex++;
@@ -169,11 +164,12 @@ public class SelectorView<T> implements Selectable<T>, View {
   }
   
   public boolean isAtBottom() {
-    return scrollableView.isAtBottom();
+    return  itemPointerIndex == linesByItem.size() - 1 && scrollableView.isAtBottom();
   }
   
   public void setAtSamePosition(SelectorView<?> other) {
     this.scrollableView.setAsSamePosition(other.scrollableView);
+    this.itemPointerIndex = other.itemPointerIndex;
   }
   
 }

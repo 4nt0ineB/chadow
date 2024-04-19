@@ -14,6 +14,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.IntStream;
 
 public interface View {
   
@@ -214,12 +215,27 @@ public interface View {
                                               Function<? super T, String> mapper) {
     var linesByItem = new ArrayList<Map.Entry<T, List<String>>>();
     var linesToDisplay = new ArrayList<String>();
+    var totalLines = 0;
     for (var item : list) {
       var str = mapper.apply(item);
       var formattedDescription = splitAndSanitize(str, cols);
-      linesToDisplay.addAll(formattedDescription);
+      totalLines += formattedDescription.size();
       linesByItem.add(Map.entry(item, formattedDescription));
     }
+    
+    var digitsInNumberOfLines = String.valueOf(totalLines).length();
+    var lineNumber = 0;
+    for (var item : linesByItem) {
+      var itemLines = item.getValue();
+      for (int j = 0; j < itemLines.size(); j++) {
+        var line = STR."%\{digitsInNumberOfLines}d| %s".formatted(lineNumber, itemLines.get(j));
+        var lineWithLineNumber = responsiveCut(line, cols);
+        item.getValue().set(j, lineWithLineNumber);
+        lineNumber++;
+        linesToDisplay.add(lineWithLineNumber);
+      }
+    }
+    
     return new SelectorView<>(title, lines, cols, linesByItem, new ScrollableView(title, lines, cols, linesToDisplay), mapper);
   }
   
@@ -241,6 +257,13 @@ public interface View {
     var message = optLastMessage.orElseThrow();
     return STR."\{username} ─ \{formatDate(message.epoch())} ─ \{message.txt()
                                                                         .replace("\\s", "")}";
+  }
+  
+  static String responsiveCut(String str, int maxCharacters) {
+    var lengthWithoutEscapeCodes = CLIColor.countLengthWithoutEscapeCodes(str);
+    var numberOfEscapeCodes = str.length() - lengthWithoutEscapeCodes;
+    var length = Math.min(str.length(), maxCharacters + numberOfEscapeCodes);
+    return str.substring(0, length) + CLIColor.RESET;
   }
   
   void setDimensions(int lines, int cols);

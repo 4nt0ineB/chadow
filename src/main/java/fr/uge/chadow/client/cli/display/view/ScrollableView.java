@@ -52,6 +52,7 @@ public class ScrollableView implements View {
     var start = scroller.getA();
     var end = scroller.getB();
     var formattedLines = View.splitAndSanitize(textLines.subList(start, end), columns);
+    var digitsInNumberOfLines = String.valueOf(textLines.size()).length();
     for (; lineIndex < maxLinesView && lineIndex < formattedLines.size(); lineIndex++) {
       sb.append("%s".formatted(View.beautifyCodexLink(formattedLines.get(lineIndex))))
         .append("\n");
@@ -110,7 +111,6 @@ public class ScrollableView implements View {
   }
   
   public void setAsSamePosition(ScrollableView other) {
-    scroller.setLines(other.scroller.getLines());
     scroller.setCurrentLine(other.scroller.getCurrentLine());
   }
   

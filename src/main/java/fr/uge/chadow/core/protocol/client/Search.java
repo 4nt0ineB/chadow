@@ -6,12 +6,16 @@ import fr.uge.chadow.core.protocol.Opcode;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.logging.Logger;
 
 public record Search(String codexName, int options, long date,  int results, int offset) implements Frame {
   private static final Charset UTF8 = StandardCharsets.UTF_8;
+  private static final Logger logger = Logger.getLogger(Search.class.getName());
   
-  public Search nextPage(int pageSize) {
-    return new Search(codexName, options, date, pageSize, offset + pageSize);
+  
+  public Search nextPage(int pageSize, int offset) {
+    logger.info("pagesize %d offset %d".formatted(pageSize, offset));
+    return new Search(codexName, options, date, pageSize, offset);
   }
   
   @Override

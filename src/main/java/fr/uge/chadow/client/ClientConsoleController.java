@@ -57,7 +57,7 @@ public class ClientConsoleController {
   private View currentView;
   private CodexStatus selectedCodexForDetails;
   private Search lastSearch;
-  private List<SearchResponse.Result> lastSearchResults;
+  private List<SearchResponse.Result> lastSearchResults = new ArrayList<>();
   private Mode mode;
   private int lines;
   private int cols;
@@ -224,19 +224,18 @@ public class ClientConsoleController {
     switch (input) {
       // Search pagination : continue searching if bottom is displayed
       case "s", "b", "d" -> {
-        if(currentSelector.isAtBottom()) {
-          var newSearch = lastSearch.nextPage(View.maxLinesView(lines));
+        if(lastSearchResults.size() >= View.maxLinesView(lines) &&  currentSelector.isAtBottom()) {
+          var newSearch = lastSearch.nextPage(View.maxLinesView(lines), lastSearchResults.size());
           var newResponse = api.searchCodexes(newSearch);
-          if(newResponse.isEmpty()){
-            return true;
+          if(newResponse.isPresent()){
+            var results = newResponse.orElseThrow();
+            lastSearch = newSearch;
+            lastSearchResults.addAll(Arrays.asList(results.results()));
+            var newSelector = View.selectorFromList("Search results", lines, cols, lastSearchResults, View::codexSearchResultShortDescription);
+            newSelector.setAtSamePosition(currentSelector);
+            currentSelector = newSelector;
+            setCurrentView(currentSelector);
           }
-          var results = newResponse.orElseThrow();
-          lastSearch = newSearch;
-          lastSearchResults.addAll(Arrays.asList(results.results()));
-          var newSelector = View.selectorFromList("Search results", lines, cols, lastSearchResults, View::codexSearchResultShortDescription);
-          newSelector.setAtSamePosition(currentSelector);
-          currentSelector = newSelector;
-          setCurrentView(currentSelector);
         }
        return processInputModeSelector(input);
       }
@@ -361,7 +360,7 @@ public class ClientConsoleController {
         return processInputModeScroller(input);
       }
     }
-    return true;
+    return false;
   }
   
   private boolean processInputModeDMScroller(String input) {
@@ -617,7 +616,7 @@ public class ClientConsoleController {
       }
       var results = response.orElseThrow();
       lastSearch = search;
-      lastSearchResults = Arrays.asList(results.results());
+      lastSearchResults.addAll(Arrays.asList(results.results()));
       mode = Mode.CODEX_SEARCH;
       currentSelector = View.selectorFromList("Search results", lines, cols, lastSearchResults, View::codexSearchResultShortDescription);
       setCurrentView(currentSelector);
