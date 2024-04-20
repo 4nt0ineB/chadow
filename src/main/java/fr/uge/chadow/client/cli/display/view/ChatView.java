@@ -198,9 +198,6 @@ public class ChatView implements View {
   
   
   private List<YellMessage> getMessagesToDisplay() {
-    if (formattedMessages.size() <= View.maxLinesView(lines) && !formattedMessages.isEmpty()) {
-      return formattedMessages;
-    }
     if (mode == ClientConsoleController.Mode.CHAT_LIVE_REFRESH) {
       var messages = clientAPI.getPublicMessages();
       var list = messages.stream()
