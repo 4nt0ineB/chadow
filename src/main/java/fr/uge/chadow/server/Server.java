@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 
-import fr.uge.chadow.core.context.ContextHandler;
+import fr.uge.chadow.core.TCPConnectionManager;
 import fr.uge.chadow.core.context.ServerContext;
 import fr.uge.chadow.core.protocol.Frame;
 import fr.uge.chadow.core.protocol.WhisperMessage;
@@ -29,7 +29,7 @@ public class Server {
   private static final Logger logger = Logger.getLogger(Server.class.getName());
   private final Map<String, SocketInfo> clients = new HashMap<>();
   private final Map<CodexRecord, List<String>> codexes = new HashMap<>(); // codex -> list of usernames
-  private ContextHandler contextHandler;
+  private TCPConnectionManager connectionManager;
   private final int port;
 
   public Server(int port) throws IOException {
@@ -37,8 +37,8 @@ public class Server {
   }
 
   public void start() throws IOException {
-    this.contextHandler = new ContextHandler(port, key -> new ServerContext(this, key));
-    contextHandler.launch();
+    this.connectionManager = new TCPConnectionManager(port, key -> new ServerContext(this, key));
+    connectionManager.launch();
   }
   
   /**
@@ -58,7 +58,7 @@ public class Server {
   }
   
   public void broadcast(Frame frame) {
-    contextHandler.broadcast(frame);
+    connectionManager.broadcast(frame);
   }
 
   public void whisper(WhisperMessage message, String username_sender) {

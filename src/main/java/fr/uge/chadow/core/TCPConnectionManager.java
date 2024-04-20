@@ -1,5 +1,6 @@
-package fr.uge.chadow.core.context;
+package fr.uge.chadow.core;
 
+import fr.uge.chadow.core.context.Context;
 import fr.uge.chadow.core.protocol.Frame;
 
 import java.io.IOException;
@@ -13,10 +14,19 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Function;
 import java.util.logging.Logger;
 
-public class ContextHandler {
-  private static final Logger logger = Logger.getLogger(ContextHandler.class.getName());
+/**
+ * Manages TCP connections
+ */
+public class TCPConnectionManager {
+  /**
+   * Represents a connection
+   * @param context the context to attach to the connection
+   * @param address the address to connect to
+   */
+  public record ConnectionData(Context context, InetSocketAddress address) {
+  }
   
-  public record ConnectionData(Context context, InetSocketAddress address) {}
+  private static final Logger logger = Logger.getLogger(TCPConnectionManager.class.getName());
   private final Selector selector;
   private final LinkedBlockingQueue<Function<SelectionKey, ConnectionData>> contextQueue = new LinkedBlockingQueue<>();
   private final ServerSocketChannel serverSocketChannel;
@@ -28,9 +38,9 @@ public class ContextHandler {
    * @param sharerContextFactory the factory to create a new context
    *                             when the server socket receive a new connection
    *                             // @Todo change the name
-   * @throws IOException
+   * @throws IOException if an I/O error occurs when opening the selector or the server socket
    */
-  public ContextHandler(int serverPort, Function<SelectionKey, Context> sharerContextFactory) throws IOException {
+  public TCPConnectionManager(int serverPort, Function<SelectionKey, Context> sharerContextFactory) throws IOException {
     this.selector = Selector.open();
     this.serverSocketChannel = ServerSocketChannel.open();
     this.serverSocketChannel.bind(new InetSocketAddress(serverPort));
@@ -40,7 +50,7 @@ public class ContextHandler {
   
   /**
    * Supply ConnectionData, being a socket to connect to and a context to attach to it
-   * @param connectionDataSupplier
+   * @param connectionDataSupplier the supplier of ConnectionData
    */
   public void supplyConnectionData(Function<SelectionKey, ConnectionData> connectionDataSupplier) {
     contextQueue.add(connectionDataSupplier);
@@ -77,7 +87,7 @@ public class ContextHandler {
   private void treatKey(SelectionKey key) {
     try {
       if (key.isValid() && key.isAcceptable()) {
-        doAccept(key);
+        doAccept();
       }
     } catch (IOException ioe) {
       // lambda call in select requires to tunnel IOException
@@ -101,7 +111,7 @@ public class ContextHandler {
     }
   }
   
-  private void doAccept(SelectionKey key) throws IOException {
+  private void doAccept() throws IOException {
     var sc = serverSocketChannel.accept();
     if (sc == null) {
       logger.warning("selector gave wrong hint for accept");

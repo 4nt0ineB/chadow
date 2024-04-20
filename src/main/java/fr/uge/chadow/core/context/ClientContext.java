@@ -1,6 +1,7 @@
 package fr.uge.chadow.core.context;
 
 import fr.uge.chadow.client.ClientAPI;
+import fr.uge.chadow.core.TCPConnectionManager;
 import fr.uge.chadow.core.protocol.*;
 import fr.uge.chadow.core.protocol.client.Discovery;
 import fr.uge.chadow.core.protocol.client.Register;
@@ -12,7 +13,7 @@ import java.util.List;
 import java.util.logging.Logger;
 
 public final class ClientContext extends Context {
-  private static final Logger logger = Logger.getLogger(ContextHandler.class.getName());
+  private static final Logger logger = Logger.getLogger(TCPConnectionManager.class.getName());
   private static final int BUFFER_SIZE = 1024;
   private final ClientAPI api;
   
@@ -25,7 +26,7 @@ public final class ClientContext extends Context {
   public void processCurrentOpcodeAction(Frame frame) {
     logger.info("Processing frame");
     switch (frame) {
-      case OK ok -> {
+      case OK _ -> {
         logger.info("Connected to the server");
         api.bindContext(this);
         super.addFrame(new Discovery()); // fetch all users

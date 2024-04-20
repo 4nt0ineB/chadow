@@ -2,7 +2,7 @@ package fr.uge.chadow.client;
 
 
 import fr.uge.chadow.core.context.ClientContext;
-import fr.uge.chadow.core.context.ContextHandler;
+import fr.uge.chadow.core.TCPConnectionManager;
 import fr.uge.chadow.core.context.DownloaderContext;
 import fr.uge.chadow.core.context.SharerContext;
 import fr.uge.chadow.core.protocol.WhisperMessage;
@@ -47,20 +47,20 @@ public class ClientAPI {
   private final SortedSet<String> users = new TreeSet<>();
   
   // Blocking Queue that will contain the fetched codex
-  private final long REQUEST_CODEX_TIMEOUT = 5;
+  private final long REQUEST_CODEX_TIMEOUT = 5; // todo add in settings
   private final ArrayBlockingQueue<Optional<Codex>> requestCodexResponseQueue = new ArrayBlockingQueue<>(1);
   
   // Manage request and answer of open download -- Maybe change the way to handle this
-  private final long DOWNLOAD_REQUEST_TIMEOUT = 5;
+  private final long DOWNLOAD_REQUEST_TIMEOUT = 5; // todo add in settings
   private final LinkedBlockingQueue<SocketField[]> sharersSocketQueue = new LinkedBlockingQueue<>();
   private final ArrayDeque<String> codexIdOfAskedDownload = new ArrayDeque<>();
   
   // Manage request and response of search
-  private final long SEARCH_TIMEOUT = 5;
+  private final long SEARCH_TIMEOUT = 5; // todo add in settings
   private final ArrayBlockingQueue<SearchResponse> searchResponseQueue = new ArrayBlockingQueue<>(1);
   
   // The context handler that will manage the client contexts
-  private ContextHandler contextHandler;
+  private TCPConnectionManager connectionManager;
   private ClientContext clientContext;
   private STATUS status = STATUS.CONNECTING;
   
@@ -85,7 +85,7 @@ public class ClientAPI {
   }
   
   public void startService() throws InterruptedException, IOException {
-    this.contextHandler = new ContextHandler(0, key -> new SharerContext(key, this));
+    this.connectionManager = new TCPConnectionManager(0, key -> new SharerContext(key, this));
     // Starts the client thread
     startClient();
     waitForConnection();
@@ -119,8 +119,8 @@ public class ClientAPI {
             .start(() -> {
               try {
                 logger.info("Client starts");
-                contextHandler.supplyConnectionData(key -> new ContextHandler.ConnectionData(new ClientContext(key, this), serverAddress));
-                contextHandler.launch();
+                connectionManager.supplyConnectionData(key -> new TCPConnectionManager.ConnectionData(new ClientContext(key, this), serverAddress));
+                connectionManager.launch();
               } catch (IOException e) {
                 logger.severe(STR."The client was interrupted. \{e.getMessage()}");
               }
@@ -158,9 +158,9 @@ public class ClientAPI {
       return;
     }
     var add = new InetSocketAddress(address, socket.port());
-    contextHandler.supplyConnectionData(key -> {
+    connectionManager.supplyConnectionData(key -> {
       var context = new DownloaderContext(key, this, codexStatus.orElseThrow());
-      return new ContextHandler.ConnectionData(context, add);
+      return new TCPConnectionManager.ConnectionData(context, add);
     });
   }
   
@@ -575,7 +575,7 @@ public class ClientAPI {
   }
   
   public int listeningPort() {
-    return contextHandler.listeningPort();
+    return connectionManager.listeningPort();
   }
   
   public void addSocketsOpenDownload(SocketField[] sockets) {
