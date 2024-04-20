@@ -2,14 +2,17 @@ package fr.uge.chadow;
 
 import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.client.ClientConsoleController;
+import fr.uge.chadow.client.CodexController;
 import fr.uge.chadow.server.Server;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.logging.Level;
+import java.util.Arrays;
 import java.util.logging.Logger;
 
 public class Main {
+  private static final Logger logger = Logger.getLogger(Main.class.getName());
   private static void usage() {
     System.out.println("Usage: " +
         "--server <port>\n" +
@@ -25,27 +28,37 @@ public class Main {
     new Server(Integer.parseInt(args[1])).start();
   }
   
-  private static void client(String[] args) throws IOException, InterruptedException {
-    if (args.length < 5) {
+  private static void client(String[] args) throws IOException {
+    if(args[0].matches("-h|--help")) {
       usage();
       return;
     }
-    InetSocketAddress socket = null;
-    int lines, cols;
+    
+    // parse args
+    var sp = new SettingsParser()
+        .addAsString("downloadPath", SettingsParser.Settings.defaultDownloadPath())
+        .addAsInt("port", 7777)
+        .addStringSettings("login", "hostname")
+        .addIntSettings("y", "x");
+    
+    SettingsParser.Settings settings = null;
+    var settingString = String.join("", args);
+    logger.info(settingString);
+    
     try {
-      socket = new InetSocketAddress(args[1], Integer.parseInt(args[2]));
-      lines = Integer.parseInt(args[3]);
-      cols = Integer.parseInt(args[4]);
-    } catch (NumberFormatException e) {
-      usage();
-      return;
+      settings = sp.parse(settingString);
+    } catch (IOException e) {
+      System.err.println(e.getMessage());
+      System.exit(1);
     }
-    var login = args[0];
-    var api = new ClientAPI(login, socket);
-    new ClientConsoleController(lines, cols, api).start();
+    
+    var codexController = new CodexController(settings.getStr("downloadPath"));
+    var serverSocket = new InetSocketAddress(settings.getStr("hostname"), settings.getInt("port"));
+    var api = new ClientAPI(settings.getStr("login"), serverSocket, codexController);
+    new ClientConsoleController(settings.getInt("y"), settings.getInt("x"), api).start();
   }
   
-  public static void main(String[] args) throws IOException, InterruptedException {
+  public static void main(String[] args) throws IOException {
     if(args.length == 0) {
       usage();
       return;

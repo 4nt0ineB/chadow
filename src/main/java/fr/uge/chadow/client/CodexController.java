@@ -17,9 +17,37 @@ public class CodexController {
   private static final String ALGORITHM = "SHA-1";
   private static final Logger logger = Logger.getLogger(Codex.class.getName());
   private static final HashMap<String, CodexStatus> codexes = new HashMap<>();
+  private Path defaultDownloadPath;
   
-  private CodexStatus addCodex(Codex codex, String root) {
-    var codexStatus = new CodexStatus(codex, root);
+  public CodexController(String defaultDownloadPath) throws IOException {
+    Objects.requireNonNull(defaultDownloadPath);
+    changeDefaultDownloadPath(defaultDownloadPath);
+  }
+  
+  /**
+   * Change the default download path
+   * @param path the new default download path
+   *             @throws IllegalArgumentException if the path is not a directory
+   * @throws IOException if the directory couldn't be created
+   */
+  public void changeDefaultDownloadPath(String path) throws IOException {
+    Objects.requireNonNull(path);
+    var dir = Paths.get(path);
+    var file = dir.toFile();
+    if(!file.exists()) {
+      try {
+        if(!file.mkdirs()) {
+          throw new IOException(STR."Couldn't create directory \"\{path}\"");
+        }
+      } catch (SecurityException e) {
+        throw new IOException(STR."Couldn't create directory \"\{path}\"", e);
+      }
+    }
+    defaultDownloadPath = dir;
+  }
+  
+  private CodexStatus addCodex(Codex codex, Path root) {
+    var codexStatus = new CodexStatus(codex, root.toString());
     var existing = codexes.putIfAbsent(codex.id(), codexStatus);
     return existing == null ? codexStatus : existing;
   }
@@ -97,11 +125,10 @@ public class CodexController {
   /**
    * Add a codex fetched from the Server
    * @param codex the codex to add
-   * @param root the path where the codex will be saved
    * @return the status of the codex
    */
-  CodexStatus addFromFetchedCodex(Codex codex, String root) {
-    return addCodex(codex, root);
+  CodexStatus addFromFetchedCodex(Codex codex) {
+    return addCodex(codex, defaultDownloadPath);
   }
   
   /**
@@ -194,7 +221,7 @@ public class CodexController {
       files[i] = fileInfoList.get(i);
     }
     var codex = new Codex(id, codexName, files);
-    addCodex(codex, rootPath.toString()) ;
+    addCodex(codex, rootPath.toPath()) ;
     var codexStatus = codexes.get(id);
     codexStatus.setAllComplete();
     return codexStatus;

@@ -39,7 +39,7 @@ public class ClientAPI {
   private static final Logger logger = Logger.getLogger(ClientAPI.class.getName());
   private final ReentrantLock lock = new ReentrantLock();
   private final Condition connectionCondition = lock.newCondition();
-  private final CodexController codexController = new CodexController();
+  private final CodexController codexController;
   private final InetSocketAddress serverAddress;
   private final String login;
   private final ArrayList<YellMessage> publicMessages = new ArrayList<>();
@@ -65,10 +65,11 @@ public class ClientAPI {
   private STATUS status = STATUS.CONNECTING;
   
   
-  public ClientAPI(String login, InetSocketAddress serverAddress) {
+  public ClientAPI(String login, InetSocketAddress serverAddress, CodexController codexController) {
     Objects.requireNonNull(login);
     this.login = login;
     this.serverAddress = serverAddress;
+    this.codexController = codexController;
   }
   
   /**
@@ -347,7 +348,7 @@ public class ClientAPI {
     if (fetchedCodex == null || fetchedCodex.isEmpty()) {
       return Optional.empty();
     }
-    return Optional.of(codexController.addFromFetchedCodex(fetchedCodex.orElseThrow(), "/tmp"));
+    return Optional.of(codexController.addFromFetchedCodex(fetchedCodex.orElseThrow()));
   }
   
   public void saveFetchedCodex(Codex codex) {
