@@ -45,6 +45,8 @@ public class GlobalReader<T extends Record> implements Reader<T> {
         readerMap.put(byte.class, new ByteReader());
       } else if (type.equals(Codex.class)) {
         readerMap.put(Codex.class, new GlobalReader<>(Codex.class));
+      } else if (type.equals(SocketField.class)) {
+        readerMap.put(SocketField.class, new GlobalReader<>(SocketField.class));
       } else if (type.isArray()) {
         var componentType = type.getComponentType();
         if (componentType.equals(String.class)) {

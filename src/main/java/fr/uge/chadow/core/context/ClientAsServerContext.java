@@ -109,7 +109,7 @@ public final class ClientAsServerContext extends Context {
     assert wantedCodexId != null;
     return api.codexExists(wantedCodexId)
         && api.isSharing(wantedCodexId)
-        && chainId != null;
+        && chainId == null;
   }
   
   @Override

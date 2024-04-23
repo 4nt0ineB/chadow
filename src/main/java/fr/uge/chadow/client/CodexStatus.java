@@ -260,6 +260,10 @@ public class CodexStatus {
         currentDownloadingFile.close();
         currentDownloadingFile = null;
         logger.info(STR."File \{file.filename()} is complete");
+        if(isComplete()) {
+          logger.info(STR."Codex \{codex.id()} is complete");
+          stopDownloading();
+        }
       }
     } finally {
        lock.unlock();
