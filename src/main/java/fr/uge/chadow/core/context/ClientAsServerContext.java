@@ -19,14 +19,13 @@ public final class ClientAsServerContext extends Context {
   private static final Logger logger = Logger.getLogger(ClientAsServerContext.class.getName());
   private static final int BUFFER_SIZE = 1024;
   private final ClientAPI api;
-  private boolean introduced = false;
   private String wantedCodexId;
   private InetSocketAddress clientAddress;
   private final FrameReader frameReader = new FrameReader();
   // proxy
   private Integer chainId;
   private Context bridgeContext;
-  private ArrayDeque<Frame> framesForTheNextHop = new ArrayDeque<>();
+  private final ArrayDeque<Frame> framesForTheNextHop = new ArrayDeque<>();
   
   public ClientAsServerContext(SelectionKey key, ClientAPI api) {
     super(key, BUFFER_SIZE);
@@ -39,7 +38,6 @@ public final class ClientAsServerContext extends Context {
       case Handshake handshake -> {
         wantedCodexId = handshake.codexId();
         if(allowedToShare()) {
-          introduced = true;
           logger.info(STR."Ready to share codex \{wantedCodexId}");
           clientAddress = (InetSocketAddress) getSocket().getRemoteAddress();
         }else {
@@ -128,11 +126,12 @@ public final class ClientAsServerContext extends Context {
     }
   }
   
-  /**
-   * Returns the codex id of the codex the client wants to download
-   * @return
-   */
-  public String getWantedCodexId() {
-    return wantedCodexId;
+  @Override
+  public void silentlyClose() {
+    super.silentlyClose();
+    if(chainId != null) {
+      // close the bridge
+      bridgeContext.silentlyClose();
+    }
   }
 }

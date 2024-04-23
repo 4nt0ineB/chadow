@@ -1,11 +1,9 @@
 package fr.uge.chadow.core.context;
 
-import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.core.protocol.Frame;
 import fr.uge.chadow.core.protocol.client.Hidden;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.util.Objects;
 import java.util.logging.Logger;
@@ -24,10 +22,7 @@ import java.util.logging.Logger;
 public final class ProxyBridgeContext extends Context {
   private static final Logger logger = Logger.getLogger(ClientAsServerContext.class.getName());
   private static final int BUFFER_SIZE = 1024;
-  private String wantedCodexId;
-  private InetSocketAddress clientAddress;
   private final ClientAsServerContext otherEnd;
-  
   
   public ProxyBridgeContext(SelectionKey key, ClientAsServerContext otherEnd) {
     super(key, BUFFER_SIZE);
@@ -35,10 +30,11 @@ public final class ProxyBridgeContext extends Context {
   }
   
   @Override
-  void processCurrentOpcodeAction(Frame frame) throws IOException {
+  void processCurrentOpcodeAction(Frame frame) {
     if (Objects.requireNonNull(frame) instanceof Hidden) {
       logger.info("Next hop send a Hidden frame");
-      otherEnd.queueFrame(frame); // just forward the frame to the previous hop through the bridge
+      // just forward the frame to the previous hop through the bridge
+      otherEnd.queueFrame(frame);
     } else {
       logger.warning(STR."Received unexpected frame \{frame}");
       silentlyClose();
@@ -50,5 +46,12 @@ public final class ProxyBridgeContext extends Context {
     super.doConnect();
     logger.info("Received connection from a client");
     otherEnd.setBridge(this);
+  }
+  
+  @Override
+  public void silentlyClose() {
+    super.silentlyClose();
+    // close the bridge
+    otherEnd.silentlyClose();
   }
 }
