@@ -93,12 +93,12 @@ public class CodexController {
    * Set the codex into downloading mode
    * @param id the id of the codex
    */
-  public void download(String id) {
+  public void download(String id, boolean mode) {
     var codexStatus = codexes.get(id);
     if(codexStatus.isSharing()){
       throw new IllegalStateException("Codex is sharing, can't download it");
     }
-    codexStatus.download();
+    codexStatus.download(mode);
     log(codexStatus.codex(),"is now downloading");
   }
   

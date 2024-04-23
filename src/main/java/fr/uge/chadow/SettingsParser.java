@@ -131,8 +131,13 @@ public class SettingsParser {
       }
       
       @Override
+      public int hashCode() {
+        return name.hashCode();
+      }
+      
+      @Override
       public boolean equals(Object o) {
-        return o instanceof Setting s && s.name.equals(name);
+        return o instanceof Setting<?> s && s.name.equals(name);
       }
     }
     private final Map<String, String> stringSettings = new HashMap<>();

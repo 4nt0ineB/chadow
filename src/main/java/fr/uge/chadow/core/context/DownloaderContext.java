@@ -1,11 +1,9 @@
 package fr.uge.chadow.core.context;
 
 import fr.uge.chadow.client.ClientAPI;
-import fr.uge.chadow.client.CodexController;
 import fr.uge.chadow.client.CodexStatus;
 import fr.uge.chadow.core.protocol.Frame;
 import fr.uge.chadow.core.protocol.client.*;
-import fr.uge.chadow.core.protocol.server.OK;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -22,17 +20,18 @@ public final class DownloaderContext extends Context {
   private final ClientAPI api;
   private final CodexStatus codexStatus;
   private final SelectionKey key;
+  private final Integer chainId;
   
-  
-  public DownloaderContext(SelectionKey key, ClientAPI api, CodexStatus codexStatus) {
+  public DownloaderContext(SelectionKey key, ClientAPI api, CodexStatus codexStatus, Integer chainId) {
     super(key, BUFFER_SIZE);
     this.api = api;
     this.codexStatus = codexStatus;
     this.key = key;
+    this.chainId = chainId;
   }
   
   @Override
-  void processCurrentOpcodeAction(Frame frame) throws IOException {
+  void processCurrentOpcodeAction(Frame frame) {
     switch (frame) {
       case Denied denied -> {
         logger.warning(STR."Sharer denied sharing codex \{denied.codexId()}");
@@ -40,7 +39,7 @@ public final class DownloaderContext extends Context {
       }
       case HereChunk hereChunk -> {
         logger.info(STR."Received chunk (\{hereChunk.offset()},\{hereChunk.payload().length})");
-        if(!canDownload()) {
+        if(downloadForbidden()) {
           silentlyClose();
           return;
         }
@@ -68,19 +67,19 @@ public final class DownloaderContext extends Context {
     }
   }
   
-  private boolean canDownload() {
+  private boolean downloadForbidden() {
     if(codexStatus == null) {
-      return false;
+      return true;
     }
     if(!api.codexExists(codexStatus.codex().id())) {
       logger.warning(STR."Codex \{codexStatus.codex().id()} does not exist");
-      return false;
+      return true;
     }
     if(codexStatus.isComplete()) {
       logger.info(STR."Codex \{codexStatus.codex().id()} is complete");
-      return false;
+      return true;
     }
-    return true;
+    return false;
   }
   
   @Override
@@ -88,11 +87,21 @@ public final class DownloaderContext extends Context {
     super.doConnect();
     var port = ((InetSocketAddress) ((SocketChannel) key.channel()).getRemoteAddress()).getPort();
     logger.info(STR."opening connection with a sharer for the codex \{codexStatus.codex().id()} on port \{port}");
+    initDownload();
+  }
+  
+  private void initDownload() {
+    if(downloadForbidden()) {
+      silentlyClose();
+      return;
+    }
+    if(chainId != null) {
+      addFrame(new ProxyOpen(chainId, codexStatus.codex().id()));
+    }
     addFrame(new Handshake(codexStatus.codex().id()));
     var chunk = codexStatus.nextRandomChunk();
     addFrame(new NeedChunk(chunk.offset(), chunk.length()));
     processOut();
     getKey().interestOps(SelectionKey.OP_WRITE);
   }
-  
 }

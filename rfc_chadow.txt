@@ -574,11 +574,11 @@ encodé de la manière suivante :
   Le reste de la communication est indentique au mode ouvert, mais 
   chaque trame contient au début un en-tête:
 
-  +---------------------+
-  | (hidden) | chain_id |
-  +---------------------+
+  +---------------------------------------------+
+  | (hidden) | chain_id  | int size   | payload |
+  +---------------------------------------------+
 
-  Et le client doit précédé toutes ses réponses par le même en-tête.
+  Et le client doit précéder toutes ses réponses par le même en-tête.
 
   Dès qu'un proxy, le client ou le sharer se déconnecte, une déconnexion 
   en chaîne est initiée.  

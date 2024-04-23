@@ -38,7 +38,7 @@ public class Scroller {
   
   public void scrollDown(int n) {
     currentLine = Math.min(maxPosition(), n + currentLine);
-    logger.info("scroll down");
+    //logger.info("scroll down");
   }
   
   public void scrollUp(int n) {

@@ -32,10 +32,10 @@ public enum Opcode {
   NEEDCHUNK (NeedChunk.class),
   //CANCEL (Cancel.class),
   HERECHUNK (HereChunk.class),
-  //PROXY (Proxy.class),
-  //PROXYOPEN (ProxyOpen.class),
-  //PROXYOK,
-  //HIDDEN,
+  PROXY (Proxy.class),
+  PROXYOPEN (ProxyOpen.class),
+  PROXYOK (ProxyOk.class),
+  HIDDEN (Hidden.class),
   ;
   
   private static final HashMap<Class<? extends Record>, Opcode> classMap = new HashMap<>();

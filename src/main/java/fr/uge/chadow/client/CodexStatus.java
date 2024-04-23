@@ -21,6 +21,7 @@ public class CodexStatus {
   private final ReentrantLock lock = new ReentrantLock();
   private final RandomAccessFile[] sharedFiles; // caching files readers (for sharing)
   private boolean downloading = false;
+  private boolean downloadHidden = false;
   private boolean sharing = false;
   // caching a file reader, 1 because we download the codex sequentially
   private RandomAccessFile currentDownloadingFile = null;
@@ -139,8 +140,9 @@ public class CodexStatus {
     sharing = true;
   }
   
-  void download() {
+  void download(boolean hidden) {
     downloading = true;
+    downloadHidden = hidden;
   }
   
   void stopSharing() {

@@ -4,6 +4,8 @@ import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.core.TCPConnectionManager;
 import fr.uge.chadow.core.protocol.*;
 import fr.uge.chadow.core.protocol.client.Discovery;
+import fr.uge.chadow.core.protocol.client.HereChunk;
+import fr.uge.chadow.core.protocol.client.ProxyOk;
 import fr.uge.chadow.core.protocol.client.Register;
 import fr.uge.chadow.core.protocol.server.*;
 
@@ -58,6 +60,14 @@ public final class ClientContext extends Context {
           logger.warning(STR."Received event \{event.code()}");
           api.addUser(event.username());
         }
+      }
+      case Proxy proxy -> {
+        logger.info(STR."Received proxy request chainId: \{proxy.chainId()}");
+        var response = api.saveProxyRoute(proxy.chainId(), proxy.socket());
+        if(response) {
+          queueFrame(new ProxyOk(proxy.chainId()));
+        }
+        // todo answer KO ??
       }
       default -> {
         logger.warning("No action for the received frame");

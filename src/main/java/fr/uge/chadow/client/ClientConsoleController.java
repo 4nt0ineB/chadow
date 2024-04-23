@@ -349,27 +349,36 @@ public class ClientConsoleController {
         }
         return true;
       }
-      case ":download" -> {
-        var codexId = currentCodex().id();
-        if (!currentCodex().isComplete()) {
-          if (api.isDownloading(codexId)) {
-            api.stopDownloading(currentCodex().id());
-          } else {
-            api.download(currentCodex().id());
-          }
-          mode = Mode.CODEX_DETAILS;
-          setCurrentView(new CodexView(selectedCodexForDetails, lines, cols));
-          currentView.scrollTop();
-        }
-      }
       case ":live" -> {
         return false;
       }
       default -> {
-        return processInputModeScroller(input);
+        return processCommandDownload(input)
+            .orElseGet(() -> processInputModeScroller(input));
       }
     }
-    return false;
+  }
+  
+  private Optional<Boolean> processCommandDownload(String input) {
+    var pattern = Pattern.compile("(?>:download|:dl)(?>\s+(?<hidden>hidden|h))?");
+    var matcher = pattern.matcher(input);
+    if (matcher.find()) {
+      var hidden = Optional.ofNullable(matcher.group("hidden")).isPresent();
+      var codexId = currentCodex().id();
+      if (!currentCodex().isComplete()) {
+        if (api.isDownloading(codexId)) {
+          api.stopDownloading(currentCodex().id());
+        } else {
+          api.download(currentCodex().id(), hidden);
+        }
+        mode = Mode.CODEX_DETAILS;
+        setCurrentView(new CodexView(selectedCodexForDetails, lines, cols));
+        currentView.scrollTop();
+        return Optional.of(false);
+      }
+      return Optional.of(true);
+    }
+    return Optional.empty();
   }
   
   private boolean processInputModeDMScroller(String input) {
@@ -382,6 +391,8 @@ public class ClientConsoleController {
     }
     return processInputModeScroller(input);
   }
+  
+  
   
   private boolean processCommandDirectMessagesList(String input) {
     switch (input) {
@@ -634,8 +645,6 @@ public class ClientConsoleController {
     }
     return Optional.empty();
   }
-  
-
   
   /**
    * Read user input from the console

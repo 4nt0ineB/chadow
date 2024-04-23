@@ -1,10 +1,8 @@
 package fr.uge.chadow.client;
 
 
-import fr.uge.chadow.core.context.ClientContext;
+import fr.uge.chadow.core.context.*;
 import fr.uge.chadow.core.TCPConnectionManager;
-import fr.uge.chadow.core.context.DownloaderContext;
-import fr.uge.chadow.core.context.SharerContext;
 import fr.uge.chadow.core.protocol.WhisperMessage;
 import fr.uge.chadow.core.protocol.YellMessage;
 import fr.uge.chadow.core.protocol.client.Propose;
@@ -12,6 +10,7 @@ import fr.uge.chadow.core.protocol.client.Request;
 import fr.uge.chadow.core.protocol.client.RequestDownload;
 import fr.uge.chadow.core.protocol.client.Search;
 import fr.uge.chadow.core.protocol.field.Codex;
+import fr.uge.chadow.core.protocol.field.ProxyNodeSocket;
 import fr.uge.chadow.core.protocol.field.SocketField;
 import fr.uge.chadow.core.protocol.server.SearchResponse;
 
@@ -20,12 +19,14 @@ import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.nio.channels.SelectionKey;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Function;
 import java.util.logging.Logger;
 
 /**
@@ -52,7 +53,7 @@ public class ClientAPI {
   
   // Manage request and answer of open download -- Maybe change the way to handle this
   private final long DOWNLOAD_REQUEST_TIMEOUT = 5; // todo add in settings
-  private final LinkedBlockingQueue<SocketField[]> sharersSocketQueue = new LinkedBlockingQueue<>();
+  private final LinkedBlockingQueue<SocketResponse> sharersSocketQueue = new LinkedBlockingQueue<>();
   private final ArrayDeque<String> codexIdOfAskedDownload = new ArrayDeque<>();
   
   // Manage request and response of search
@@ -64,6 +65,28 @@ public class ClientAPI {
   private ClientContext clientContext;
   private STATUS status = STATUS.CONNECTING;
   
+  // Proxy
+  private final HashMap<Integer, SocketField> proxyRoutes = new HashMap<>();
+  
+  public boolean saveProxyRoute(int chainId, SocketField socket) {
+    return proxyRoutes.putIfAbsent(chainId, socket) == null;
+  }
+  
+  public void setUpBridge(int chainId, ClientAsServerContext clientAsServerContext) {
+    var socket = proxyRoutes.get(chainId);
+    if(socket == null) {
+      return;
+    }
+    addContext(socket, key -> new ProxyBridgeContext(key, clientAsServerContext));
+  }
+  
+  private record SocketResponse(SocketField[] sockets, int[] chainId) {
+    public SocketResponse {
+      if (chainId != null && chainId.length != chainId.length) {
+        throw new IllegalArgumentException("The number of chain ids must be equal to the number of sockets");
+      }
+    }
+  }
   
   public ClientAPI(String login, InetSocketAddress serverAddress, CodexController codexController) {
     Objects.requireNonNull(login);
@@ -85,7 +108,7 @@ public class ClientAPI {
   }
   
   public void startService() throws InterruptedException, IOException {
-    this.connectionManager = new TCPConnectionManager(0, key -> new SharerContext(key, this));
+    this.connectionManager = new TCPConnectionManager(0, key -> new ClientAsServerContext(key, this));
     // Starts the client thread
     startClient();
     waitForConnection();
@@ -99,14 +122,16 @@ public class ClientAPI {
     }
     // make a loop to manage downloads
     while (!Thread.interrupted() && status.equals(STATUS.CONNECTED)) {
-      var sockets = sharersSocketQueue.poll(DOWNLOAD_REQUEST_TIMEOUT, java.util.concurrent.TimeUnit.SECONDS);
-      if (sockets != null) {
+      var socketResponse = sharersSocketQueue.poll(DOWNLOAD_REQUEST_TIMEOUT, java.util.concurrent.TimeUnit.SECONDS);
+      if (socketResponse != null) {
         var codexId = codexIdOfAskedDownload.pollFirst();
+        codexController.createFileTree(codexId);
         // create downloader for each sharer
-        for(var socket: sockets) {
-          logger.info(STR."(startService) adding downloader context for codex \{codexId} (sharer: \{socket.ip()}:\{socket.port()})");
-          codexController.createFileTree(codexId);
-          addDownloaderContext(codexId, socket);
+        for(var i = 0;  i < socketResponse.sockets.length; i++) {
+          var socket = socketResponse.sockets[i];
+          var chainId = socketResponse.chainId != null ? socketResponse.chainId[i] : null;
+          logger.info(STR."New downloader context for codex \{codexId} (sharer: \{socket.ip()}:\{socket.port()}) (hidden: \{chainId != null})");
+          addDownloaderContext(codexId, socket, chainId);
         }
       }
     }
@@ -144,12 +169,19 @@ public class ClientAPI {
   
   /**
    * Create the contexts that will download the codex
+   * @param codexId the id of the codex
+   * @param socket the socket of the sharer
+    * @param chainId the chain id of the download - may be null if the download is not hidden
    */
-  private void addDownloaderContext(String codexId, SocketField socket) {
+  private void addDownloaderContext(String codexId, SocketField socket, Integer chainId) {
     var codexStatus = codexController.getCodexStatus(codexId);
     if(codexStatus.isEmpty()) {
       return;
     }
+    addContext(socket, key -> new DownloaderContext(key, this, codexStatus.orElseThrow(), chainId));
+  }
+  
+  public void addContext(SocketField socket, Function<SelectionKey, Context> contextSupplier) {
     InetAddress address;
     try {
       address = InetAddress.getByAddress(socket.ip());
@@ -157,10 +189,10 @@ public class ClientAPI {
       logger.warning("Could not resolve the address of the sharer");
       return;
     }
-    var add = new InetSocketAddress(address, socket.port());
+    var addr = new InetSocketAddress(address, socket.port());
     connectionManager.supplyConnectionData(key -> {
-      var context = new DownloaderContext(key, this, codexStatus.orElseThrow());
-      return new TCPConnectionManager.ConnectionData(context, add);
+      var context = contextSupplier.apply(key);
+      return new TCPConnectionManager.ConnectionData(context, addr);
     });
   }
   
@@ -449,11 +481,16 @@ public class ClientAPI {
     }
   }
   
-  public void download(String id) {
+  /**
+   * Download a codex
+   * @param id the id of the codex
+   * @param hidden if the codex must be downloaded in hidden mode
+   */
+  public void download(String id, boolean hidden) {
     lock.lock();
     try {
-      codexController.download(id);
-      clientContext.queueFrame(new RequestDownload(id, (byte) 0));
+      codexController.download(id, hidden);
+      clientContext.queueFrame(new RequestDownload(id, (byte) (hidden ? 1 : 0)));
       codexIdOfAskedDownload.addLast(id);
     } finally {
       lock.unlock();
@@ -579,7 +616,17 @@ public class ClientAPI {
   }
   
   public void addSocketsOpenDownload(SocketField[] sockets) {
-    sharersSocketQueue.add(sockets);
+    sharersSocketQueue.add(new SocketResponse(sockets, null));
+  }
+  
+  public void addSocketsClosedDownload(ProxyNodeSocket[] proxySockets) {
+    var sockets = new SocketField[proxySockets.length];
+    var chainId = new int[proxySockets.length];
+    for (int i = 0; i < proxySockets.length; i++) {
+      sockets[i] = proxySockets[i].socket();
+      chainId[i] = proxySockets[i].chainId();
+    }
+    sharersSocketQueue.add(new SocketResponse(sockets, chainId));
   }
   
   /**
