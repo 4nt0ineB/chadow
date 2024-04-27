@@ -88,12 +88,14 @@ public class Server {
     serverContext.queueFrame(new RequestResponse(codex));
   }
 
-  public void requestOpenDownload(String codexId, ServerContext serverContext) {
+  public void requestOpenDownload(ServerContext serverContext, String codexId, int numberOfSharers) {
     var sharersList = codexes.entrySet().stream()
                              .filter(e -> e.getKey().codex().id().equals(codexId))
             .map(Map.Entry::getValue)
+            .limit(numberOfSharers)
             .findFirst()
             .orElseThrow();
+    // TODO: add a random selection of sharers
 
     var sharersSocketFieldArray = sharersList.stream()
             .map(clients::get)

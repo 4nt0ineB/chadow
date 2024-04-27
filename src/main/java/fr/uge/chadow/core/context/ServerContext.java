@@ -104,7 +104,7 @@ public final class ServerContext extends Context {
           return;
         }
         if (requestDownload.mode() == 0) {
-          server.requestOpenDownload(requestDownload.codexId(), this);
+          server.requestOpenDownload(this, requestDownload.codexId(), requestDownload.numberOfSharers());
         } else {
           // TODO : implement closed download
         }
