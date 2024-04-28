@@ -582,7 +582,7 @@ encodé de la manière suivante :
   +-----------------------------------+
 
   chain_id : identifiant unique de la chaîne de proxy (long) 
-             généré aléatoirement par le client.
+             généré aléatoirement par le serveur.
   codex_id : hachage (SHA1) du codex.
 
   Si le chain_id est inconnu, la connexion est fermée.

@@ -107,6 +107,7 @@ public final class ServerContext extends Context {
           server.requestOpenDownload(this, requestDownload.codexId(), requestDownload.numberOfSharers());
         } else {
           // TODO : implement closed download
+          server.requestClosedDownload(this, requestDownload.codexId(), requestDownload.numberOfSharers(), requestDownload.numberOfProxies());
         }
       }
 
