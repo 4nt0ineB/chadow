@@ -7,15 +7,17 @@ import java.nio.ByteBuffer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-public record RequestDownload(String codexId, byte mode) implements Frame {
+public record RequestDownload(String codexId, byte mode, int numberOfSharers, int numberOfProxies) implements Frame {
   @Override
   public ByteBuffer toByteBuffer() {
     var opcodeByte = Opcode.toByte(this.getClass());
     var codexIdByteBuffer = UTF_8.encode(codexId);
-    var bb = ByteBuffer.allocate(Byte.BYTES * 2 + Integer.BYTES + codexIdByteBuffer.remaining());
+    var bb = ByteBuffer.allocate(Byte.BYTES * 2 + Integer.BYTES * 3 + codexIdByteBuffer.remaining());
     return bb.put(opcodeByte)
             .putInt(codexIdByteBuffer.remaining())
             .put(codexIdByteBuffer)
-            .put(mode);
+            .put(mode)
+            .putInt(numberOfSharers)
+            .putInt(numberOfProxies);
   }
 }

@@ -388,14 +388,30 @@ encodé de la manière suivante :
   Le client envoie une trame de demande de téléchargement au serveur 
   avec les informations suivantes :
 
-  +---------------------------------------------+
-  | (request_download) | codex_id | mode (byte) |
-  +---------------------------------------------+
+  +-------------------------------------------------------------------------------------+
+  | (request_download) | codex_id | mode (byte) | number_of_sharers | number_of_proxies |
+  +-------------------------------------------------------------------------------------+
 
   - codex_id : Le hachage (SHA1) du codex à télécharger.
   - mode : Un byte indiquant le mode de téléchargement :
     - 0 pour le mode ouvert.
     - 1 pour le mode fermé.
+  - number_of_sharers : Le nombre maximum de sharers qui seront
+                        contactés pour le téléchargement (int).
+  - number_of_proxies : Le nombre de proxies qui seront utilisés par
+                        chaîne (int). La valeur doit être à 0 si le mode
+                        est ouvert.
+  Exemple : Si le client souhaite télécharger le codex "MonCodex" en mode caché
+    avec 5 sharers et 2 proxies par chaîne, la trame sera la suivante :
+
+    Client <-> Proxy1 <-> Proxy2 <-> Sharer1
+      ^
+      |
+      --> Proxy3 <-> Proxy4 <-> Sharer2
+
+    +--------------------------------------------------------------------------+
+    | (request_download) | 3a2b1c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0 | 1 | 5 | 2 |
+    +--------------------------------------------------------------------------+
 
   Le serveur répond ensuite avec une trame contenant les informations 
   nécessaires pour effectuer le téléchargement :
@@ -547,13 +563,10 @@ encodé de la manière suivante :
   
   Quand le client reçoit cette commande, il associe le socket (ip_dest:port_dest) au chain_id dans la table de routage. 
   Le client répond ok
+
   +-----------------------+
   | (proxy_ok) | chain_id |
   +-----------------------+
-
-
- le serveur doit trouver un autre proxy pour cette table de routage.
-
 
   8.3.2 Connexion
 
@@ -566,7 +579,7 @@ encodé de la manière suivante :
   +-----------------------------------+
 
   chain_id : identifiant unique de la chaîne de proxy (long) 
-             généré aléatoirement par le client.
+             généré aléatoirement par le serveur.
   codex_id : hachage (SHA1) du codex.
 
   Si le chain_id est inconnu, la connexion est fermée.

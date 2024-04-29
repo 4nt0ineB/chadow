@@ -490,7 +490,8 @@ public class ClientAPI {
     lock.lock();
     try {
       codexController.download(id, hidden);
-      clientContext.queueFrame(new RequestDownload(id, (byte) (hidden ? 1 : 0)));
+      // TODO : change the way to handle this
+      clientContext.queueFrame(new RequestDownload(id, (byte) (hidden ? 1 : 0), 10, 1));
       codexIdOfAskedDownload.addLast(id);
     } finally {
       lock.unlock();
