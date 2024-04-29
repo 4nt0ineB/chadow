@@ -106,8 +106,7 @@ public final class ServerContext extends Context {
         if (requestDownload.mode() == 0) {
           server.requestOpenDownload(this, requestDownload.codexId(), requestDownload.numberOfSharers());
         } else {
-          // TODO : implement closed download
-          server.requestClosedDownload(this, requestDownload.codexId(), requestDownload.numberOfSharers(), requestDownload.numberOfProxies());
+          server.requestClosedDownload(this, requestDownload);
         }
       }
 
@@ -121,6 +120,16 @@ public final class ServerContext extends Context {
         var result = server.search(search);
         queueFrame(result);
         logger.info(STR."Get \{result.results().length} results");
+      }
+
+      case ProxyOk proxyOk -> {
+        if (!isAuthenticated()) {
+          logger.warning(STR."Client \{super.getSocket().getRemoteAddress()} is not authenticated");
+          silentlyClose();
+          return;
+        }
+
+        server.proxyOk(this, proxyOk.chainId());
       }
       
       default -> {

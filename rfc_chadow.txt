@@ -563,13 +563,10 @@ encodé de la manière suivante :
   
   Quand le client reçoit cette commande, il associe le socket (ip_dest:port_dest) au chain_id dans la table de routage. 
   Le client répond ok
+
   +-----------------------+
   | (proxy_ok) | chain_id |
   +-----------------------+
-
-
- le serveur doit trouver un autre proxy pour cette table de routage.
-
 
   8.3.2 Connexion
 

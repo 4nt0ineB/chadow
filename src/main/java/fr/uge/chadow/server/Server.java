@@ -14,6 +14,7 @@ import fr.uge.chadow.core.protocol.WhisperMessage;
 import fr.uge.chadow.core.protocol.client.RequestDownload;
 import fr.uge.chadow.core.protocol.client.Search;
 import fr.uge.chadow.core.protocol.field.Codex;
+import fr.uge.chadow.core.protocol.field.ProxyNodeSocket;
 import fr.uge.chadow.core.protocol.field.SocketField;
 import fr.uge.chadow.core.protocol.server.*;
 
@@ -89,6 +90,13 @@ public class Server {
               .map(Map.Entry::getValue)
               .findFirst()
               .orElseThrow();
+
+      // Contact the proxies for each chain
+      for (var chainId : proxiesDetails.chains.keySet()) {
+        logger.info(STR."Contacting proxies for chain \{chainId}");
+        contactingProxiesForAChain(chainId, requestDownload.numberOfProxies(), sharersList, serverContext.login(),
+                proxiesDetails);
+      }
     }
 
     /**
@@ -97,18 +105,19 @@ public class Server {
      *
      * @param chainId         The ID of the chain for which proxies are being contacted.
      * @param numberOfProxies The number of proxies to contact for the chain.
-     * @param sharers         The set of sharers associated with the requested resource.
+     * @param sharers         The list of sharers associated with the requested resource.
      * @param client          The client initiating the request.
      * @param proxiesDetails  Details about the proxies and chains involved in the process.
      */
-    public void contactingProxiesForAChain(int chainId, int numberOfProxies, Set<String> sharers, String client,
+    public void contactingProxiesForAChain(int chainId, int numberOfProxies, List<String> sharers, String client,
                                            ProxiesDetails proxiesDetails) {
       Set<String> contactedProxies = new HashSet<>();
+      Set<String> sharersSet = new HashSet<>(sharers);
 
       // This proxy will be the last proxy in the chain.
       // This proxy will contact the sharer.
       // The proxy is selected based on the score of the proxies.
-      String currentProxyToContact = selectBestProxy(sharers, contactedProxies, client);
+      String currentProxyToContact = selectBestProxy(sharersSet, contactedProxies, client);
       logger.info(STR."Last proxy in the chain: \{currentProxyToContact}");
 
       contactedProxies.add(currentProxyToContact);
@@ -117,7 +126,7 @@ public class Server {
       proxiesDetails.chains.get(chainId).proxiesContacted.add(currentProxyToContact);
 
       for (int i = 0; i < numberOfProxies - 1; i++) {
-        String proxyUsername = selectBestProxy(sharers, contactedProxies, client);
+        String proxyUsername = selectBestProxy(sharersSet, contactedProxies, client);
         logger.info(STR."Next proxy in the chain: \{proxyUsername}");
 
         contactedProxies.add(proxyUsername);
@@ -196,6 +205,96 @@ public class Server {
       }
 
       return possibleSharers;
+    }
+
+    /**
+     * Handles the confirmation of a proxy for a specific chain and manages the completion status of the associated request.
+     * If all proxies in the chain have confirmed the request, sends a response to the client.
+     *
+     * @param serverContext The server context of the confirming proxy.
+     * @param chainId       The ID of the chain for which the proxy confirms the request.
+     */
+    public void proxyConfirmed(ServerContext serverContext, int chainId) {
+      // Retrieve the client request associated with the chain ID
+      var clientRequest = chainIdToRequest.get(chainId);
+
+      // Retrieve the details of proxies associated with the client request
+      var proxiesDetails = requests.get(clientRequest);
+
+      // Add the confirming proxy to the list of confirmed proxies for the chain
+      var chainDetails = proxiesDetails.chains.get(chainId);
+      chainDetails.proxiesConfirmed.add(serverContext.login());
+
+      // Manage the completion status of the associated request
+      manageRequest(clientRequest);
+    }
+
+
+    /**
+     * Manages the completion status of a client request and sends a response if the request is complete.
+     *
+     * @param clientRequest The client request to manage.
+     */
+    private void manageRequest(ClientRequest clientRequest) {
+      // Retrieve the details of proxies associated with the client request
+      var proxiesDetails = requests.get(clientRequest);
+
+      // Check if all proxies in each chain have confirmed the request
+      for (var chainDetails : proxiesDetails.chains.values()) {
+        if (chainDetails.proxiesConfirmed.size() != proxiesDetails.numberOfProxies) {
+          // If the request is not complete, log the information and return
+          logger.info(STR."Request of \{clientRequest.codexId()} by \{clientRequest.serverContext.login()} is not complete");
+          return;
+        }
+      }
+
+      // If the request is complete, prepare and send the response
+      var proxyNodeSocketArray = proxiesDetails.chains.entrySet().stream()
+              .map(entry -> {
+                var chainId = entry.getKey();
+                var chainDetails = entry.getValue();
+                var firstProxyOfChain = chainDetails.proxiesContacted.getFirst();
+
+                // Prepare the socket field for the first proxy in the chain
+                var socketFieldOfFirstProxy = new SocketField(
+                        clients.get(firstProxyOfChain).address().getAddress().getAddress(),
+                        clients.get(firstProxyOfChain).address().getPort());
+
+                return new ProxyNodeSocket(socketFieldOfFirstProxy, chainId);
+              })
+              .toArray(ProxyNodeSocket[]::new);
+
+      // Send a response containing the proxy node sockets to the client
+      clientRequest.serverContext.queueFrame(new ClosedDownloadResponse(proxyNodeSocketArray));
+    }
+
+
+    /**
+     * Removes all instances of a client from the proxy scores and requests, including
+     * client requests associated with any chains involving the client.
+     *
+     * @param username The username of the client to remove.
+     */
+    public void removeAllInstancesOfClient(String username) {
+      // Remove the client from the proxy scores
+      proxyScores.remove(username);
+
+      // Remove the client from the requests where the client is present in any chain
+      List<ClientRequest> requestsToRemove = new ArrayList<>();
+
+      for (var entry : requests.entrySet()) {
+        var clientRequest = entry.getKey();
+        var proxiesDetails = entry.getValue();
+
+        for (var chainDetails : proxiesDetails.chains.values()) {
+          if (chainDetails.proxiesContacted.contains(username)) {
+            requestsToRemove.add(clientRequest);
+            break;
+          }
+        }
+      }
+
+      requestsToRemove.forEach(requests::remove);
     }
   }
 
@@ -302,23 +401,12 @@ public class Server {
     serverContext.queueFrame(new RequestOpenDownload(sharersSocketFieldArray));
   }
 
-  public void requestClosedDownload(ServerContext serverContext, String codexId, int numberOfSharers,
-                                    int numberOfProxies) {
-    var sharersList = codexes.entrySet().stream()
-            .filter(e -> e.getKey().codex().id().equals(codexId))
-            .map(Map.Entry::getValue)
-            .findFirst()
-            .orElseThrow();
-
-
+  public void requestClosedDownload(ServerContext serverContext, RequestDownload requestDownload) {
+    proxyHandler.initRequest(requestDownload, serverContext);
   }
 
-  public boolean addClient(String login, SocketChannel sc, InetSocketAddress address, ServerContext serverContext) {
-    if (clients.containsKey(login)) {
-      return false;
-    }
-    clients.put(login, new SocketInfo(sc, address, serverContext));
-    return true;
+  public void proxyOk(ServerContext serverContext, int chainId) {
+    proxyHandler.proxyConfirmed(serverContext, chainId);
   }
 
   public SearchResponse search(Search search) {
@@ -354,9 +442,19 @@ public class Server {
     return new SearchResponse(filteredCodexes);
   }
 
+  public boolean addClient(String login, SocketChannel sc, InetSocketAddress address, ServerContext serverContext) {
+    if (clients.containsKey(login)) {
+      return false;
+    }
+    clients.put(login, new SocketInfo(sc, address, serverContext));
+    proxyHandler.proxyScores.put(login, 0);
+    return true;
+  }
+
   public void removeClient(String login) {
     logger.info(STR."Client \{login} has disconnected");
     clients.remove(login);
+    proxyHandler.removeAllInstancesOfClient(login);
     broadcast(new Event((byte) 0, login));
   }
 
