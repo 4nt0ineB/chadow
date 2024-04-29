@@ -24,6 +24,7 @@ public class CodexView implements View {
     this.lines = lines;
     this.cols = cols;
     scrollableView = toView(codexStatus, lines, cols);
+    scrollableView.scrollTop();
   }
   
   @Override
@@ -34,7 +35,7 @@ public class CodexView implements View {
   @Override
   public void draw() throws IOException {
     var newview = toView(codexStatus, lines, cols);
-    scrollableView.setAsSamePosition(newview);
+    newview.setAsSamePosition(scrollableView);
     scrollableView = newview;
     scrollableView.draw();
     logger.info("Drawing CodexView");
@@ -62,8 +63,7 @@ public class CodexView implements View {
       sb.append(CLIColor.ITALIC)
         .append(CLIColor.BOLD)
         .append(CLIColor.ORANGE)
-        .append(codexStatus.isDownloading() ? (STR."▓ Downloading ...\{codexStatus.isDownloadingHidden() ? "(hidden)" : ""}"):
-            (codexStatus.isSharing() ? "▓ Sharing... " : ""))
+        .append(codexStatus.isDownloading() ? STR."▓ Downloading ...\{codexStatus.isDownloadingHidden() ? "(hidden)" : ""}" : (codexStatus.isSharing() ? "▓ Sharing... " : ""))
         .append(CLIColor.RESET)
         .append("\n");
       
@@ -104,9 +104,7 @@ public class CodexView implements View {
                                     .append("\n"));
           });
     
-   var aa = View.scrollableFromString(STR."[Codex] \{codex.name()}", lines, cols, sb.toString());
-   
-   return aa;
+    return View.scrollableFromString(STR."[Codex] \{codex.name()}", lines, cols, sb.toString());
   }
   
   @Override
