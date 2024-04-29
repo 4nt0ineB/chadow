@@ -701,7 +701,7 @@ public class ClientAPI {
     //this.directMessages.put(userId, new DirectMessages(userId, "Alan1"));
     // test codex
     if (login.equals("Alan1")) {
-      var status = codexController.createFromPath("my codex", "/home/alan1/Pictures");
+      var status = codexController.createFromPath("my codex", "/mnt/d/Photos/DSC00003.JPG");
       share(status.id());
       /*var paths = new String[]{
           "lau-ardelean-wallpaper",

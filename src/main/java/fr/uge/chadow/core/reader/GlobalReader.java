@@ -1,6 +1,7 @@
 package fr.uge.chadow.core.reader;
 
 import fr.uge.chadow.core.protocol.field.Codex;
+import fr.uge.chadow.core.protocol.field.ProxyNodeSocket;
 import fr.uge.chadow.core.protocol.field.SocketField;
 import fr.uge.chadow.core.protocol.server.DiscoveryResponse;
 import fr.uge.chadow.core.protocol.server.SearchResponse;
@@ -59,6 +60,8 @@ public class GlobalReader<T extends Record> implements Reader<T> {
           readerMap.put(type, new ArrayReader<>(new GlobalReader<>(SocketField.class), SocketField.class));
         } else if (componentType.equals(SearchResponse.Result.class)) {
           readerMap.put(type, new ArrayReader<>(new GlobalReader<>(SearchResponse.Result.class), SearchResponse.Result.class));
+        } else if (componentType.equals(ProxyNodeSocket.class)) {
+          readerMap.put(type, new ArrayReader<>(new GlobalReader<>(ProxyNodeSocket.class), ProxyNodeSocket.class));
         } else {
           throw new IllegalArgumentException(STR."Unsupported array type: \{type}");
         }

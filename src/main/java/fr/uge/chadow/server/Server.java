@@ -69,7 +69,7 @@ public class Server {
               requestDownload.numberOfSharers(), requestDownload.codexId());
       logger.info(STR."Possible sharers: \{possibleSharers}");
 
-      if (possibleSharers == -1) {
+      if (possibleSharers <= 0) {
         // TODO : send an error message
         // serverContext.queueFrame(new Error("Not enough proxies available"));
         return;
@@ -85,11 +85,22 @@ public class Server {
       var clientRequest = new ClientRequest(serverContext, requestDownload.codexId());
       var proxiesDetails = new ProxiesDetails(requestDownload.numberOfProxies(), possibleSharers, new HashMap<>());
 
+      // Add the client request and associated proxies details to the requests map
+      requests.put(clientRequest, proxiesDetails);
+
+      logger.info(STR."clientRequest: \{clientRequest}");
+      logger.info(STR."proxiesDetails: \{proxiesDetails}");
+
       // Create the different chainIds and add them to the proxiesDetails
       for (int i = 0; i < possibleSharers; i++) {
         var newChainId = generateUniqueInt(chainIdToRequest);
+        logger.info(STR."New chainId: \{newChainId}");
         proxiesDetails.chains.put(newChainId, new ChainDetails(new ArrayList<>(), new HashSet<>()));
         chainIdToRequest.put(newChainId, clientRequest);
+
+        System.out.println(STR."proxiesDetails: \{proxiesDetails}");
+        System.out.println(STR."chainIdToRequest: \{chainIdToRequest}");
+
 
         // Add the Sharer to the contacted proxies
         proxiesDetails.chains.get(newChainId).proxiesContacted.add(sharersList.get(i));
@@ -215,13 +226,18 @@ public class Server {
     public void proxyConfirmed(ServerContext serverContext, int chainId) {
       // Retrieve the client request associated with the chain ID
       var clientRequest = chainIdToRequest.get(chainId);
+      System.out.println(STR."clientRequest: \{clientRequest}");
 
       // Retrieve the details of proxies associated with the client request
       var proxiesDetails = requests.get(clientRequest);
 
+      System.out.println(STR."proxiesDetails: \{proxiesDetails}");
+
       // Add the confirming proxy to the list of confirmed proxies for the chain
       var chainDetails = proxiesDetails.chains.get(chainId);
       chainDetails.proxiesConfirmed.add(serverContext.login());
+
+      System.out.println(STR."chainDetails: \{chainDetails}");
 
       // Manage the completion status of the associated request
       manageRequest(clientRequest);
@@ -251,7 +267,7 @@ public class Server {
               .map(entry -> {
                 var chainId = entry.getKey();
                 var chainDetails = entry.getValue();
-                var firstProxyOfChain = chainDetails.proxiesContacted.getFirst();
+                var firstProxyOfChain = chainDetails.proxiesContacted.getLast();
 
                 // Prepare the socket field for the first proxy in the chain
                 var socketFieldOfFirstProxy = new SocketField(
@@ -261,6 +277,8 @@ public class Server {
                 return new ProxyNodeSocket(socketFieldOfFirstProxy, chainId);
               })
               .toArray(ProxyNodeSocket[]::new);
+
+      System.out.println(Arrays.toString(proxyNodeSocketArray));
 
       // Send a response containing the proxy node sockets to the client
       clientRequest.serverContext.queueFrame(new ClosedDownloadResponse(proxyNodeSocketArray));
@@ -407,6 +425,7 @@ public class Server {
   }
 
   public void proxyOk(ServerContext serverContext, int chainId) {
+    logger.info(STR."Proxy \{serverContext.login()} confirmed chain \{chainId}");
     proxyHandler.proxyConfirmed(serverContext, chainId);
   }
 
