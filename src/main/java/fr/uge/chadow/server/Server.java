@@ -37,7 +37,7 @@ public class Server {
      *
      * @param numberOfProxies The number of proxies associated with the request.
      * @param numberOfSharers The number of sharers associated with the request.
-     * @param chains          A map associating the chain ID to a list of usernames.
+     * @param chains          A map associating the chain ID to the details of the chain.
      *                        The list of usernames represents the proxies in the chain.
      */
     private record ProxiesDetails(int numberOfProxies, int numberOfSharers, Map<Integer, ChainDetails> chains) {
@@ -278,6 +278,9 @@ public class Server {
     public void removeAllInstancesOfClient(String username) {
       // Remove the client from the proxy scores
       proxyScores.remove(username);
+
+      // Remove the requests associated with the client
+      requests.entrySet().removeIf(entry -> entry.getKey().serverContext.login().equals(username));
 
       // Remove the client from the requests where the client is present in any chain
       List<ClientRequest> requestsToRemove = new ArrayList<>();
