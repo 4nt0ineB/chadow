@@ -3,10 +3,7 @@ package fr.uge.chadow.server;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 
@@ -21,12 +18,6 @@ import fr.uge.chadow.core.protocol.field.SocketField;
 import fr.uge.chadow.core.protocol.server.*;
 
 public class Server {
-  public record SocketInfo(SocketChannel socketChannel, InetSocketAddress address, ServerContext serverContext) {
-  }
-
-  public record CodexRecord(Codex codex, long registrationDate) {
-  }
-
   /**
    * Class to manage client requests and associated proxy details.
    */
@@ -48,22 +39,35 @@ public class Server {
      * @param chains          A map associating the chain ID to a list of usernames.
      *                        The list of usernames represents the proxies in the chain.
      */
-    private record ProxiesDetails(int numberOfProxies, int numberOfSharers, Map<Integer, List<String>> chains) {
+    private record ProxiesDetails(int numberOfProxies, int numberOfSharers, Map<Integer, ChainDetails> chains) {
+    }
+
+    /**
+     * Represents the details of a chain.
+     *
+     * @param proxiesContacted A list of usernames representing the proxies contacted in the chain.
+     * @param proxiesConfirmed A set of usernames representing the proxies that have confirmed the chain.
+     */
+    private record ChainDetails(List<String> proxiesContacted, Set<String> proxiesConfirmed) {
     }
 
     // Map to store client requests and associated proxy details.
     private final Map<ClientRequest, ProxiesDetails> requests = new HashMap<>();
 
     // Map to store the client request associated with a chain ID.
-    private final Map<String, ClientRequest> chainIdToRequest = new HashMap<>();
+    private final Map<Integer, ClientRequest> chainIdToRequest = new HashMap<>();
 
     // Map to store the scores of proxies.
     // The key is the username of the proxy and the value is the score.
     // The score is used to determine the best proxy to use.
     private final Map<String, Integer> proxyScores = new HashMap<>();
+    private final Random random = new Random();
 
     public void initRequest(RequestDownload requestDownload, ServerContext serverContext) {
-      var possibleSharers = calculatePossibleSharers(requestDownload.numberOfProxies(), requestDownload.numberOfSharers(), requestDownload.codexId());
+      var possibleSharers = calculatePossibleSharers(requestDownload.numberOfProxies(),
+              requestDownload.numberOfSharers(), requestDownload.codexId());
+      logger.info(STR."Possible sharers: \{possibleSharers}");
+
       if (possibleSharers == -1) {
         // TODO : send an error message
         // serverContext.queueFrame(new Error("Not enough proxies available"));
@@ -73,7 +77,96 @@ public class Server {
       var clientRequest = new ClientRequest(serverContext, requestDownload.codexId());
       var proxiesDetails = new ProxiesDetails(requestDownload.numberOfProxies(), possibleSharers, new HashMap<>());
 
+      // Create the different chainIds and add them to the proxiesDetails
+      for (int i = 0; i < possibleSharers; i++) {
+        var newChainId = generateUniqueInt(chainIdToRequest);
+        proxiesDetails.chains.put(newChainId, new ChainDetails(new ArrayList<>(), new HashSet<>()));
+        chainIdToRequest.put(newChainId, clientRequest);
+      }
 
+      var sharersList = codexes.entrySet().stream()
+              .filter(e -> e.getKey().codex().id().equals(requestDownload.codexId()))
+              .map(Map.Entry::getValue)
+              .findFirst()
+              .orElseThrow();
+    }
+
+    /**
+     * Initiates the process of contacting proxies for a given chain, starting from the last proxy in the chain
+     * and working towards the first proxy.
+     *
+     * @param chainId         The ID of the chain for which proxies are being contacted.
+     * @param numberOfProxies The number of proxies to contact for the chain.
+     * @param sharers         The set of sharers associated with the requested resource.
+     * @param client          The client initiating the request.
+     * @param proxiesDetails  Details about the proxies and chains involved in the process.
+     */
+    public void contactingProxiesForAChain(int chainId, int numberOfProxies, Set<String> sharers, String client,
+                                           ProxiesDetails proxiesDetails) {
+      Set<String> contactedProxies = new HashSet<>();
+
+      // This proxy will be the last proxy in the chain.
+      // This proxy will contact the sharer.
+      // The proxy is selected based on the score of the proxies.
+      String currentProxyToContact = selectBestProxy(sharers, contactedProxies, client);
+      logger.info(STR."Last proxy in the chain: \{currentProxyToContact}");
+
+      contactedProxies.add(currentProxyToContact);
+      proxyScores.put(currentProxyToContact, proxyScores.getOrDefault(currentProxyToContact, 0) + 1);
+
+      proxiesDetails.chains.get(chainId).proxiesContacted.add(currentProxyToContact);
+
+      for (int i = 0; i < numberOfProxies - 1; i++) {
+        String proxyUsername = selectBestProxy(sharers, contactedProxies, client);
+        logger.info(STR."Next proxy in the chain: \{proxyUsername}");
+
+        contactedProxies.add(proxyUsername);
+        proxyScores.put(proxyUsername, proxyScores.getOrDefault(proxyUsername, 0) + 1);
+
+        proxiesDetails.chains.get(chainId).proxiesContacted.add(proxyUsername);
+
+        SocketField proxySocket = new SocketField(clients.get(currentProxyToContact).address().getAddress()
+                .getAddress(), clients.get(currentProxyToContact).address().getPort());
+
+        // Send a Proxy Frame to the proxy
+        clients.get(proxyUsername).serverContext.queueFrame(new Proxy(chainId, proxySocket));
+        logger.info(STR."\{proxyUsername} contacted the proxy \{currentProxyToContact} for the chain \{chainId}");
+
+        currentProxyToContact = proxyUsername;
+      }
+    }
+
+    /**
+     * Selects the best proxy from the available proxies based on certain criteria.
+     *
+     * @param sharers          The set of sharers associated with the requested resource.
+     * @param contactedProxies The set of proxies that have already been contacted.
+     * @param client           The client making the request.
+     * @return The best proxy to contact based on the given criteria.
+     * @throws NoSuchElementException if no proxy can be selected.
+     */
+    private String selectBestProxy(Set<String> sharers, Set<String> contactedProxies, String client) {
+      return proxyScores.entrySet().stream()
+              .filter(e -> !client.equals(e.getKey()))
+              .filter(e -> !sharers.contains(e.getKey()))
+              .filter(e -> !contactedProxies.contains(e.getKey()))
+              .min(Map.Entry.comparingByValue())
+              .map(Map.Entry::getKey)
+              .orElseThrow();
+    }
+
+    /**
+     * Generates a unique integer that is not already present in the given map.
+     *
+     * @param map The map to check for the presence of the generated integer.
+     * @return A unique integer that is not already present in the given map.
+     */
+    private int generateUniqueInt(Map<Integer, ?> map) {
+      int uniqueInt;
+      do {
+        uniqueInt = random.nextInt();
+      } while (map.containsKey(uniqueInt));
+      return uniqueInt;
     }
 
     /**
@@ -106,10 +199,31 @@ public class Server {
     }
   }
 
+  /**
+   * Represents information about a socket, including the associated socket channel,
+   * address, and server context.
+   *
+   * @param socketChannel The socket channel associated with the socket.
+   * @param address       The listening address of the socket.
+   * @param serverContext The server context associated with the socket.
+   */
+  public record SocketInfo(SocketChannel socketChannel, InetSocketAddress address, ServerContext serverContext) {
+  }
+
+  /**
+   * Represents a record containing information about a codex and its registration date.
+   *
+   * @param codex            The codex information.
+   * @param registrationDate The registration date of the codex.
+   */
+  public record CodexRecord(Codex codex, long registrationDate) {
+  }
+
 
   private static final Logger logger = Logger.getLogger(Server.class.getName());
   private final Map<String, SocketInfo> clients = new HashMap<>();
   private final Map<CodexRecord, List<String>> codexes = new HashMap<>(); // codex -> list of usernames
+  private final ProxyHandler proxyHandler = new ProxyHandler();
   private TCPConnectionManager connectionManager;
   private final int port;
 
@@ -150,7 +264,8 @@ public class Server {
   }
 
   public void propose(Codex codex, String username) {
-    var clientCodexes = codexes.computeIfAbsent(new CodexRecord(codex, System.currentTimeMillis()), k -> new ArrayList<>());
+    var clientCodexes = codexes.computeIfAbsent(new CodexRecord(codex,
+            System.currentTimeMillis()), k -> new ArrayList<>());
     logger.info(STR."Proposing: \{codex}");
     clientCodexes.add(username);
   }
@@ -187,7 +302,8 @@ public class Server {
     serverContext.queueFrame(new RequestOpenDownload(sharersSocketFieldArray));
   }
 
-  public void requestClosedDownload(ServerContext serverContext, String codexId, int numberOfSharers, int numberOfProxies) {
+  public void requestClosedDownload(ServerContext serverContext, String codexId, int numberOfSharers,
+                                    int numberOfProxies) {
     var sharersList = codexes.entrySet().stream()
             .filter(e -> e.getKey().codex().id().equals(codexId))
             .map(Map.Entry::getValue)
@@ -231,7 +347,8 @@ public class Server {
             .limit(search.results())
             .map(codexRegistration -> {
               var codex = codexRegistration.codex();
-              return new SearchResponse.Result(codex.name(), codex.id(), codexRegistration.registrationDate, codexes.get(codexRegistration).size());
+              return new SearchResponse.Result(codex.name(), codex.id(), codexRegistration.registrationDate,
+                      codexes.get(codexRegistration).size());
             })
             .toArray(SearchResponse.Result[]::new);
     return new SearchResponse(filteredCodexes);
