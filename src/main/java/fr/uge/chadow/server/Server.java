@@ -75,6 +75,13 @@ public class Server {
         return;
       }
 
+      var sharersList = codexes.entrySet().stream()
+              .filter(e -> e.getKey().codex().id().equals(requestDownload.codexId()))
+              .map(Map.Entry::getValue)
+              .limit(possibleSharers)
+              .findFirst()
+              .orElseThrow();
+
       var clientRequest = new ClientRequest(serverContext, requestDownload.codexId());
       var proxiesDetails = new ProxiesDetails(requestDownload.numberOfProxies(), possibleSharers, new HashMap<>());
 
@@ -83,13 +90,10 @@ public class Server {
         var newChainId = generateUniqueInt(chainIdToRequest);
         proxiesDetails.chains.put(newChainId, new ChainDetails(new ArrayList<>(), new HashSet<>()));
         chainIdToRequest.put(newChainId, clientRequest);
-      }
 
-      var sharersList = codexes.entrySet().stream()
-              .filter(e -> e.getKey().codex().id().equals(requestDownload.codexId()))
-              .map(Map.Entry::getValue)
-              .findFirst()
-              .orElseThrow();
+        // Add the Sharer to the contacted proxies
+        proxiesDetails.chains.get(newChainId).proxiesContacted.add(sharersList.get(i));
+      }
 
       // Contact the proxies for each chain
       for (var chainId : proxiesDetails.chains.keySet()) {
@@ -114,18 +118,12 @@ public class Server {
       Set<String> contactedProxies = new HashSet<>();
       Set<String> sharersSet = new HashSet<>(sharers);
 
-      // This proxy will be the last proxy in the chain.
-      // This proxy will contact the sharer.
-      // The proxy is selected based on the score of the proxies.
-      String currentProxyToContact = selectBestProxy(sharersSet, contactedProxies, client);
-      logger.info(STR."Last proxy in the chain: \{currentProxyToContact}");
+      // The current proxyContacted list contains only one element, the sharer to contact
+      String currentProxyToContact = proxiesDetails.chains.get(chainId).proxiesContacted.getFirst();
+      logger.info(STR."The sharer to contact: \{currentProxyToContact} in the chain \{chainId}");
 
-      contactedProxies.add(currentProxyToContact);
-      proxyScores.put(currentProxyToContact, proxyScores.getOrDefault(currentProxyToContact, 0) + 1);
 
-      proxiesDetails.chains.get(chainId).proxiesContacted.add(currentProxyToContact);
-
-      for (int i = 0; i < numberOfProxies - 1; i++) {
+      for (int i = 0; i < numberOfProxies; i++) {
         String proxyUsername = selectBestProxy(sharersSet, contactedProxies, client);
         logger.info(STR."Next proxy in the chain: \{proxyUsername}");
 
