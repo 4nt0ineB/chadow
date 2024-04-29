@@ -62,7 +62,8 @@ public class CodexView implements View {
       sb.append(CLIColor.ITALIC)
         .append(CLIColor.BOLD)
         .append(CLIColor.ORANGE)
-        .append(codexStatus.isDownloading() ? "▓ Downloading ..." : codexStatus.isSharing() ? "▓ Sharing... " : "")
+        .append(codexStatus.isDownloading() ? (STR."▓ Downloading ...\{codexStatus.isDownloadingHidden() ? "(hidden)" : ""}"):
+            (codexStatus.isSharing() ? "▓ Sharing... " : ""))
         .append(CLIColor.RESET)
         .append("\n");
       

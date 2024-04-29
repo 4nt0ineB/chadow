@@ -11,6 +11,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
 public class CodexStatus {
+  
   public record Chunk(long offset, int length) {
   }
   private static final Logger logger = Logger.getLogger(CodexStatus.class.getName());
@@ -75,6 +76,10 @@ public class CodexStatus {
     } finally {
       lock.unlock();
     }
+  }
+  
+  public boolean isDownloadingHidden() {
+    return downloadHidden;
   }
   
   public boolean isComplete(Codex.FileInfo file) {
@@ -172,7 +177,8 @@ public class CodexStatus {
   }
   
   /**
-   * Get the next random chunk to download
+   * Get the next random chunk to download of first non completed file
+   * in the codex
    *
    * @return the chunk
    */

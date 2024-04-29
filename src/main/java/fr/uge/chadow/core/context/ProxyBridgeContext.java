@@ -15,8 +15,8 @@ import java.util.logging.Logger;
  * Then received frames from the next node are forwarded back to the ClientAsServerContext.
  *
  * <pre>
- *                         The current client App (being a proxy)
- * client A <---[-->(ClientServerAsContext) <--API--> (ProxyBridgeContext)<---]---> client B
+ *              [           The current client App (being a proxy)       ]
+ * client A <---[-->(ClientServerAstext) <--> (ProxyBridgeContext) <---]---> client B
  * </pre>
  */
 public final class ProxyBridgeContext extends Context {
