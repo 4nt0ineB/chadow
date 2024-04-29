@@ -52,6 +52,10 @@ public final class ClientContext extends Context {
         logger.info(STR."Received search response (\{searchResponse.results().length} results)");
         api.saveSearchResponse(searchResponse);
       }
+      case ClosedDownloadResponse closedDownloadResponse -> {
+        logger.info(STR."Received \{closedDownloadResponse.proxies().length} proxy sockets");
+        api.addSocketsClosedDownload(closedDownloadResponse.proxies());
+      }
       case Event event -> {
         if(event.code() == (byte) 0) {
           logger.info("Received event 0");

@@ -85,7 +85,7 @@ public class CodexView implements View {
       .append(View.bytesToHumanReadable(codex.totalSize()))
       .append("\n");
     sb.append("Local Path: ")
-      .append(Path.of(codexStatus.root(), codexStatus.codex().name()))
+      .append(Path.of(codexStatus.root()))
       .append("\n\n");
     sb.append(colorize(CLIColor.BOLD, "Files:  \n"));
     
