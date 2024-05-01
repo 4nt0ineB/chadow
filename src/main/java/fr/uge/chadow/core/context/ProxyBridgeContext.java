@@ -17,12 +17,14 @@ import java.util.logging.Logger;
  * <pre>
  *              [           The current client App (being a proxy)       ]
  * client A <---[-->(ClientServerAstext) <--> (ProxyBridgeContext) <---]---> client B
+ *
  * </pre>
  */
 public final class ProxyBridgeContext extends Context {
   private static final Logger logger = Logger.getLogger(ClientAsServerContext.class.getName());
   private static final int BUFFER_SIZE = 1024;
   private final ClientAsServerContext otherEnd;
+  private boolean isClosed;
   
   public ProxyBridgeContext(SelectionKey key, ClientAsServerContext otherEnd) {
     super(key, BUFFER_SIZE);
@@ -50,8 +52,11 @@ public final class ProxyBridgeContext extends Context {
   
   @Override
   public void silentlyClose() {
-    super.silentlyClose();
     // close the bridge
-    otherEnd.silentlyClose();
+    super.silentlyClose();
+    if(otherEnd != null && !isClosed) {
+      isClosed = true;
+      otherEnd.silentlyClose();
+    }
   }
 }

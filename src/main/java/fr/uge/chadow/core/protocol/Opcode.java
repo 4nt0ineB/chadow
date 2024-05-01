@@ -27,7 +27,6 @@ public enum Opcode {
   REQUEST_DOWNLOAD(RequestDownload.class),
   REQUEST_OPEN_DOWNLOAD_RESPONSE(RequestOpenDownload.class),
   REQUEST_CLOSED_DOWNLOAD_RESPONSE(ClosedDownloadResponse.class),
-  //UPDATE,
   HANDSHAKE(Handshake.class),
   DENIED(Denied.class),
   NEEDCHUNK(NeedChunk.class),

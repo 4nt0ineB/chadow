@@ -61,13 +61,17 @@ public class Display {
   /**
    * Start the loop that will refresh the view
    */
-  public void startLoop() throws InterruptedException, IOException {
+  public void startLoop() throws InterruptedException {
     System.out.print(CLIColor.CLEAR);
     System.out.flush();
     while (!Thread.interrupted() && controller.isAlive()) {
       var canRefresh = controller.viewCanRefresh().get();
       if (canRefresh) {
-        draw();
+        try {
+          draw();
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
       }
       Thread.sleep(400);
     }

@@ -112,13 +112,18 @@ public class CodexStatus {
   }
   
   public double completionRate() {
-    return (double) chunks.values()
-                          .stream()
-                          .mapToInt(BitSet::cardinality)
-                          .sum() / chunks.keySet()
-                                         .stream()
-                                         .mapToInt(this::numberOfChunks)
-                                         .sum();
+    lock.lock();
+    try {
+      return (double) chunks.values()
+                            .stream()
+                            .mapToInt(BitSet::cardinality)
+                            .sum() / chunks.keySet()
+                                           .stream()
+                                           .mapToInt(this::numberOfChunks)
+                                           .sum();
+    } finally {
+      lock.unlock();
+    }
   }
   
   public Codex codex() {
@@ -130,7 +135,12 @@ public class CodexStatus {
   }
   
   void setAllComplete() {
-    chunks.forEach((key, value) -> value.flip(0, numberOfChunks(key)));
+    lock.lock();
+    try {
+      chunks.forEach((key, value) -> value.flip(0, numberOfChunks(key)));
+    } finally {
+      lock.unlock();
+    }
   }
   
   public boolean isDownloading() {
@@ -151,28 +161,38 @@ public class CodexStatus {
   }
   
   void stopSharing() {
-    sharing = false;
-    for (var i = 0; i < sharedFiles.length; i++) {
-      if (sharedFiles[i] != null) {
-        try {
-          sharedFiles[i].close();
-          sharedFiles[i] = null;
-        } catch (IOException e) {
-          logger.severe(STR."Error while closing file \{codex.files()[i].filename()} : " + e.getMessage());
+    lock.lock();
+    try {
+      sharing = false;
+      for (var i = 0; i < sharedFiles.length; i++) {
+        if (sharedFiles[i] != null) {
+          try {
+            sharedFiles[i].close();
+            sharedFiles[i] = null;
+          } catch (IOException e) {
+            logger.severe(STR."Error while closing file \{codex.files()[i].filename()} : " + e.getMessage());
+          }
         }
       }
+    } finally {
+      lock.unlock();
     }
   }
   
   void stopDownloading() {
-    downloading = false;
-    if (currentDownloadingFile != null) {
-      try {
-        currentDownloadingFile.close();
-        currentDownloadingFile = null;
-      } catch (IOException e) {
-        logger.severe(STR."Error while closing file : \{e.getMessage()}");
+    lock.lock();
+    try {
+      downloading = false;
+      if (currentDownloadingFile != null) {
+        try {
+          currentDownloadingFile.close();
+          currentDownloadingFile = null;
+        } catch (IOException e) {
+          logger.severe(STR."Error while closing file : \{e.getMessage()}");
+        }
       }
+    } finally {
+      lock.unlock();
     }
   }
   
@@ -219,21 +239,26 @@ public class CodexStatus {
    * or if an error occurs while reading the file
    */
   byte[] getChunk(long offsetInCodex, int length) throws IOException {
-    var fileIndex = fileIndex(offsetInCodex, length);
-    var file = codex.files()[fileIndex];
-    var path = Paths.get(root, file.relativePath(), file.filename());
-    var fileOffset = offsetInCodex - fileOffset(fileIndex);
-    var data = new byte[length];
-    var raf = sharedFiles[fileIndex];
-    if (raf == null) {
-      // we cache the file reader, will be closed when the codex is complete
-      // or the sharing is stopped
-      raf = new RandomAccessFile(path.toString(), "r");
-      sharedFiles[fileIndex] = raf;
+    lock.lock();
+    try {
+      var fileIndex = fileIndex(offsetInCodex, length);
+      var file = codex.files()[fileIndex];
+      var path = Paths.get(root, file.relativePath(), file.filename());
+      var fileOffset = offsetInCodex - fileOffset(fileIndex);
+      var data = new byte[length];
+      var raf = sharedFiles[fileIndex];
+      if (raf == null) {
+        // we cache the file reader, will be closed when the codex is complete
+        // or the sharing is stopped
+        raf = new RandomAccessFile(path.toString(), "r");
+        sharedFiles[fileIndex] = raf;
+      }
+      raf.seek(fileOffset);
+      raf.read(data, 0, Math.min(length, (int) (file.length() - fileOffset)));
+      return data;
+    } finally {
+      lock.unlock();
     }
-    raf.seek(fileOffset);
-    raf.read(data, 0, Math.min(length, (int) (file.length() - fileOffset)));
-    return data;
   }
   
   /**

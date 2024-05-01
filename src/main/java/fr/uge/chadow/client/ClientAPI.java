@@ -55,6 +55,7 @@ public class ClientAPI {
   private final long DOWNLOAD_REQUEST_TIMEOUT = 5; // todo add in settings
   private final LinkedBlockingQueue<SocketResponse> sharersSocketQueue = new LinkedBlockingQueue<>();
   private final ArrayDeque<String> codexIdOfAskedDownload = new ArrayDeque<>();
+  private final HashMap<String, Integer> downloaders = new HashMap<>();
   
   // Manage request and response of search
   private final long SEARCH_TIMEOUT = 5; // todo add in settings
@@ -72,12 +73,36 @@ public class ClientAPI {
     return proxyRoutes.putIfAbsent(chainId, socket) == null;
   }
   
-  public void setUpBridge(int chainId, ClientAsServerContext clientAsServerContext) {
+  public boolean setUpBridge(int chainId, ClientAsServerContext clientAsServerContext) {
     var socket = proxyRoutes.get(chainId);
     if(socket == null) {
-      return;
+      return false;
     }
     addContext(socket, key -> new ProxyBridgeContext(key, clientAsServerContext));
+    return true;
+  }
+  
+  /**
+   * Register a downloader context.
+   * Increment the number of downloaders for the codex
+   * @param id the id of the codex
+   */
+  public void registerDownloader(String id) {
+    lock.lock();
+    try {
+      downloaders.compute(id, (k, v) -> v == null ? 1 : v + 1);
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  public void unregisterDownloader(String id) {
+    lock.lock();
+    try {
+      downloaders.computeIfPresent(id, (k, v) -> Math.max(0, v - 1));
+    } finally {
+      lock.unlock();
+    }
   }
   
   private record SocketResponse(SocketField[] sockets, int[] chainId) {
@@ -551,6 +576,15 @@ public class ClientAPI {
     propose(codexId);
   }
   
+  public int howManySharers(String codexId) {
+    lock.lock();
+    try {
+      return downloaders.getOrDefault(codexId, 0);
+    } finally {
+      lock.unlock();
+    }
+  }
+  
   public void addUser(String username) {
     lock.lock();
     try {
@@ -593,6 +627,7 @@ public class ClientAPI {
           .ifPresent(dm -> {
             var random = new Random();
             var newUsername = STR."\{dm.username()}[\{random.nextInt(1000)}]";
+            var randomUUID = UUID.randomUUID();
             dm.changeUsername(newUsername);
             dm.addMessage(new WhisperMessage("<--", STR."User \{username} left", System.currentTimeMillis()));
             dm.addMessage(new WhisperMessage("<--", STR."\{username} renamed as \{newUsername}", System.currentTimeMillis()));
@@ -701,7 +736,9 @@ public class ClientAPI {
     //this.directMessages.put(userId, new DirectMessages(userId, "Alan1"));
     // test codex
     if (login.equals("Alan1")) {
-      var status = codexController.createFromPath("my codex", "/mnt/d/Photos/DSC00003.JPG");
+      //var status = codexController.createFromPath("my codex", "/mnt/d/Photos/DSC00003.JPG");
+      //var status = codexController.createFromPath("test", "/home/alan1/Documents/tmp/tablette");
+      var status = codexController.createFromPath("test", "/home/alan1/Pictures");
       share(status.id());
       /*var paths = new String[]{
           "lau-ardelean-wallpaper",

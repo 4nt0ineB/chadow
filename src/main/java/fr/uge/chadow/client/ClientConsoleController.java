@@ -126,7 +126,7 @@ public class ClientConsoleController {
             try {
               logger.info(STR."Display starts with (\{lines} rows \{cols} cols)");
               display.startLoop();
-            } catch (IOException | InterruptedException e) {
+            } catch (InterruptedException e) {
               logger.severe(STR."The console display was interrupted. \{e.getMessage()}");
             } finally {
               exitNicely();
@@ -255,7 +255,7 @@ public class ClientConsoleController {
           return true;
         }
         selectedCodexForDetails = askCodexDetailsFromServer.orElseThrow();
-        setCurrentView(new CodexView(selectedCodexForDetails, lines, cols));
+        setCurrentView(new CodexView(selectedCodexForDetails, lines, cols, api));
         currentView.scrollTop();
         return true;
       }
@@ -344,7 +344,7 @@ public class ClientConsoleController {
             api.share(codexId);
           }
           mode = Mode.CODEX_DETAILS;
-          setCurrentView(new CodexView(selectedCodexForDetails, lines, cols));
+          setCurrentView(new CodexView(selectedCodexForDetails, lines, cols, api));
           currentView.scrollTop();
         }
         return true;
@@ -372,7 +372,7 @@ public class ClientConsoleController {
           api.download(currentCodex().id(), hidden);
         }
         mode = Mode.CODEX_DETAILS;
-        setCurrentView(new CodexView(selectedCodexForDetails, lines, cols));
+        setCurrentView(new CodexView(selectedCodexForDetails, lines, cols, api));
         currentView.scrollTop();
         return Optional.of(false);
       }
@@ -413,6 +413,15 @@ public class ClientConsoleController {
   
   private boolean processInputModeDirectMessagesLive(String input) {
     switch (input) {
+      /*case ":delete" -> {
+        var receiver = privateMessageView.receiver();
+        api.deleteDirectMessagesWith(receiver.id());
+        mode = Mode.CHAT_LIVE_REFRESH;
+        mainView.setMode(mode);
+        setCurrentView(mainView);
+        drawDisplay();
+        return Optional.of(false);
+      }*/
       case ":m", ":msg" -> {
         mode = Mode.DIRECT_MESSAGES_SCROLLER;
         privateMessageView.setMode(mode);
@@ -436,7 +445,7 @@ public class ClientConsoleController {
         mode = Mode.CODEX_DETAILS;
         selectedCodexForDetails = (CodexStatus) currentSelector.get();
         logger.info(STR."see cdx: \{selectedCodexForDetails.id()}");
-        setCurrentView(new CodexView(selectedCodexForDetails, lines, cols));
+        setCurrentView(new CodexView(selectedCodexForDetails, lines, cols, api));
         currentView.scrollTop();
         logger.info(STR."see cdx: \{selectedCodexForDetails.id()}");
         return true;
@@ -554,7 +563,7 @@ public class ClientConsoleController {
         logger.info(STR.":create \{path}\n");
         selectedCodexForDetails = api.addCodex(codexName, path);
         mode = Mode.CODEX_DETAILS;
-        setCurrentView(new CodexView(selectedCodexForDetails, lines, cols));
+        setCurrentView(new CodexView(selectedCodexForDetails, lines, cols, api));
         currentView.scrollTop();
         logger.info(STR."Codex created with id: \{selectedCodexForDetails.id()}");
         return Optional.of(true);
@@ -581,7 +590,7 @@ public class ClientConsoleController {
       }
       selectedCodexForDetails = codex.orElseThrow();
       mode = Mode.CODEX_DETAILS;
-      setCurrentView(new CodexView(selectedCodexForDetails, lines, cols));
+      setCurrentView(new CodexView(selectedCodexForDetails, lines, cols, api));
       currentView.scrollTop();
       return Optional.of(true);
     }

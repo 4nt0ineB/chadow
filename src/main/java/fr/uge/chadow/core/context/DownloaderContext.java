@@ -4,9 +4,11 @@ import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.client.CodexStatus;
 import fr.uge.chadow.core.protocol.Frame;
 import fr.uge.chadow.core.protocol.client.*;
+import fr.uge.chadow.core.reader.FrameReader;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.logging.Logger;
@@ -21,6 +23,7 @@ public final class DownloaderContext extends Context {
   private final CodexStatus codexStatus;
   private final SelectionKey key;
   private final Integer chainId;
+  private final FrameReader frameReader = new FrameReader();
   
   public DownloaderContext(SelectionKey key, ClientAPI api, CodexStatus codexStatus, Integer chainId) {
     super(key, BUFFER_SIZE);
@@ -57,8 +60,20 @@ public final class DownloaderContext extends Context {
         // request next chunk
         var chunk = codexStatus.nextRandomChunk();
         if (chunk != null) {
-          queueFrame(new NeedChunk(chunk.offset(), chunk.length()));
+          send(new NeedChunk(chunk.offset(), chunk.length()));
         }
+      }
+      case Hidden hidden -> {
+        logger.info("Received hidden frame");
+        // we received a response from our hidden download request
+        var payload = ByteBuffer.allocate(hidden.payload().length)
+                                .put(hidden.payload());
+        if(frameReader.process(payload) != FrameReader.ProcessStatus.DONE) {
+          logger.warning("Error while processing hidden frame");
+          silentlyClose();
+        }
+        processCurrentOpcodeAction(frameReader.get());
+        frameReader.reset();
       }
       default -> {
         logger.warning("No action for the received frame");
@@ -90,18 +105,37 @@ public final class DownloaderContext extends Context {
     initDownload();
   }
   
+  private void send(Frame frame) {
+    if(chainId != null) {
+      var buffer = frame.toByteBuffer();
+      frame = new Hidden(chainId, buffer.array());
+    }
+    queueFrame(frame);
+  }
+  
   private void initDownload() {
     if(downloadForbidden()) {
       silentlyClose();
       return;
     }
-    if(chainId != null) {
-      addFrame(new ProxyOpen(chainId, codexStatus.codex().id()));
-    }
-    addFrame(new Handshake(codexStatus.codex().id()));
+    var handshake = new Handshake(codexStatus.codex().id());
     var chunk = codexStatus.nextRandomChunk();
-    addFrame(new NeedChunk(chunk.offset(), chunk.length()));
+    var needChunk = new NeedChunk(chunk.offset(), chunk.length());
+    if(chainId != null) {
+      addFrame(new Hidden(chainId, handshake.toByteBuffer().array()));
+      addFrame(new Hidden(chainId, needChunk.toByteBuffer().array()));
+    }else{
+      addFrame(handshake);
+      addFrame(needChunk);
+    }
+    api.registerDownloader(codexStatus.codex().id());
     processOut();
     getKey().interestOps(SelectionKey.OP_WRITE);
+  }
+  
+  @Override
+  public void silentlyClose() {
+    super.silentlyClose();
+    api.unregisterDownloader(codexStatus.codex().id());
   }
 }

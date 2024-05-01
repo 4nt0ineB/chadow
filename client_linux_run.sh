@@ -13,6 +13,6 @@ echo $cmd >> logs
 if [[ "$1" == "Alan1" ]]; then
     err="logs"
 else
-    err="lougs"
+    err="logs2"
 fi
 java -jar --enable-preview target/chadow-1.0.0.jar --login:$login--hostname:localhost--port:7777--y:$((y - 4))--x:$x 2>$err

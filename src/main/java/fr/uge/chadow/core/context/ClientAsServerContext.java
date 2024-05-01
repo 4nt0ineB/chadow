@@ -25,7 +25,10 @@ public final class ClientAsServerContext extends Context {
   // proxy
   private Integer chainId;
   private Context bridgeContext;
+  private boolean isClosed;
   private final ArrayDeque<Frame> framesForTheNextHop = new ArrayDeque<>();
+  private boolean isProxy = false;
+  
   
   public ClientAsServerContext(SelectionKey key, ClientAPI api) {
     super(key, BUFFER_SIZE);
@@ -62,33 +65,42 @@ public final class ClientAsServerContext extends Context {
           throw new RuntimeException(e);
         }
       }
-      case ProxyOpen proxyOpen -> {
+     case ProxyOpen proxyOpen -> {
         logger.info("Received proxy open request");
         chainId = proxyOpen.chainId();
         api.setUpBridge(chainId, this);
       }
       case Hidden hidden -> {
         logger.info("Received hidden frame");
-        if(chainId != null) {
-          // we are a proxy
-          if(bridgeContext == null) {
-            // we have a chain, but the bridge is not set yet
-            framesForTheNextHop.addLast(hidden);
-          }else {
-            bridgeContext.queueFrame(hidden); // forward the frame
+        if(chainId == null) {
+          // first frame received
+          // bridgeContext not set yet;
+          chainId = hidden.chainId();
+          // if a routing exists, we are a proxy
+          isProxy = api.setUpBridge(chainId, this);
+          logger.info(STR."Client is a \{isProxy ? "proxy" : "sharer"}");
+        }
+        
+        if(isProxy && bridgeContext == null){
+          // we are a proxy, but the bridge is not set yet
+          // queue the frame
+          framesForTheNextHop.addLast(hidden);
+        } else if (isProxy) {
+          // we are a proxy and the bridge is set
+          // forward the frame to the bridge
+          bridgeContext.queueFrame(hidden);
+        } else {
+          // we are a sharer
+          // extract payload and processIt
+          var payload = ByteBuffer.allocate(hidden.payload().length)
+                                  .put(hidden.payload());
+          if(frameReader.process(payload) != FrameReader.ProcessStatus.DONE) {
+            logger.warning("Error while processing hidden frame");
+            silentlyClose();
           }
-          return;
+          processCurrentOpcodeAction(frameReader.get());
+          frameReader.reset();
         }
-        // we are a client (sharing a codex)
-        // extract payload and processIt
-        var payload = ByteBuffer.allocate(hidden.payload().length)
-                                .put(hidden.payload());
-        if(frameReader.process(payload) != FrameReader.ProcessStatus.DONE) {
-          logger.warning("Error while processing hidden frame");
-          silentlyClose();
-        }
-        processCurrentOpcodeAction(frameReader.get());
-        frameReader.reset();
       }
       default -> {
         logger.warning("No action for the received frame");
@@ -109,7 +121,7 @@ public final class ClientAsServerContext extends Context {
     assert wantedCodexId != null;
     return api.codexExists(wantedCodexId)
         && api.isSharing(wantedCodexId)
-        && chainId == null;
+        && !isProxy;
   }
   
   @Override
@@ -129,9 +141,11 @@ public final class ClientAsServerContext extends Context {
   @Override
   public void silentlyClose() {
     super.silentlyClose();
-    if(chainId != null) {
+    if(!isClosed && chainId != null && bridgeContext != null) {
       // close the bridge
+      isClosed = true;
       bridgeContext.silentlyClose();
+      bridgeContext = null;
     }
   }
 }
