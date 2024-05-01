@@ -79,10 +79,9 @@ public enum CLIColor {
   }
   
   public static int countLengthWithoutEscapeCodes(String str) {
-    String escapeCodePattern = "\\u001B\\[\\d+m|\\033\\[\\d+;\\d+;\\d+m|\\033\\[\\d+;\\d+m|\\033\\[\\d+m";
+    String escapeCodePattern = "\\x1B\\[[;\\d]*m";
     Pattern pattern = Pattern.compile(escapeCodePattern);
-    String strWithoutEscapeCodes = pattern.matcher(str).replaceAll("");
-    return strWithoutEscapeCodes.length();
+    return pattern.matcher(str).replaceAll("").length();
   }
 
 }

@@ -23,6 +23,11 @@ public class SettingsParser {
     return this;
   }
   
+  public SettingsParser addAsBoolean(String name, Boolean defaultValue) {
+    addSettingImpl(name, boolean.class, defaultValue);
+    return this;
+  }
+  
   /**
    * Add a setting that is expected to be a string.
    * These a required
@@ -92,6 +97,11 @@ public class SettingsParser {
           throw new IOException(STR."Invalid integer value \"\{value}\" for setting \"\{name}\"");
         }
         parsedSettings.intSettings.put(name, intValue);
+      } else if (sr.expectedType == boolean.class) {
+        if (!Pattern.compile("true|false|1|0").matcher(value).matches()) {
+          throw new IOException(STR."Invalid boolean value \"\{value}\" for setting \"\{name}\"");
+        }
+        parsedSettings.stringSettings.put(name, value);
       } else {
         throw new AssertionError("Unexpected setting type");
       }
@@ -154,6 +164,10 @@ public class SettingsParser {
     public int getInt(String name) {
       return Optional.ofNullable(intSettings.get(name))
                      .orElseThrow(() -> new IllegalArgumentException(STR."Int setting \"\{name}\" not found"));
+    }
+    
+    public boolean getBool(String name) {
+      return Boolean.parseBoolean(getStr(name));
     }
     
     /**

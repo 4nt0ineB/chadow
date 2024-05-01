@@ -5,32 +5,90 @@ Implementation of the Chadow protocole described in [rfc_chadow.txt](./rfc_chado
 http://igm.univ-mlv.fr/coursprogreseau/tds/projet2024.html
 
 
-### run
+### Build
 ```sh
-# find your terminal size first
-$ stty size 
-25 238
-$ java -jar --enable-preview target/chadow-1.0.0.jar localhost 7777 25 238
+mvn package
+```
+It builds an uber jar in the target folder. It contains all the dependencies for the client and the server.
+
+## Chadow server CLI
+
+### run
+The server require settings. you can use -h or --help to see the usage.
+```sh
+$ java -jar --enable-preview target/chadow-1.0.0.jar -h
+```
+You start the app as a server by using the --server option.
+
+ex:
+```sh
+$ java -jar --enable-preview target/chadow-1.0.0.jar --server 7777
 ```
 
-### Chadow client CLI
-By default, the main view is in live reload and shows the new messages and connected users in real time.
+The linux script `server_linux_run.sh` is provided to run the server locally on port 7777.
+```shell
+$ chmod +x server_linux_run.sh
+$ ./server_linux_run.sh (username)
+```
+
+## Chadow client CLI
+
+By default, the main view is in live refresh and shows the new messages and connected users in real time.
 Because it needs to clear up the screen, the user can't type commands or messages at the same time 
-('live reload' mode is indicated by the user's login being greyed out).
+('live refresh' mode is indicated by the user's login being greyed out).
 The user has to press enter to switch to 'input mode' (the user's login is then shown in color).
 
 The input field allows multiline input. It works by writing the character \ before pressing enter. 
 In 'message mode' any input that is not a command is considered as message to be sent to the server.
 
-The user can type the following commands:
+Available commands are described in the client by typing :h or :help.
 
+Find you terminal size. <br>
+On linux:
+```sh
+$ stty size
+25 238
+```
+
+### run
+The client require settings. you can use -h or --help to see the usage.
+```sh
+$ java -jar --enable-preview target/chadow-1.0.0.jar -h
+```
+ex:
+
+```sh
+$ java -jar --enable-preview target/chadow-1.0.0.jar John localhost 7777 25 238
+```
+You can also not provide the terminal size, the server will use the default size 25 80.
+You will be able to change the size later with the command :resize (or :r) in the client. 
+``` :r 25 238 ```
+
+The linux script `run.sh` is provided to run the client with the right parameters for a server running locally 
+on localhost 7777.
 ```shell
+$ chmod +x client_linux_run.sh
+# will run the client with a random username and the default server settings localhost 7777
+# You can override the username by providing it as an argument
+$ ./client_linux_run.sh (username)
+```
+
+```sh
+
+### Commands
+
+```sh
 ##  ┓┏  ┓
 ##  ┣┫┏┓┃┏┓
 ##  ┛┗┗━┗┣┛
 ##       ┛
 
-'scrollable':
+User Interaction:
+- When your [username] is greyed out, your input is disabled.
+- Press enter to switch to input mode and enable your input. Your [username] will be colored.
+- The input field allows multiline input. It works by writing the character \ before pressing enter.s
+
+Scrollable mode:
   e - scroll one page up
   s - scroll one page down
   r - scroll one line up
@@ -38,43 +96,76 @@ The user can type the following commands:
   t - scroll to the top
   b - scroll to the bottom
   
-'selectable' (is scrollable):
+Selectable mode (also scrollable):
   y - move selector up
   h - move selector down
-  :s, :see - Select the item
+  :s, :select - Select the item
+  ! scrolling also moves the selector !
   
 [GLOBAL COMMANDS]
-  :h, :help - Display this help (scrollable)
-  :c, :chat - Back to the [CHAT] in live reload
-  :w, :whisper <username> (message)- Start a new private discussion with a user
-    if (message) is present, send the message also
-  :d - Update and draw the display
-  :r <lines> <columns> - Resize the view
-  :new <codexName>, <path> - Create a codex from a file or directory
-    and display the details of new created [CODEX] info (mind the space between , and <path>)
+  :h, :help
+    Display this help (scrollable)
+    
+  :c, :chat
+    Back to the [CHAT] in live refresh
+    
+  :w, :whisper <username> (message)
+    Create and display a new DM with a user. If (message) is present,
+    send the message also
+    
+  :ws,:whispers
+    Display the list of DM [Direct Message list]
+    
+  :d
+    Update and draw the display
+    
+  :r <lines> <columns>
+    Resize the view
+    
+  :new <codexName>, <path>
+    Create a codex from a file or directory and display the [CODEX]
+    and display the details of new created [CODEX] info
+    
+  :f, :find [:at(:before|:after)) <date>] [(name|date):(asc|desc)] <name>
+    Interrogate the server for codexes
+    
+  :f - Back to the last search results
   
-  :mycdx - Display the list of your codex (selectable)
-  :cdx:<SHA-1> - Retrieves and display the [CODEX] info with the given SHA-1
-    if the codex is not present locally, the server will be interrogated        (TODO)
-  :exit - Exit the application                                                  (WIP)
+  :mycdx
+    Display the [CODEX LIST]
+    
+  :cdx:<SHA-1>
+    Retrieves and display the [CODEX] info with the given SHA-1
+    if the codex is not present locally, the server will be interrogated
+    
+  :exit - Exit the application
   
 [CHAT]
-  when the live reload is disabled (indicated by the coloured input field)
+  when the live refresh is disabled (indicated by the coloured input field)
   any input not starting with ':' will be considered as a message to be sent
   
   :m, :msg - Focus on chat (scrollable)
   :u, :users - Focus on the users list (scrollable)
   
-[PRIVATE MESSAGES]
-  :m, :msg - Focus on the chat (scrollable)
-  :w - Enables back live reload
+[DM list]
+  (selectable)
+  :s, :select - Select the direct message
+  :rm - Delete the focused discussion
+  
+[DM]
+  :m, :msg - Enable scrolling (scrollable)
+  :w - Enables chat mode
+  :delete - Delete the discussion
   
 [CODEX]
-(scrollable)
-:share - Share/stop sharing the codex
-:download - Download/stop downloading the codex
-        
+  (scrollable)
+  :share - Share/stop sharing the codex
+  :dl, :download (h|hidden)
+    Download/stop downloading the codex, when downloading live refresh is enabled
+  :live - Switch to live refresh to see the changes in real time
 ```
+
+
 
 ### Sources
 

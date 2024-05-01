@@ -109,8 +109,10 @@ public class ClientConsoleController {
     infoBar.clear();
     var unreadDiscussions = api.discussionWithUnreadMessages();
     unreadDiscussions.forEach(discussion -> {
-      var txt = (STR."<\{CLIColor.YELLOW_BACKGROUND}\{CLIColor.BOLD}\{CLIColor.BLACK}%s\{CLIColor.RESET}>")
-          .formatted(discussion.username());
+      var username = discussion.username();
+      var color = CLIColor.stringToColor(username);
+      var txt = (STR."<\{color}\{CLIColor.BOLD}%s\{CLIColor.RESET}>")
+          .formatted(username);
       infoBar.addInfo(txt);
     });
   }
@@ -247,7 +249,7 @@ public class ClientConsoleController {
         }
        return processInputModeSelector(input);
       }
-      case ":s", ":see" -> {
+      case ":s", ":select" -> {
         mode = Mode.CODEX_DETAILS;
         var selectedCodexFromSearch = (SearchResponse.Result) currentSelector.get();
         var askCodexDetailsFromServer = api.getCodex(selectedCodexFromSearch.codexId());
@@ -276,22 +278,26 @@ public class ClientConsoleController {
   
   private Optional<Boolean> globalCommandDisplayDM(String input) {
     if (input.equals(":ws") || input.equals(":whispers")) {
-      mode = Mode.DIRECT_MESSAGES_LIST;
-      var list = api.getAllDirectMessages()
-                    .stream()
-                    .sorted(Comparator.comparingLong(dm -> dm.getLastMessage()
-                                                             .map(WhisperMessage::epoch)
-                                                             .orElse(Long.MIN_VALUE)))
-                    .toList();
-      currentSelector = View.selectorFromList("Direct messages", lines, cols, list, directMessages -> {
-        var str = View.directMessageShortDescription(directMessages);
-        return View.responsiveCut(str, cols);
-      });
-      setCurrentView(currentSelector);
-      logger.info("Displaying whispers");
+      setMessageList();
       return Optional.of(true);
     }
     return Optional.empty();
+  }
+  
+  private void setMessageList() {
+    mode = Mode.DIRECT_MESSAGES_LIST;
+    var list = api.getAllDirectMessages()
+                  .stream()
+                  .sorted(Comparator.comparingLong(dm -> dm.getLastMessage()
+                                                           .map(WhisperMessage::epoch)
+                                                           .orElse(Long.MIN_VALUE)))
+                  .toList();
+    currentSelector = View.selectorFromList("Direct messages", lines, cols, list, directMessages -> {
+      var str = View.directMessageShortDescription(directMessages);
+      return View.responsiveCut(str, cols);
+    });
+    setCurrentView(currentSelector);
+    logger.info("Displaying whispers");
   }
   
   private Optional<Boolean> globalCommandDisplayCodexes(String input) {
@@ -396,7 +402,30 @@ public class ClientConsoleController {
   
   private boolean processCommandDirectMessagesList(String input) {
     switch (input) {
-      case ":s", ":see" -> {
+      case ":rm" -> {
+        var selected = (DirectMessages) currentSelector.get();
+        api.deleteDirectMessagesWith(selected.id());
+        
+        mode = Mode.DIRECT_MESSAGES_LIST;
+        var list = api.getAllDirectMessages()
+                      .stream()
+                      .sorted(Comparator.comparingLong(dm -> dm.getLastMessage()
+                                                               .map(WhisperMessage::epoch)
+                                                               .orElse(Long.MIN_VALUE)))
+                      .toList();
+        var newSelector = View.selectorFromList("Direct messages", lines, cols, list, directMessages -> {
+          var str = View.directMessageShortDescription(directMessages);
+          return View.responsiveCut(str, cols);
+        });
+        
+        currentSelector.selectorUp();
+        newSelector.setAtSamePosition(currentSelector);
+        setCurrentView(newSelector);
+        logger.info("Displaying whispers");
+        
+        return true;
+      }
+      case ":s", ":select" -> {
         var selected = (DirectMessages) currentSelector.get();
         mode = Mode.DIRECT_MESSAGES_LIVE;
         privateMessageView.setPrivateDiscussion(selected);
@@ -413,15 +442,12 @@ public class ClientConsoleController {
   
   private boolean processInputModeDirectMessagesLive(String input) {
     switch (input) {
-      /*case ":delete" -> {
+      case ":delete" -> {
         var receiver = privateMessageView.receiver();
         api.deleteDirectMessagesWith(receiver.id());
-        mode = Mode.CHAT_LIVE_REFRESH;
-        mainView.setMode(mode);
-        setCurrentView(mainView);
-        drawDisplay();
-        return Optional.of(false);
-      }*/
+        setMessageList();
+        return true;
+      }
       case ":m", ":msg" -> {
         mode = Mode.DIRECT_MESSAGES_SCROLLER;
         privateMessageView.setMode(mode);
@@ -441,7 +467,7 @@ public class ClientConsoleController {
   
   private boolean processInputModeCodexList(String input) {
     switch (input) {
-      case ":s", ":see" -> {
+      case ":s", ":select" -> {
         mode = Mode.CODEX_DETAILS;
         selectedCodexForDetails = (CodexStatus) currentSelector.get();
         logger.info(STR."see cdx: \{selectedCodexForDetails.id()}");
@@ -708,7 +734,12 @@ public class ClientConsoleController {
             ##  ┛┗┗━┗┣┛
             ##       ┛
             
-            'scrollable':
+            User Interaction:
+            - When your [username] is greyed out, your input is disabled.
+            - Press enter to switch to input mode and enable your input. Your [username] will be colored.
+            - The input field allows multiline input. It works by writing the character \\ before pressing enter.\s
+            
+            Scrollable mode:
               e - scroll one page up
               s - scroll one page down
               r - scroll one line up
@@ -716,116 +747,75 @@ public class ClientConsoleController {
               t - scroll to the top
               b - scroll to the bottom
               
-            'selectable' (is scrollable):
+            Selectable mode (also scrollable):
               y - move selector up
               h - move selector down
-              :s, :see - Select the item
+              :s, :select - Select the item
+              ! scrolling also moves the selector !
               
             [GLOBAL COMMANDS]
-              :h, :help - Display this help (scrollable)
-              :c, :chat - Back to the [CHAT] in live reload
-              :w, :whisper <username> (message)- Create and display a new DM with a user
-                if (message) is present, send the message also
-              :ws, :whispers - Display the list of DM (selectable)
-              :d - Update and draw the display
-              :r <lines> <columns> - Resize the view
-              :new <codexName>, <path> - Create a codex from a file or directory
-              \tand display the details of new created [CODEX] info (mind the space between , and <path>)
-              :f, :find [:at(:before|:after)) <date>] [(name|date):(asc|desc)] <name> - Interrogate the server for codexes
-              :f back to the last search results
+              :h, :help
+                Display this help (scrollable)
+                
+              :c, :chat
+                Back to the [CHAT] in live refresh
+                
+              :w, :whisper <username> (message)
+                Create and display a new DM with a user. If (message) is present,
+                send the message also
+                
+              :ws,:whispers
+                Display the list of DM [Direct Message list]
+                
+              :d
+                Update and draw the display
+                
+              :r <lines> <columns>
+                Resize the view
+                
+              :new <codexName>, <path>
+                Create a codex from a file or directory and display the [CODEX]
+                and display the details of new created [CODEX] info
+                
+              :f, :find [:at(:before|:after)) <date>] [(name|date):(asc|desc)] <name>
+                Interrogate the server for codexes
+                
+              :f - Back to the last search results
               
-              
-              :mycdx - Display the list of your codex (selectable)
-              :cdx:<SHA-1> - Retrieves and display the [CODEX] info with the given SHA-1
-              \tif the codex is not present locally, the server will be interrogated
-              :exit - Exit the application                                                  (WIP)
+              :mycdx
+                Display the [CODEX LIST]
+                
+              :cdx:<SHA-1>
+                Retrieves and display the [CODEX] info with the given SHA-1
+                if the codex is not present locally, the server will be interrogated
+                
+              :exit - Exit the application
               
             [CHAT]
-              when the live reload is disabled (indicated by the coloured input field)
+              when the live refresh is disabled (indicated by the coloured input field)
               any input not starting with ':' will be considered as a message to be sent
               
               :m, :msg - Focus on chat (scrollable)
               :u, :users - Focus on the users list (scrollable)
               
-            [Direct Messages]
-              :m, :msg - Focus on the chat (scrollable)
-              :w - Enables back live reload
+            [DM list]
+              (selectable)
+              :s, :select - Select the direct message
+              :rm - Delete the focused discussion
+              
+            [DM]
+              :m, :msg - Enable scrolling (scrollable)
+              :w - Enables chat mode
+              :delete - Delete the discussion
               
             [CODEX]
-            (scrollable)
-            :share - Share/stop sharing the codex
-            :download - Download/stop downloading the codex
-            
-            [CODEX SEARCH]
-            
+              (scrollable)
+              :share - Share/stop sharing the codex
+              :dl, :download (h|hidden)
+                Download/stop downloading the codex, when downloading live refresh is enabled
+              :live - Switch to live refresh to see the changes in real time
             """;
     
     return View.scrollableFromString("Help", lines, cols, txt);
   }
-  
-  /*
-  private ScrollableView codexView(CodexStatus codexStatus) {
-    try {
-      var codex = codexStatus.codex();
-      var sb = new StringBuilder();
-      var splash = """
-              ## ┏┓   ┓
-              ## ┃ ┏┓┏┫┏┓┓┏
-              ## ┗┛┗┛┻┗┗━┛┗
-              
-              """;
-      sb.append(splash);
-      sb.append("cdx:")
-        .append(codex.id())
-        .append("\n");
-      if (codexStatus.isComplete()) {
-        sb.append(CLIColor.BLUE)
-          .append("▓ Complete\n")
-          .append(CLIColor.RESET);
-      }
-      if (api.isDownloading(codex.id()) || api.isSharing(codex.id())) {
-        sb.append(CLIColor.ITALIC)
-          .append(CLIColor.BOLD)
-          .append(CLIColor.ORANGE)
-          .append(api.isDownloading(codex.id()) ? "▓ Downloading ..." : api.isSharing(codex.id()) ? "▓ Sharing... " : "")
-          .append(CLIColor.RESET)
-          .append("\n\n");
-      }
-      sb.append(colorize(CLIColor.BOLD, "Title: "))
-        .append(codex.name())
-        .append("\n");
-      var infoFiles = codex.files();
-      sb.append(colorize(CLIColor.BOLD, "Number of files:  "))
-        .append(infoFiles.length)
-        .append("\n");
-      sb.append(colorize(CLIColor.BOLD, "Total size:   "))
-        .append(View.bytesToHumanReadable(codex.totalSize()))
-        .append("\n");
-      sb.append("Local Path: ")
-        .append(Path.of(codexStatus.root(), codexStatus.codex().name()))
-        .append("\n\n");
-      sb.append(colorize(CLIColor.BOLD, "Files:  \n"));
-      Arrays.stream(infoFiles)
-            .collect(Collectors.groupingBy(Codex.FileInfo::relativePath))
-            .forEach((dir, files) -> {
-              sb.append(colorize(CLIColor.BOLD, STR."[\{dir}]\n"));
-              files.forEach(file -> sb.append("\t- ")
-                                      .append(CLIColor.BOLD)
-                                      .append("%10s".formatted(View.bytesToHumanReadable(file.length())))
-                                      .append("  ")
-                                      .append("%.2f%%".formatted(codexStatus.completionRate(file) * 100))
-                                      .append("  ")
-                                      .append(CLIColor.RESET)
-                                      .append(file.filename())
-                                      .append("\n"));
-            });
-      return View.scrollableFromString(STR."[Codex] \{codex.name()}", lines, cols, sb.toString());
-    } catch (Exception e) {
-      logger.severe(STR."Error while creating codex view.\{e.getMessage()}");
-      exitNicely();
-    }
-    return null;
-  }*/
-  
-  
 }

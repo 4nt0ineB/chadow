@@ -7,7 +7,6 @@ import java.util.PriorityQueue;
 import java.util.function.Consumer;
 
 public class InfoBar {
-  
   private final PriorityQueue<Message> messages;
   private final Consumer<InfoBar> updater;
   private int cols;
@@ -35,7 +34,7 @@ public class InfoBar {
     var numberOfEscapeCodes = sb.length() - lengthWithoutEscapeCodes;
     var length = Math.min(sb.length(), cols + numberOfEscapeCodes);
     System.out.print(sb.substring(0, length) + CLIColor.RESET);
-    System.out.printf((STR."\{STR."\{CLIColor.CYAN}%s\{CLIColor.RESET}"}%n"), "\u25A0".repeat(cols - length + numberOfEscapeCodes));
+    System.out.printf((STR."\{STR."\{CLIColor.CYAN}%s\{CLIColor.RESET}"}%n"), "\u25A0".repeat((cols - lengthWithoutEscapeCodes) ));
   }
   
   public void setDimensions(int cols) {

@@ -220,9 +220,9 @@ public class CodexStatus {
       logger.info(STR."Remainging chunks for the file \{nonCompletedFile.filename()} : \{nonCompletedChunks.length}");
       
       var offsetInFile = (long) chunkIndex * CHUNK_SIZE;
-      var offsetInCodex = fileOffset(firstNonCompletedFileIndex) + offsetInFile;
-      var length = Math.min(CHUNK_SIZE, (int) (nonCompletedFile.length() - offsetInFile));
-      return new Chunk(offsetInCodex, length);
+      long offsetInCodex = fileOffset(firstNonCompletedFileIndex) + offsetInFile;
+      var length = Math.min(CHUNK_SIZE, (nonCompletedFile.length() - offsetInFile));
+      return new Chunk(offsetInCodex, (int) length);
     } finally {
       lock.unlock();
     }
@@ -254,7 +254,7 @@ public class CodexStatus {
         sharedFiles[fileIndex] = raf;
       }
       raf.seek(fileOffset);
-      raf.read(data, 0, Math.min(length, (int) (file.length() - fileOffset)));
+      raf.read(data, 0, (int) Math.min(length, file.length() - fileOffset));
       return data;
     } finally {
       lock.unlock();
@@ -357,7 +357,7 @@ public class CodexStatus {
       throw new IllegalArgumentException(STR."Offset is out of the codex : \{offsetInCodex} > \{codexTotalSize}");
     }
     var files = codex.files();
-    long currentOffset = 0;
+    long currentOffset = 0L;
     for (int i = 0; i < files.length; i++) {
       var file = files[i];
       var fileLength = file.length();
