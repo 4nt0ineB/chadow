@@ -88,19 +88,12 @@ public class Server {
       // Add the client request and associated proxies details to the requests map
       requests.put(clientRequest, proxiesDetails);
 
-      logger.info(STR."clientRequest: \{clientRequest}");
-      logger.info(STR."proxiesDetails: \{proxiesDetails}");
-
       // Create the different chainIds and add them to the proxiesDetails
       for (int i = 0; i < possibleSharers; i++) {
         var newChainId = generateUniqueInt(chainIdToRequest);
         logger.info(STR."New chainId: \{newChainId}");
         proxiesDetails.chains.put(newChainId, new ChainDetails(new ArrayList<>(), new HashSet<>()));
         chainIdToRequest.put(newChainId, clientRequest);
-
-        System.out.println(STR."proxiesDetails: \{proxiesDetails}");
-        System.out.println(STR."chainIdToRequest: \{chainIdToRequest}");
-
 
         // Add the Sharer to the contacted proxies
         proxiesDetails.chains.get(newChainId).proxiesContacted.add(sharersList.get(i));
@@ -148,7 +141,7 @@ public class Server {
 
         // Send a Proxy Frame to the proxy
         clients.get(proxyUsername).serverContext.queueFrame(new Proxy(chainId, proxySocket));
-        logger.info(STR."\{proxyUsername} contacted the proxy \{currentProxyToContact} for the chain \{chainId}");
+        logger.info(STR."Sending Proxy frame to \{proxyUsername}");
 
         currentProxyToContact = proxyUsername;
       }
@@ -226,18 +219,13 @@ public class Server {
     public void proxyConfirmed(ServerContext serverContext, int chainId) {
       // Retrieve the client request associated with the chain ID
       var clientRequest = chainIdToRequest.get(chainId);
-      System.out.println(STR."clientRequest: \{clientRequest}");
 
       // Retrieve the details of proxies associated with the client request
       var proxiesDetails = requests.get(clientRequest);
 
-      System.out.println(STR."proxiesDetails: \{proxiesDetails}");
-
       // Add the confirming proxy to the list of confirmed proxies for the chain
       var chainDetails = proxiesDetails.chains.get(chainId);
       chainDetails.proxiesConfirmed.add(serverContext.login());
-
-      System.out.println(STR."chainDetails: \{chainDetails}");
 
       // Manage the completion status of the associated request
       manageRequest(clientRequest);
@@ -278,7 +266,8 @@ public class Server {
               })
               .toArray(ProxyNodeSocket[]::new);
 
-      System.out.println(Arrays.toString(proxyNodeSocketArray));
+      logger.info(STR."Request of \{clientRequest.codexId()} by \{clientRequest.serverContext.login()} is complete");
+      logger.info(STR."Proxies :\{Arrays.toString(proxyNodeSocketArray)}");
 
       // Send a response containing the proxy node sockets to the client
       clientRequest.serverContext.queueFrame(new ClosedDownloadResponse(proxyNodeSocketArray));
@@ -382,10 +371,17 @@ public class Server {
   }
 
   public void propose(Codex codex, String username) {
-    var clientCodexes = codexes.computeIfAbsent(new CodexRecord(codex,
-            System.currentTimeMillis()), k -> new ArrayList<>());
-    logger.info(STR."Proposing: \{codex}");
-    clientCodexes.add(username);
+    codexes.entrySet().stream()
+            .filter(e -> e.getKey().codex().id().equals(codex.id()))
+            .map(Map.Entry::getValue)
+            .findFirst()
+            .ifPresentOrElse(
+                    clientCodexes -> clientCodexes.add(username),
+                    () -> {
+                      var newCodexRecord = new CodexRecord(codex, System.currentTimeMillis());
+                      codexes.put(newCodexRecord, new ArrayList<>(List.of(username)));
+                    }
+            );
   }
 
   public void request(String codexId, ServerContext serverContext) {
@@ -493,6 +489,4 @@ public class Server {
   private static void usage() {
     System.out.println("Usage : ServerSumBetter port");
   }
-
-
 }

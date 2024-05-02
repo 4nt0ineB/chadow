@@ -744,11 +744,11 @@ public class ClientAPI {
     //var userId = UUID.randomUUID();
     //this.directMessages.put(userId, new DirectMessages(userId, "Alan1"));
     // test codex
-    if (login.equals("Alan1")) {
-      //var status = codexController.createFromPath("my codex", "/mnt/d/Photos/DSC00003.JPG");
+    if (login.equals("Alan1") || login.equals("Alan2") || login.equals("Alan3")) {
+      var status = codexController.createFromPath("my codex", "/mnt/d/testReseau2");
       //var status = codexController.createFromPath("test", "/home/alan1/Documents/tmp/tablette");
       //var status = codexController.createFromPath("test", "/home/alan1/Pictures");
-      var status = codexController.createFromPath("test", "/home/alan1/Downloads/temoinaaaaa");
+      //var status = codexController.createFromPath("test", "/home/alan1/Downloads/temoinaaaaa");
       share(status.id());
     }
   }

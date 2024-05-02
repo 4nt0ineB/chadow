@@ -88,7 +88,7 @@ public class Main {
         rootLogger.removeHandler(handler);
       }
       // set the file handler
-      FileHandler fileHandler = new FileHandler(STR.".logs/\{settings.getStr("login")}.log", false);
+      FileHandler fileHandler = new FileHandler(STR."logs/\{settings.getStr("login")}.log", false);
       fileHandler.setFormatter(new SimpleFormatter());
       rootLogger.addHandler(fileHandler);
       Logger.getLogger(Main.class.getName()).info(settingString);
