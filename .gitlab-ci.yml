@@ -10,3 +10,5 @@ deploy:
     - nohup java -jar target/chadow-1.0.0.jar --server 7777 &
   only:
     - main
+  tags:
+    - shell
