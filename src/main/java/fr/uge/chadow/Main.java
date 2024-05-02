@@ -37,9 +37,16 @@ public class Main {
               Workspace path. Default is the "Downloads" folder of your use depending on your OS (e.g: ~/Downloads on Unix)
               The files of a codex named "MyCodex" will be downloaded in "downloadPath/MyCodex".
           
+            --sharersRequired:<int>
+              Number (at max) of sharers asked to the server when downloading. Default is 5.
+              
+            --proxyChainSize:<int>
+              Size of the proxy chain in hidden download mode. Default is 1.
+              
         [Server]
           --server <port>
             Start the server on the given port
+          
         """;
     System.out.println(str);
   }
@@ -60,10 +67,14 @@ public class Main {
     
     // parse args
     var sp = new SettingsParser()
-        .addAsString("downloadPath", SettingsParser.Settings.defaultDownloadPath())
+        // optional
         .addAsInt("port", 7777)
         .addAsInt("y", 30)
         .addAsInt("x", 80)
+        .addAsInt("sharersRequired", 5)
+        .addAsInt("proxyChainSize", 1)
+        // mandatory
+        .addAsString("downloadPath", SettingsParser.Settings.defaultDownloadPath())
         .addAsBoolean("log", false)
         .addStringSettings("login", "hostname");
     
@@ -96,7 +107,7 @@ public class Main {
     
     var codexController = new CodexController(settings.getStr("downloadPath"));
     var serverSocket = new InetSocketAddress(settings.getStr("hostname"), settings.getInt("port"));
-    var api = new ClientAPI(settings.getStr("login"), serverSocket, codexController);
+    var api = new ClientAPI(settings.getStr("login"), serverSocket, codexController, settings);
     new ClientConsoleController(settings.getInt("y"), settings.getInt("x"), api).start();
   }
   

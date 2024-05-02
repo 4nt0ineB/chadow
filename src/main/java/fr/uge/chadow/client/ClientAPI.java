@@ -1,6 +1,7 @@
 package fr.uge.chadow.client;
 
 
+import fr.uge.chadow.SettingsParser;
 import fr.uge.chadow.core.context.*;
 import fr.uge.chadow.core.TCPConnectionManager;
 import fr.uge.chadow.core.protocol.WhisperMessage;
@@ -46,6 +47,7 @@ public class ClientAPI {
   private final ArrayList<YellMessage> publicMessages = new ArrayList<>();
   private final HashMap<UUID, DirectMessages> directMessages = new HashMap<>();
   private final SortedSet<String> users = new TreeSet<>();
+  private final SettingsParser.Settings settings;
   
   // Blocking Queue that will contain the fetched codex
   private final long REQUEST_CODEX_TIMEOUT = 5; // todo add in settings
@@ -68,6 +70,16 @@ public class ClientAPI {
   
   // Proxy
   private final HashMap<Integer, SocketField> proxyRoutes = new HashMap<>();
+  
+  
+  public ClientAPI(String login, InetSocketAddress serverAddress, CodexController codexController, SettingsParser.Settings settings) {
+    Objects.requireNonNull(login);
+    this.login = login;
+    this.serverAddress = serverAddress;
+    this.codexController = codexController;
+    this.settings = settings;
+  }
+  
   
   public boolean saveProxyRoute(int chainId, SocketField socket) {
     return proxyRoutes.putIfAbsent(chainId, socket) == null;
@@ -122,12 +134,7 @@ public class ClientAPI {
     }
   }
   
-  public ClientAPI(String login, InetSocketAddress serverAddress, CodexController codexController) {
-    Objects.requireNonNull(login);
-    this.login = login;
-    this.serverAddress = serverAddress;
-    this.codexController = codexController;
-  }
+  
   
   /**
    * Create a splash screen logo with a list of messages
@@ -526,7 +533,9 @@ public class ClientAPI {
     try {
       codexController.download(id, hidden);
       // TODO : change the way to handle this
-      clientContext.queueFrame(new RequestDownload(id, (byte) (hidden ? 1 : 0), 10, 1)); // todo add in settings
+      clientContext.queueFrame(new RequestDownload(id, (byte) (hidden ? 1 : 0),
+          settings.getInt("sharersRequired"),
+          settings.getInt("proxyChainSize")));
       codexIdOfAskedDownload.addLast(id);
     } finally {
       lock.unlock();

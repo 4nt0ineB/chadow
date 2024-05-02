@@ -1,0 +1,12 @@
+stages:
+  - deploy
+
+deploy:
+  stage: deploy
+  script:
+    - git pull origin main
+    - mvn package
+    - pkill -f "java -jar" || echo "No existing application found to stop"
+    - nohup java -jar target/your-artifact-name.jar &
+  only:
+    - main

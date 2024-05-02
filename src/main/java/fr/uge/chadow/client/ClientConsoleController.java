@@ -53,7 +53,7 @@ public class ClientConsoleController {
   private View currentView;
   private CodexStatus selectedCodexForDetails;
   private Search lastSearch;
-  private List<SearchResponse.Result> lastSearchResults = new ArrayList<>();
+  private final List<SearchResponse.Result> lastSearchResults = new ArrayList<>();
   private Mode mode;
   private int lines;
   private int cols;
@@ -366,7 +366,7 @@ public class ClientConsoleController {
   }
   
   private Optional<Boolean> processCommandDownload(String input) {
-    var pattern = Pattern.compile("(?>:download|:dl)(?>\s+(?<hidden>hidden|h))?");
+    var pattern = Pattern.compile("(?>:download|:dl)(?>\s+(?<hidden>(hidden|h)(?>\s+(?<size>\d+))?))?");
     var matcher = pattern.matcher(input);
     if (matcher.find()) {
       var hidden = Optional.ofNullable(matcher.group("hidden")).isPresent();
