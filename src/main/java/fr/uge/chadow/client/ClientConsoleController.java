@@ -366,7 +366,7 @@ public class ClientConsoleController {
   }
   
   private Optional<Boolean> processCommandDownload(String input) {
-    var pattern = Pattern.compile("(?>:download|:dl)(?>\s+(?<hidden>(hidden|h)(?>\s+(?<size>\d+))?))?");
+    var pattern = Pattern.compile("(?>:download|:dl)(?>\\s+(?<hidden>(hidden|h)(?>\\s+(?<size>\\d+))?))?");
     var matcher = pattern.matcher(input);
     if (matcher.find()) {
       var hidden = Optional.ofNullable(matcher.group("hidden")).isPresent();
