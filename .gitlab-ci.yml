@@ -7,7 +7,7 @@ deploy:
     - git pull origin main
     - mvn package
     - pkill -f "java -jar" || echo "No existing application found to stop"
-    - nohup java -jar target/chadow-1.0.0.jar --server 7777 &
+    - nohup java -jar --enable-preview target/chadow-1.0.0.jar --server 7777 &
   only:
     - main
   tags:
