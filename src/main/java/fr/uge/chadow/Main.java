@@ -42,6 +42,16 @@ public class Main {
               
             --proxyChainSize:<int>
               Size of the proxy chain in hidden download mode. Default is 1.
+             
+            --debug:<boolean>
+              Debug mode. Default is false.
+            
+            --chunkSize:<int>
+              Size of the chunks in bytes in Kb. Default is 128 Kb. Shouldn't be changed unless you know what you're doing.
+              
+            --maxAcceptedChunkSize:<int>
+              Maximum size of a chunk that can be accepted in Kb. Default is 512 Kb. Allows to prevent bandwidth exhaustion from
+              other clients by closing connection that request too big chunks.
               
         [Server]
           --server <port>
@@ -74,6 +84,8 @@ public class Main {
         .addAsInt("sharersRequired", 5)
         .addAsInt("proxyChainSize", 1)
         .addAsBoolean("debug", false)
+        .addAsInt("chunkSize", 128) // 128KB
+        .addAsInt("maxAcceptedChunkSize", 512) // 512KB
         // mandatory
         .addAsString("downloadPath", SettingsParser.Settings.defaultDownloadPath())
         .addAsBoolean("log", false)
@@ -107,7 +119,7 @@ public class Main {
       Logger.getLogger(Main.class.getName()).info(settingString);
     }
     
-    var codexController = new CodexController(settings.getStr("downloadPath"));
+    var codexController = new CodexController(settings.getStr("downloadPath"), settings.getInt("chunkSize") * 1024);
     var serverSocket = new InetSocketAddress(settings.getStr("hostname"), settings.getInt("port"));
     var api = new ClientAPI(settings.getStr("login"), serverSocket, codexController, settings);
     new ClientConsoleController(settings.getInt("y"), settings.getInt("x"), api).start();

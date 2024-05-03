@@ -66,9 +66,17 @@ public class CodexView implements View {
     if (codexStatus.isDownloading() || codexStatus.isSharing()) {
       sb.append(CLIColor.ITALIC)
         .append(CLIColor.BOLD)
-        .append(CLIColor.ORANGE)
-        .append(codexStatus.isDownloading() ? STR."▓ Downloading \{codexStatus.isDownloadingHidden() ? "(hidden)" : ""}... - from \{api.howManySharers(codexStatus.id())} sharers" : (codexStatus.isSharing() ? "▓ Sharing... " : ""))
-        .append(CLIColor.RESET)
+        .append(CLIColor.ORANGE);
+        if(codexStatus.isDownloading()) {
+          sb.append(STR."▓ Downloading \{codexStatus.isDownloadingHidden() ? "(hidden)" : ""}... - from \{api.howManySharers(codexStatus.id())} sharers\n")
+              .append(STR."▓ Download Speed: \{View.bytesToHumanReadable((long) codexStatus.getCurrentSpeed())}/s\n");
+        } else {
+          sb.append(STR."▓ Sharing... - to \{api.howManyDownloaders(codexStatus.id())}\n")
+              .append("▓ Sharing Speed: ")
+              .append(View.bytesToHumanReadable((long) codexStatus.getCurrentSpeed()))
+              .append("/s\n");
+        }
+        sb.append(CLIColor.RESET)
         .append("\n");
       // progressbar on the full screen length
       if(codexStatus.isDownloading() && !codexStatus.isComplete()) {

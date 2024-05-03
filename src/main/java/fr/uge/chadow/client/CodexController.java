@@ -18,9 +18,14 @@ public class CodexController {
   private static final Logger logger = Logger.getLogger(Codex.class.getName());
   private static final HashMap<String, CodexStatus> codexes = new HashMap<>();
   private Path defaultDownloadPath;
+  private final int chunkSize;
   
-  public CodexController(String defaultDownloadPath) throws IOException {
+  public CodexController(String defaultDownloadPath, int chunkSize) throws IOException {
     Objects.requireNonNull(defaultDownloadPath);
+    if(chunkSize <= 0){
+      throw new IllegalArgumentException("Chunk size must be positive");
+    }
+    this.chunkSize = chunkSize;
     changeDefaultDownloadPath(defaultDownloadPath);
   }
   
@@ -47,7 +52,7 @@ public class CodexController {
   }
   
   private CodexStatus addCodex(Codex codex, Path root) {
-    var codexStatus = new CodexStatus(codex, root.toString());
+    var codexStatus = new CodexStatus(codex, root.toString(), chunkSize);
     var existing = codexes.putIfAbsent(codex.id(), codexStatus);
     return existing == null ? codexStatus : existing;
   }
@@ -203,6 +208,9 @@ public class CodexController {
     var fileInfoList = new ArrayList<Codex.FileInfo>();
     logger.info(STR."Creating codex of \"\{rootPath}\"");
     // get all files
+    if(!rootPath.exists()){
+      throw new IOException("File or directory not found");
+    }
     if(rootPath.isFile()){
       fileInfoList.add(fileInfofromPath(rootPath.getPath(), rootPath.toPath()));
     }if(rootPath.isDirectory()) {

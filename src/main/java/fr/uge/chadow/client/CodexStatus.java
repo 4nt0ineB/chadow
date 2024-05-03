@@ -15,7 +15,7 @@ public class CodexStatus {
   public record Chunk(long offset, int length) {
   }
   private static final Logger logger = Logger.getLogger(CodexStatus.class.getName());
-  private static final int CHUNK_SIZE = 128 * 1024; // 128KB
+  private final int chunkSize;
   private final Codex codex;
   private final HashMap<Codex.FileInfo, BitSet> chunks = new HashMap<>();
   private final String root;
@@ -27,9 +27,14 @@ public class CodexStatus {
   // caching a file reader, 1 because we download the codex sequentially
   private RandomAccessFile currentDownloadingFile = null;
   
-  CodexStatus(Codex codex, String root) {
+  // track download speed
+  private long totalBytesPassed = 0;
+  private long downloadStartTime;
+  
+  CodexStatus(Codex codex, String root, int chunkSize) {
     this.codex = codex;
     this.root = root;
+    this.chunkSize = chunkSize;
     // initialize chunks bitset
     var files = codex.files();
     for (Codex.FileInfo file : files) {
@@ -39,7 +44,7 @@ public class CodexStatus {
   }
   
   public int numberOfChunks(Codex.FileInfo file) {
-    return (int) Math.ceil((double) file.length() / CHUNK_SIZE);
+    return (int) Math.ceil((double) file.length() / chunkSize);
   }
   
   /**
@@ -153,11 +158,15 @@ public class CodexStatus {
   
   void share() {
     sharing = true;
+    totalBytesPassed = 0;
+    downloadStartTime = System.currentTimeMillis();
   }
   
   void download(boolean hidden) {
     downloading = true;
     downloadHidden = hidden;
+    totalBytesPassed = 0;
+    downloadStartTime = System.currentTimeMillis();
   }
   
   void stopSharing() {
@@ -219,9 +228,9 @@ public class CodexStatus {
       var chunkIndex = nonCompletedChunks[random.nextInt(nonCompletedChunks.length)];
       logger.info(STR."Remainging chunks for the file \{nonCompletedFile.filename()} : \{nonCompletedChunks.length}");
       
-      var offsetInFile = (long) chunkIndex * CHUNK_SIZE;
+      var offsetInFile = (long) chunkIndex * chunkSize;
       long offsetInCodex = fileOffset(firstNonCompletedFileIndex) + offsetInFile;
-      var length = Math.min(CHUNK_SIZE, (nonCompletedFile.length() - offsetInFile));
+      var length = Math.min(chunkSize, (nonCompletedFile.length() - offsetInFile));
       return new Chunk(offsetInCodex, (int) length);
     } finally {
       lock.unlock();
@@ -254,7 +263,9 @@ public class CodexStatus {
         sharedFiles[fileIndex] = raf;
       }
       raf.seek(fileOffset);
-      raf.read(data, 0, (int) Math.min(length, file.length() - fileOffset));
+      var readLength = (int) Math.min(length, file.length() - fileOffset);
+      totalBytesPassed += readLength;
+      raf.read(data, 0, readLength);
       return data;
     } finally {
       lock.unlock();
@@ -278,13 +289,14 @@ public class CodexStatus {
       Objects.checkIndex(offsetInFile + payload.length, codex().totalSize() + 1);
       var file = codex().files()[fileIndex];
       var path = Paths.get(root(), codex().name(), file.relativePath(), file.filename());
+      totalBytesPassed += payload.length;
       // sequential download
       if (currentDownloadingFile == null) {
         currentDownloadingFile = new RandomAccessFile(path.toString(), "rw");
       }
       currentDownloadingFile.seek(offsetInFile);
       currentDownloadingFile.write(payload);
-      var chunkIndex = (int) (offsetInFile / CodexStatus.CHUNK_SIZE);
+      var chunkIndex = (int) (offsetInFile / chunkSize);
       chunks.get(file)
             .set(chunkIndex);
       if (isComplete(file)) {
@@ -373,5 +385,16 @@ public class CodexStatus {
     throw new IllegalArgumentException("Offset is out of the codex");
   }
   
+  /**
+   * Get the download speed in bytes per second if downloading
+   * Get the upload speed in bytes per second if sharing
+   * @return the speed in bytes per second
+   */
+  public double getCurrentSpeed() {
+    long currentTime = System.currentTimeMillis();
+    long downloadTimeInSeconds = (currentTime - downloadStartTime) / 1000;
+    if (downloadTimeInSeconds == 0) return 0;
+    return (double) totalBytesPassed / downloadTimeInSeconds;
+  }
   
 }

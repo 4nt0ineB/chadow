@@ -28,11 +28,13 @@ public final class ClientAsServerContext extends Context {
   private boolean isClosed;
   private final ArrayDeque<Frame> framesForTheNextHop = new ArrayDeque<>();
   private boolean isProxy = false;
+  private final int maxAcceptedChunkSize;
   
   
-  public ClientAsServerContext(SelectionKey key, ClientAPI api) {
+  public ClientAsServerContext(SelectionKey key, ClientAPI api, int maxAcceptedChunkSize) {
     super(key, BUFFER_SIZE);
     this.api = api;
+    this.maxAcceptedChunkSize = maxAcceptedChunkSize;
   }
   
   @Override
@@ -43,6 +45,7 @@ public final class ClientAsServerContext extends Context {
         if(allowedToShare()) {
           logger.info(STR."Ready to share codex \{wantedCodexId}");
           clientAddress = (InetSocketAddress) getSocket().getRemoteAddress();
+          api.registerSharer(wantedCodexId);
         }else {
           logger.info("Client wants to download a codex that is not shared");
           clearFrameQueue();
@@ -53,6 +56,10 @@ public final class ClientAsServerContext extends Context {
       case NeedChunk needChunk -> {
         logger.info(STR."\{clientAddress} needs chunk (\{needChunk.offset()},\{needChunk.length()})");
         if(!allowedToShare()) {
+          silentlyClose();
+        }
+        if(needChunk.length() > maxAcceptedChunkSize) {
+          logger.warning("Client requested a too big chunk");
           silentlyClose();
         }
         try {
@@ -132,6 +139,7 @@ public final class ClientAsServerContext extends Context {
   
   public void setBridge(Context bridgeContext) {
     this.bridgeContext = bridgeContext;
+    api.registerProxy();
     // send queued frames
     while(!framesForTheNextHop.isEmpty()) {
       bridgeContext.queueFrame(framesForTheNextHop.pollFirst());
@@ -146,6 +154,10 @@ public final class ClientAsServerContext extends Context {
       isClosed = true;
       bridgeContext.silentlyClose();
       bridgeContext = null;
+      api.unregisterProxy();
+    }
+    if(!isProxy) {
+      api.unregisterSharer(wantedCodexId);
     }
   }
 }

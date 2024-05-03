@@ -57,7 +57,9 @@ public class ClientAPI {
   private final long DOWNLOAD_REQUEST_TIMEOUT = 5; // todo add in settings
   private final LinkedBlockingQueue<SocketResponse> sharersSocketQueue = new LinkedBlockingQueue<>();
   private final ArrayDeque<String> codexIdOfAskedDownload = new ArrayDeque<>();
-  private final HashMap<String, Integer> downloaders = new HashMap<>();
+  private final HashMap<String, Set<InetSocketAddress>> currentDownloads = new HashMap<>();
+  private final HashMap<String, Integer> currentSharing = new HashMap<>();
+  private int proxyiedConnection = 0;
   
   // Manage request and response of search
   private final long SEARCH_TIMEOUT = 5; // todo add in settings
@@ -71,7 +73,6 @@ public class ClientAPI {
   // Proxy
   private final HashMap<Integer, SocketField> proxyRoutes = new HashMap<>();
   
-  
   public ClientAPI(String login, InetSocketAddress serverAddress, CodexController codexController, SettingsParser.Settings settings) {
     Objects.requireNonNull(login);
     this.login = login;
@@ -80,78 +81,10 @@ public class ClientAPI {
     this.settings = settings;
   }
   
-  
-  public boolean saveProxyRoute(int chainId, SocketField socket) {
-    return proxyRoutes.putIfAbsent(chainId, socket) == null;
-  }
-  
-  public boolean setUpBridge(int chainId, ClientAsServerContext clientAsServerContext) {
-    var socket = proxyRoutes.get(chainId);
-    if(socket == null) {
-      return false;
-    }
-    addContext(socket, key -> new ProxyBridgeContext(key, clientAsServerContext));
-    return true;
-  }
-  
-  /**
-   * Register a downloader context.
-   * Increment the number of downloaders for the codex
-   * @param id the id of the codex
-   */
-  public void registerDownloader(String id) {
-    lock.lock();
-    try {
-      downloaders.compute(id, (k, v) -> v == null ? 1 : v + 1);
-    } finally {
-      lock.unlock();
-    }
-  }
-  
-  public void unregisterDownloader(String id) {
-    lock.lock();
-    try {
-      downloaders.computeIfPresent(id, (k, v) -> Math.max(0, v - 1));
-    } finally {
-      lock.unlock();
-    }
-  }
-  
-  public void deleteDirectMessagesWith(UUID id) {
-    lock.lock();
-    try {
-      directMessages.remove(id);
-    } finally {
-      lock.unlock();
-    }
-  }
-  
-  private record SocketResponse(SocketField[] sockets, int[] chainId) {
-    public SocketResponse {
-      if (chainId != null && chainId.length != chainId.length) {
-        throw new IllegalArgumentException("The number of chain ids must be equal to the number of sockets");
-      }
-    }
-  }
-  
-  
-  
-  /**
-   * Create a splash screen logo with a list of messages
-   * showing le title "Chadow" in ascii art and the version
-   */
-  public static List<YellMessage> splashLogo() {
-    return List.of(
-        new YellMessage("", "┏┓┓    ┓", 0),
-        new YellMessage("", "┃ ┣┓┏┓┏┫┏┓┓┏┏", 0),
-        new YellMessage("", "┗┛┗┗┗┗┗┗┗┛┗┛┛ v1.0.0 - Bastos & Sebbah", 0)
-    );
-  }
-  
   public void startService() throws InterruptedException, IOException {
-    this.connectionManager = new TCPConnectionManager(0, key -> new ClientAsServerContext(key, this));
+    this.connectionManager = new TCPConnectionManager(0, key -> new ClientAsServerContext(key, this, settings.getInt("maxAcceptedChunkSize") * 1024));
     // Starts the client thread
-    startClient();
+    startConnectionManagerThread();
     waitForConnection();
     this.publicMessages.addAll(splashLogo());
     if(settings.getBool("debug")) {
@@ -160,34 +93,21 @@ public class ClientAPI {
       } catch (IOException e) {
         throw new RuntimeException(e);
       } catch (NoSuchAlgorithmException e) {
-        throw new RuntimeException(e);
         // just die
+        throw new RuntimeException(e);
       }
     }
-    // make a loop to manage downloads
-    while (!Thread.interrupted() && status.equals(STATUS.CONNECTED)) {
-      var socketResponse = sharersSocketQueue.poll(DOWNLOAD_REQUEST_TIMEOUT, java.util.concurrent.TimeUnit.SECONDS);
-      if (socketResponse != null) {
-        var codexId = codexIdOfAskedDownload.pollFirst();
-        codexController.createFileTree(codexId);
-        // create downloader for each sharer
-        for(var i = 0;  i < socketResponse.sockets.length; i++) {
-          var socket = socketResponse.sockets[i];
-          var chainId = socketResponse.chainId != null ? socketResponse.chainId[i] : null;
-          logger.info(STR."New downloader context for codex \{codexId} (sharer: \{socket.ip()}:\{socket.port()}) (hidden: \{chainId != null})");
-          addDownloaderContext(codexId, socket, chainId);
-        }
-      }
-    }
+    Thread.ofPlatform().daemon().start(this::periodicSocketRequest);
+    startDownloaderRunner();
   }
   
-  private void startClient() throws InterruptedException, IOException {
+  private void startConnectionManagerThread() throws InterruptedException, IOException {
     try {
       Thread.ofPlatform()
             .daemon()
             .start(() -> {
               try {
-                logger.info("Client starts");
+                logger.info("Client context starts");
                 connectionManager.supplyConnectionData(key -> new TCPConnectionManager.ConnectionData(new ClientContext(key, this), serverAddress));
                 connectionManager.launch();
               } catch (IOException e) {
@@ -209,6 +129,192 @@ public class ClientAPI {
       
       throw new IOException();
     }
+  }
+  
+  /**
+   * Start the downloader runner
+   * This method will wait for sockets requested by the client to download a codex.
+   * When sockets is received, will create a downloader context for each socket
+   * @throws IOException
+   * @throws InterruptedException
+   */
+  private void startDownloaderRunner() throws IOException, InterruptedException {
+    while (!Thread.interrupted() && status.equals(STATUS.CONNECTED)) {
+      var socketResponse = sharersSocketQueue.poll(DOWNLOAD_REQUEST_TIMEOUT, java.util.concurrent.TimeUnit.SECONDS);
+      if (socketResponse != null) {
+        var codexId = codexIdOfAskedDownload.pollFirst();
+        if(!currentDownloads.containsKey(codexId)) {
+          codexController.createFileTree(codexId);
+          currentDownloads.put(codexId, new HashSet<>());
+        }
+        var sockets = currentDownloads.get(codexId);
+        // create downloader for each sharer
+        for(var i = 0;  i < socketResponse.sockets.length; i++) {
+          var socketField = socketResponse.sockets[i];
+          var socketAddress = new InetSocketAddress(InetAddress.getByAddress(socketField.ip()), socketField.port());
+          if(sockets.contains(socketAddress)) {
+            continue; // already downloading from this sharer
+          }
+          var chainId = socketResponse.chainId != null ? socketResponse.chainId[i] : null;
+          logger.info(STR."New downloader context for codex \{codexId} (sharer: \{socketField.ip()}:\{socketField.port()}) (hidden: \{chainId != null})");
+          addDownloaderContext(codexId, socketField, chainId);
+        }
+      }
+    }
+  }
+  
+  /**
+   * Try to improve a download by requesting more sockets
+   * each minute
+   */
+  private void periodicSocketRequest() {
+    while (!Thread.interrupted() && status.equals(STATUS.CONNECTED)) {
+      try {
+        Thread.sleep(1000 * 60);
+        logger.info("Requesting more sockets for current downloads");
+      } catch (InterruptedException e) {
+        logger.severe(STR."The client was interrupted while sleeping.\{e.getCause()}");
+        return;
+      }
+      var toRemove = new HashSet<String>();
+      for(var codexId: currentDownloads.keySet()) {
+        var codexStatus = codexController.getCodexStatus(codexId);
+        if(codexStatus.isPresent() && codexStatus.orElseThrow().isComplete()) {
+          toRemove.add(codexId);
+          continue;
+        }
+        var downloadIsHidden = codexController.getCodexStatus(codexId).orElseThrow().isDownloadingHidden();
+        requestSocketForDownload(codexId, downloadIsHidden);
+      }
+      toRemove.forEach(currentDownloads::remove);
+    }
+  }
+  
+  
+  public boolean saveProxyRoute(int chainId, SocketField socket) {
+    return proxyRoutes.putIfAbsent(chainId, socket) == null;
+  }
+  
+  public boolean setUpBridge(int chainId, ClientAsServerContext clientAsServerContext) {
+    var socket = proxyRoutes.get(chainId);
+    if(socket == null) {
+      return false;
+    }
+    addContext(socket, key -> new ProxyBridgeContext(key, clientAsServerContext));
+    return true;
+  }
+  
+  
+  /**
+   * Register a downloader context.
+   * Update the list of sharers for the codex
+   * @param codexId the id of the codex
+   */
+  public void registerDownloader(String codexId, InetSocketAddress sharerAddress) {
+    lock.lock();
+    try {
+      currentDownloads.get(codexId).add(sharerAddress);
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  public void unregisterDownloader(String codexId, InetSocketAddress sharerAddress) {
+    lock.lock();
+    try {
+      currentDownloads.computeIfPresent(codexId, (k, v) -> {
+        v.remove(sharerAddress);
+        return v;
+      });
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  public int howManyDownloaders(String codexId) {
+    lock.lock();
+    try {
+      return currentDownloads.getOrDefault(codexId, Set.of()).size();
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  /**
+   * Register a sharer context.
+   * Update the list of sharers for the codex
+   * @param codexId the id of the codex
+   */
+  public void registerSharer(String codexId) {
+    lock.lock();
+    try {
+      currentSharing.compute(codexId, (k, v) -> v == null ? 1 : v + 1);
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  public void unregisterSharer(String codexId) {
+    lock.lock();
+    try {
+      currentSharing.computeIfPresent(codexId, (k, v) -> v == 1 ? 0 : v - 1);
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  public int howManySharers(String codexId) {
+    lock.lock();
+    try {
+      return currentSharing.getOrDefault(codexId, 0);
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  public void registerProxy() {
+    lock.lock();
+    try {
+      proxyiedConnection++;
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  public void unregisterProxy() {
+    lock.lock();
+    try {
+      proxyiedConnection = Math.max(0, proxyiedConnection - 1);
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  public int howManyProxy() {
+    lock.lock();
+    try {
+      return proxyiedConnection;
+    } finally {
+      lock.unlock();
+    }
+  }
+  
+  
+  public void deleteDirectMessagesWith(UUID id) {
+    lock.lock();
+    try {
+      directMessages.remove(id);
+    } finally {
+      lock.unlock();
+    }
+  }
+  private record SocketResponse(SocketField[] sockets, int[] chainId) {
+    public SocketResponse {
+      if (chainId != null && chainId.length != chainId.length) {
+        throw new IllegalArgumentException("The number of chain ids must be equal to the number of sockets");
+      }
+    }
+  
   }
   
   /**
@@ -535,14 +641,17 @@ public class ClientAPI {
     lock.lock();
     try {
       codexController.download(id, hidden);
-      // TODO : change the way to handle this
-      clientContext.queueFrame(new RequestDownload(id, (byte) (hidden ? 1 : 0),
-          settings.getInt("sharersRequired"),
-          settings.getInt("proxyChainSize")));
-      codexIdOfAskedDownload.addLast(id);
+      requestSocketForDownload(id, hidden);
     } finally {
       lock.unlock();
     }
+  }
+  
+  private void requestSocketForDownload(String codexId, boolean hidden) {
+    clientContext.queueFrame(new RequestDownload(codexId, (byte) (hidden ? 1 : 0),
+        settings.getInt("sharersRequired"),
+        settings.getInt("proxyChainSize")));
+    codexIdOfAskedDownload.addLast(codexId);
   }
   
   public void addIncomingDM(WhisperMessage msg) {
@@ -587,6 +696,7 @@ public class ClientAPI {
     lock.lock();
     try {
       codexController.stopSharing(codexId);
+      currentDownloads.remove(codexId);
       // clientContext.queueFrame(new Cancel(codexId)); @Todo
     } finally {
       lock.unlock();
@@ -596,15 +706,6 @@ public class ClientAPI {
   public void share(String codexId) {
     codexController.share(codexId);
     propose(codexId);
-  }
-  
-  public int howManySharers(String codexId) {
-    lock.lock();
-    try {
-      return downloaders.getOrDefault(codexId, 0);
-    } finally {
-      lock.unlock();
-    }
   }
   
   public void addUser(String username) {
@@ -755,11 +856,23 @@ public class ClientAPI {
     //this.directMessages.put(userId, new DirectMessages(userId, "Alan1"));
     // test codex
     if (login.equals("Alan1") || login.equals("Alan2") || login.equals("Alan3")) {
-      var status = codexController.createFromPath("my codex", "/mnt/d/testReseau2");
+      //var status = codexController.createFromPath("my codex", "/mnt/d/testReseau2");
       //var status = codexController.createFromPath("test", "/home/alan1/Documents/tmp/tablette");
       //var status = codexController.createFromPath("test", "/home/alan1/Pictures");
-      //var status = codexController.createFromPath("test", "/home/alan1/Downloads/temoinaaaaa");
+      var status = codexController.createFromPath("test", "/home/alan1/Downloads/aaa");
       share(status.id());
     }
+  }
+  
+  /**
+   * Create a splash screen logo with a list of messages
+   * showing le title "Chadow" in ascii art and the version
+   */
+  public static List<YellMessage> splashLogo() {
+    return List.of(
+        new YellMessage("", "┏┓┓    ┓", 0),
+        new YellMessage("", "┃ ┣┓┏┓┏┫┏┓┓┏┏", 0),
+        new YellMessage("", "┗┛┗┗┗┗┗┗┗┛┗┛┛ v1.0.0 - Bastos & Sebbah", 0)
+    );
   }
 }

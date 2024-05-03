@@ -12,7 +12,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.logging.Logger;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -172,7 +171,8 @@ public class ChatView implements View {
     var colsRemaining = cols - getMaxUserLength() - 2;
     sb.append(CLIColor.CYAN_BACKGROUND);
     sb.append(CLIColor.WHITE);
-    var title = (STR."%-\{colsRemaining}s ").formatted(STR."CHADOW CLIENT (\{cols},\{lines})");
+    var proxies = clientAPI.howManyProxy();
+    var title = (STR."%-\{colsRemaining}s ").formatted(STR."CHADOW CLIENT (\{cols},\{lines}) | \{proxies} prox\{proxies > 1 ? "ies" : "y"}");
     colsRemaining -= title.length() + 2; // right side pannel of users + margin (  )
     var totalUsers = (STR."\{CLIColor.BOLD}\{CLIColor.BLACK}%-\{getMaxUserLength()}s").formatted(STR."(\{clientAPI.totalUsers()})");
     colsRemaining -= totalUsers.length();

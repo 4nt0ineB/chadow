@@ -145,7 +145,8 @@ public class GlobalReaderTest {
 
   @Test
   public void proposeCodex() throws IOException {
-    var codexController = new CodexController(SettingsParser.Settings.defaultDownloadPath());
+    var chunkSize = 128 * 1024;
+    var codexController = new CodexController(SettingsParser.Settings.defaultDownloadPath(), chunkSize);
     CodexStatus codexStatus;
     try {
       codexStatus = codexController.createFromPath("my codex", "/home/alan1/Pictures");

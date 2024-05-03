@@ -19,6 +19,7 @@ import java.util.logging.Logger;
 public final class DownloaderContext extends Context {
   private static final Logger logger = Logger.getLogger(DownloaderContext.class.getName());
   private static final int BUFFER_SIZE = 1024;
+  private final InetSocketAddress sharerAddress;
   private final ClientAPI api;
   private final CodexStatus codexStatus;
   private final SelectionKey key;
@@ -31,6 +32,14 @@ public final class DownloaderContext extends Context {
     this.codexStatus = codexStatus;
     this.key = key;
     this.chainId = chainId;
+    
+    InetSocketAddress socketAddress = null;
+    try {
+      socketAddress = (InetSocketAddress) ((SocketChannel) key.channel()).getRemoteAddress();
+    } catch (IOException e) {
+      silentlyClose();
+    }
+    this.sharerAddress = socketAddress;
   }
   
   @Override
@@ -86,12 +95,19 @@ public final class DownloaderContext extends Context {
     if(codexStatus == null) {
       return true;
     }
+    if(!codexStatus.isDownloading()){
+      return true;
+    }
     if(!api.codexExists(codexStatus.codex().id())) {
       logger.warning(STR."Codex \{codexStatus.codex().id()} does not exist");
       return true;
     }
     if(codexStatus.isComplete()) {
       logger.info(STR."Codex \{codexStatus.codex().id()} is complete");
+      return true;
+    }
+    if(chainId == null && codexStatus.isDownloadingHidden()) {
+      logger.info(STR."The current downloader was downloading Codex \{codexStatus.codex().id()} with open mode, but the codex is now hidden");
       return true;
     }
     return false;
@@ -128,7 +144,7 @@ public final class DownloaderContext extends Context {
       addFrame(handshake);
       addFrame(needChunk);
     }
-    api.registerDownloader(codexStatus.codex().id());
+    api.registerDownloader(codexStatus.codex().id(), sharerAddress);
     processOut();
     getKey().interestOps(SelectionKey.OP_WRITE);
   }
@@ -136,6 +152,6 @@ public final class DownloaderContext extends Context {
   @Override
   public void silentlyClose() {
     super.silentlyClose();
-    api.unregisterDownloader(codexStatus.codex().id());
+    api.unregisterDownloader(codexStatus.codex().id(), sharerAddress);
   }
 }
