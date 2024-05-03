@@ -153,13 +153,16 @@ public class ClientAPI {
     // Starts the client thread
     startClient();
     waitForConnection();
-    try {
-      fillWithFakeData();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    } catch (NoSuchAlgorithmException e) {
-      throw new RuntimeException(e);
-      // just die
+    this.publicMessages.addAll(splashLogo());
+    if(settings.getBool("debug")) {
+      try {
+        fillWithFakeData();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      } catch (NoSuchAlgorithmException e) {
+        throw new RuntimeException(e);
+        // just die
+      }
     }
     // make a loop to manage downloads
     while (!Thread.interrupted() && status.equals(STATUS.CONNECTED)) {
@@ -646,7 +649,6 @@ public class ClientAPI {
           .ifPresent(dm -> {
             var random = new Random();
             var newUsername = STR."\{dm.username()}[\{random.nextInt(1000)}]";
-            var randomUUID = UUID.randomUUID();
             dm.changeUsername(newUsername);
             dm.addMessage(new WhisperMessage("<--", STR."User \{username} left", System.currentTimeMillis()));
             dm.addMessage(new WhisperMessage("<--", STR."\{username} renamed as \{newUsername}", System.currentTimeMillis()));
@@ -748,7 +750,6 @@ public class ClientAPI {
         new YellMessage("SKIDROW", "Here is the codex of the FOSS (.deb) : cdx:1eb49a28a0c02b47eed4d0b968bb9aec116a5a47", System.currentTimeMillis()),
         new YellMessage("Antoine", "Le lien vers le sujet : https://igm.univ-mlv.fr/coursprogreseau/tds/projet2024.html", System.currentTimeMillis())
     };
-    this.publicMessages.addAll(splashLogo());
     this.publicMessages.addAll(Arrays.asList(messages));
     //var userId = UUID.randomUUID();
     //this.directMessages.put(userId, new DirectMessages(userId, "Alan1"));

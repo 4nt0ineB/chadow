@@ -73,6 +73,7 @@ public class Main {
         .addAsInt("x", 80)
         .addAsInt("sharersRequired", 5)
         .addAsInt("proxyChainSize", 1)
+        .addAsBoolean("debug", false)
         // mandatory
         .addAsString("downloadPath", SettingsParser.Settings.defaultDownloadPath())
         .addAsBoolean("log", false)
@@ -80,6 +81,7 @@ public class Main {
     
     SettingsParser.Settings settings = null;
     var settingString = String.join("", args);
+    System.out.println(settingString);
     
     try {
       settings = sp.parse(settingString);
