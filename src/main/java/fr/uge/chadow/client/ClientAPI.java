@@ -2,6 +2,7 @@ package fr.uge.chadow.client;
 
 
 import fr.uge.chadow.SettingsParser;
+import fr.uge.chadow.core.ProxyManager;
 import fr.uge.chadow.core.context.*;
 import fr.uge.chadow.core.TCPConnectionManager;
 import fr.uge.chadow.core.protocol.WhisperMessage;
@@ -61,6 +62,8 @@ public class ClientAPI {
   private final HashMap<String, Integer> currentSharing = new HashMap<>();
   private int proxyiedConnection = 0;
   
+  private final ProxyManager proxyManager = new ProxyManager();
+  
   // Manage request and response of search
   private final long SEARCH_TIMEOUT = 5; // todo add in settings
   private final ArrayBlockingQueue<SearchResponse> searchResponseQueue = new ArrayBlockingQueue<>(1);
@@ -69,9 +72,6 @@ public class ClientAPI {
   private TCPConnectionManager connectionManager;
   private ClientContext clientContext;
   private STATUS status = STATUS.CONNECTING;
-  
-  // Proxy
-  private final HashMap<Integer, SocketField> proxyRoutes = new HashMap<>();
   
   public ClientAPI(String login, InetSocketAddress serverAddress, CodexController codexController, SettingsParser.Settings settings) {
     Objects.requireNonNull(login);
@@ -192,15 +192,15 @@ public class ClientAPI {
   
   
   public boolean saveProxyRoute(int chainId, SocketField socket) {
-    return proxyRoutes.putIfAbsent(chainId, socket) == null;
+    return proxyManager.saveProxyRoute(chainId, socket);
   }
   
   public boolean setUpBridge(int chainId, ClientAsServerContext clientAsServerContext) {
-    var socket = proxyRoutes.get(chainId);
-    if(socket == null) {
+    var socket = proxyManager.getNextHopSocket(chainId);
+    if(socket.isEmpty()) {
       return false;
     }
-    addContext(socket, key -> new ProxyBridgeContext(key, clientAsServerContext));
+    addContext(socket.orElseThrow(), key -> new ProxyBridgeRightSideContext(key, clientAsServerContext));
     return true;
   }
   
@@ -331,7 +331,7 @@ public class ClientAPI {
     addContext(socket, key -> new DownloaderContext(key, this, codexStatus.orElseThrow(), chainId));
   }
   
-  public void addContext(SocketField socket, Function<SelectionKey, Context> contextSupplier) {
+  private void addContext(SocketField socket, Function<SelectionKey, Context> contextSupplier) {
     InetAddress address;
     try {
       address = InetAddress.getByAddress(socket.ip());

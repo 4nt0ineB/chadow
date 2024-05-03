@@ -9,14 +9,21 @@ import fr.uge.chadow.server.Server;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
+import java.util.ArrayDeque;
 import java.util.logging.Logger;
 
-public final class ServerContext extends Context {
+public final class ServerContext extends Context implements ProxyBridgeLeftSideContext {
   private static final Logger logger = Logger.getLogger(Server.class.getName());
   private static final int BUFFER_SIZE = 1_024;
   private final Server server;
   private boolean closed = false;
   private String login;
+  // proxy
+  private Integer chainId;
+  private Context bridgeRightSide;
+  private boolean isClosed;
+  private final ArrayDeque<Frame> framesForTheNextHop = new ArrayDeque<>();
+  private boolean isProxy = false;
 
   public ServerContext(Server server, SelectionKey key) {
     super(key, BUFFER_SIZE);
@@ -132,6 +139,28 @@ public final class ServerContext extends Context {
         server.proxyOk(this, proxyOk.chainId());
       }
       
+      case Hidden hidden -> {
+        logger.info("Received hidden frame");
+        if(chainId == null) {
+          // first frame received
+          // bridgeContext not set yet;
+          chainId = hidden.chainId();
+          // if a routing exists, we are a proxy
+          isProxy = server.setUpBridge(chainId, this);
+          logger.info(STR."Client is a \{isProxy ? "proxy" : "sharer"}");
+        }
+        
+        if(isProxy && bridgeRightSide == null){
+          // we are a proxy, but the bridge is not set yet
+          // queue the frame
+          framesForTheNextHop.addLast(hidden);
+        } else if (isProxy) {
+          // we are a proxy and the bridge is set
+          // forward the frame to the bridge
+          bridgeRightSide.queueFrame(hidden);
+        }
+      }
+      
       default -> {
         logger.warning("No action for the received frame ");
         silentlyClose();
@@ -154,8 +183,23 @@ public final class ServerContext extends Context {
   }
   
   @Override
+  public void setBridge(Context bridgeRightSide) {
+    this.bridgeRightSide = bridgeRightSide;
+    // send queued frames
+    while(!framesForTheNextHop.isEmpty()) {
+      this.bridgeRightSide.queueFrame(framesForTheNextHop.pollFirst());
+    }
+  }
+  
+  @Override
   public void silentlyClose() {
     server.removeClient(login);
+    if(!isClosed && chainId != null && bridgeRightSide != null) {
+      // close the bridge
+      isClosed = true;
+      bridgeRightSide.silentlyClose();
+      bridgeRightSide = null;
+    }
     super.silentlyClose();
   }
 }

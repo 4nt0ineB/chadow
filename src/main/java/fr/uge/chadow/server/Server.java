@@ -1,14 +1,18 @@
 package fr.uge.chadow.server;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.channels.*;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 
+import fr.uge.chadow.core.ProxyManager;
 import fr.uge.chadow.core.TCPConnectionManager;
-import fr.uge.chadow.core.context.ServerContext;
+import fr.uge.chadow.core.context.*;
 import fr.uge.chadow.core.protocol.Frame;
 import fr.uge.chadow.core.protocol.WhisperMessage;
 import fr.uge.chadow.core.protocol.client.RequestDownload;
@@ -332,6 +336,7 @@ public class Server {
   private final Map<CodexRecord, List<String>> codexes = new HashMap<>(); // codex -> list of usernames
   private final ProxyHandler proxyHandler = new ProxyHandler();
   private TCPConnectionManager connectionManager;
+  private final ProxyManager proxyManager = new ProxyManager(); // when server is a proxy
   private final int port;
 
   public Server(int port) throws IOException {
@@ -488,5 +493,33 @@ public class Server {
 
   private static void usage() {
     System.out.println("Usage : ServerSumBetter port");
+  }
+  
+  public boolean saveProxyRoute(int chainId, SocketField socket) {
+    return proxyManager.saveProxyRoute(chainId, socket);
+  }
+  
+  public boolean setUpBridge(int chainId, ProxyBridgeLeftSideContext clientAsServerContext) {
+    var socket = proxyManager.getNextHopSocket(chainId);
+    if(socket.isEmpty()) {
+      return false;
+    }
+    addContext(socket.orElseThrow(), key -> new ProxyBridgeRightSideContext(key, clientAsServerContext));
+    return true;
+  }
+  
+  public void addContext(SocketField socket, Function<SelectionKey, Context> contextSupplier) {
+    InetAddress address;
+    try {
+      address = InetAddress.getByAddress(socket.ip());
+    } catch (UnknownHostException e) {
+      logger.warning("Could not resolve the address of the sharer");
+      return;
+    }
+    var addr = new InetSocketAddress(address, socket.port());
+    connectionManager.supplyConnectionData(key -> {
+      var context = contextSupplier.apply(key);
+      return new TCPConnectionManager.ConnectionData(context, addr);
+    });
   }
 }

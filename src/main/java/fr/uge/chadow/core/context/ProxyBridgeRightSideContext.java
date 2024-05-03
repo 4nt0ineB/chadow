@@ -20,15 +20,15 @@ import java.util.logging.Logger;
  *
  * </pre>
  */
-public final class ProxyBridgeContext extends Context {
+public final class ProxyBridgeRightSideContext extends Context {
   private static final Logger logger = Logger.getLogger(ClientAsServerContext.class.getName());
   private static final int BUFFER_SIZE = 1024;
-  private final ClientAsServerContext otherEnd;
+  private final ProxyBridgeLeftSideContext leftSide;
   private boolean isClosed;
   
-  public ProxyBridgeContext(SelectionKey key, ClientAsServerContext otherEnd) {
+  public ProxyBridgeRightSideContext(SelectionKey key, ProxyBridgeLeftSideContext leftSide) {
     super(key, BUFFER_SIZE);
-    this.otherEnd = otherEnd;
+    this.leftSide = leftSide;
   }
   
   @Override
@@ -36,7 +36,7 @@ public final class ProxyBridgeContext extends Context {
     if (Objects.requireNonNull(frame) instanceof Hidden) {
       logger.info("Next hop send a Hidden frame");
       // just forward the frame to the previous hop through the bridge
-      otherEnd.queueFrame(frame);
+      leftSide.queueFrame(frame);
     } else {
       logger.warning(STR."Received unexpected frame \{frame}");
       silentlyClose();
@@ -47,16 +47,16 @@ public final class ProxyBridgeContext extends Context {
   public void doConnect() throws IOException {
     super.doConnect();
     logger.info("Received connection from a client");
-    otherEnd.setBridge(this);
+    leftSide.setBridge(this);
   }
   
   @Override
   public void silentlyClose() {
     // close the bridge
     super.silentlyClose();
-    if(otherEnd != null && !isClosed) {
+    if(leftSide != null && !isClosed) {
       isClosed = true;
-      otherEnd.silentlyClose();
+      leftSide.silentlyClose();
     }
   }
 }

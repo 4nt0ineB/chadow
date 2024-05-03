@@ -13,7 +13,7 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
 import java.util.logging.Logger;
 
-public sealed abstract class Context permits ClientAsServerContext, ClientContext, DownloaderContext, ProxyBridgeContext, ServerContext {
+public sealed abstract class Context permits ClientAsServerContext, ClientContext, DownloaderContext, ProxyBridgeRightSideContext, ServerContext {
   
   private static final Logger logger = Logger.getLogger(Context.class.getName());
   private final ArrayDeque<Frame> queue = new ArrayDeque<>();

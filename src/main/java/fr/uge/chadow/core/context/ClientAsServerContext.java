@@ -15,21 +15,20 @@ import java.util.logging.Logger;
 /**
  * Context for when the app is sharing files to another client
  */
-public final class ClientAsServerContext extends Context {
+public final class ClientAsServerContext extends Context implements ProxyBridgeLeftSideContext {
   private static final Logger logger = Logger.getLogger(ClientAsServerContext.class.getName());
   private static final int BUFFER_SIZE = 1024;
   private final ClientAPI api;
   private String wantedCodexId;
+  private final int maxAcceptedChunkSize;
   private InetSocketAddress clientAddress;
   private final FrameReader frameReader = new FrameReader();
   // proxy
   private Integer chainId;
-  private Context bridgeContext;
+  private Context bridgeRightSide;
   private boolean isClosed;
   private final ArrayDeque<Frame> framesForTheNextHop = new ArrayDeque<>();
   private boolean isProxy = false;
-  private final int maxAcceptedChunkSize;
-  
   
   public ClientAsServerContext(SelectionKey key, ClientAPI api, int maxAcceptedChunkSize) {
     super(key, BUFFER_SIZE);
@@ -88,14 +87,14 @@ public final class ClientAsServerContext extends Context {
           logger.info(STR."Client is a \{isProxy ? "proxy" : "sharer"}");
         }
         
-        if(isProxy && bridgeContext == null){
+        if(isProxy && bridgeRightSide == null){
           // we are a proxy, but the bridge is not set yet
           // queue the frame
           framesForTheNextHop.addLast(hidden);
         } else if (isProxy) {
           // we are a proxy and the bridge is set
           // forward the frame to the bridge
-          bridgeContext.queueFrame(hidden);
+          bridgeRightSide.queueFrame(hidden);
         } else {
           // we are a sharer
           // extract payload and processIt
@@ -137,23 +136,23 @@ public final class ClientAsServerContext extends Context {
     logger.info("Received connection from a client");
   }
   
-  public void setBridge(Context bridgeContext) {
-    this.bridgeContext = bridgeContext;
+  public void setBridge(Context bridgeRightSide) {
+    this.bridgeRightSide = bridgeRightSide;
     api.registerProxy();
     // send queued frames
     while(!framesForTheNextHop.isEmpty()) {
-      bridgeContext.queueFrame(framesForTheNextHop.pollFirst());
+      this.bridgeRightSide.queueFrame(framesForTheNextHop.pollFirst());
     }
   }
   
   @Override
   public void silentlyClose() {
     super.silentlyClose();
-    if(!isClosed && chainId != null && bridgeContext != null) {
+    if(!isClosed && chainId != null && bridgeRightSide != null) {
       // close the bridge
       isClosed = true;
-      bridgeContext.silentlyClose();
-      bridgeContext = null;
+      bridgeRightSide.silentlyClose();
+      bridgeRightSide = null;
       api.unregisterProxy();
     }
     if(!isProxy) {
