@@ -68,12 +68,14 @@ public class CodexView implements View {
         .append(CLIColor.BOLD)
         .append(CLIColor.ORANGE);
         if(codexStatus.isDownloading()) {
-          sb.append(STR."▓ Downloading \{codexStatus.isDownloadingHidden() ? "(hidden)" : ""}... - from \{api.howManySharers(codexStatus.id())} sharers\n")
-              .append(STR."▓ Download Speed: \{View.bytesToHumanReadable((long) codexStatus.getCurrentSpeed())}/s\n");
+          var currentDownloaders = api.howManyDownloaders(codexStatus.id());
+          sb.append(STR."▓ Downloading \{codexStatus.isDownloadingHidden() ? "(hidden)" : ""}... - from \{currentDownloaders} sharers\n")
+              .append(STR."▓ Download Speed: \{View.bytesToHumanReadable(currentDownloaders > 0 ? (long) codexStatus.getCurrentSpeed() : 0)}/s\n");
         } else {
-          sb.append(STR."▓ Sharing... - to \{api.howManyDownloaders(codexStatus.id())}\n")
-              .append("▓ Sharing Speed: ")
-              .append(View.bytesToHumanReadable((long) codexStatus.getCurrentSpeed()))
+          var currentSharers = api.howManySharers(codexStatus.id());
+          sb.append(STR."▓ Sharing... - to \{currentSharers} clients\n")
+              .append("▓ Upload Speed: ")
+              .append(View.bytesToHumanReadable(currentSharers > 0 ? (long) codexStatus.getCurrentSpeed() : 0))
               .append("/s\n");
         }
         sb.append(CLIColor.RESET)

@@ -214,6 +214,7 @@ public class ClientAPI {
     lock.lock();
     try {
       currentDownloads.get(codexId).add(sharerAddress);
+      logger.info(STR."REGISTER downloader for codex \{codexId} (sharer: \{sharerAddress})");
     } finally {
       lock.unlock();
     }
@@ -234,6 +235,7 @@ public class ClientAPI {
   public int howManyDownloaders(String codexId) {
     lock.lock();
     try {
+      logger.info(STR."NUMBER OF DOWNLOADERS : " + currentDownloads.getOrDefault(codexId, Set.of()).size());
       return currentDownloads.getOrDefault(codexId, Set.of()).size();
     } finally {
       lock.unlock();
@@ -248,7 +250,8 @@ public class ClientAPI {
   public void registerSharer(String codexId) {
     lock.lock();
     try {
-      currentSharing.compute(codexId, (k, v) -> v == null ? 1 : v + 1);
+      currentSharing.computeIfAbsent(codexId, k -> 0);
+      currentSharing.compute(codexId, (k, v) -> v + 1);
     } finally {
       lock.unlock();
     }
@@ -257,7 +260,7 @@ public class ClientAPI {
   public void unregisterSharer(String codexId) {
     lock.lock();
     try {
-      currentSharing.computeIfPresent(codexId, (k, v) -> v == 1 ? 0 : v - 1);
+      currentSharing.computeIfPresent(codexId, (k, v) -> Math.max(0, v - 1));
     } finally {
       lock.unlock();
     }
