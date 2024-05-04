@@ -848,11 +848,14 @@ public class ClientAPI {
    * Create a splash screen logo with a list of messages
    * showing le title "Chadow" in ascii art and the version
    */
-  public static List<YellMessage> splashLogo() {
+  public List<YellMessage> splashLogo() {
     return List.of(
         new YellMessage("", "┏┓┓    ┓", 0),
         new YellMessage("", "┃ ┣┓┏┓┏┫┏┓┓┏┏", 0),
-        new YellMessage("", "┗┛┗┗┗┗┗┗┗┛┗┛┛ v1.0.0 - Bastos & Sebbah", 0)
+        new YellMessage("", "┗┛┗┗┗┗┗┗┗┛┗┛┛ v1.0.0 - Bastos & Sebbah\n", 0),
+        new YellMessage("", "All files shared here are not stored on our server. We cannot be held responsible for any misuse of the platform.", 0),
+        new YellMessage("", "Please note that messages are not encrypted. This project has no claim to be anything other than educational.", 0),
+        new YellMessage("", "Use at your own risk and comply with laws.\n", 0)
     );
   }
 }

@@ -204,7 +204,7 @@ public final class ServerContext extends Context implements ProxyBridgeLeftSideC
   @Override
   public void doConnect() throws IOException {
     super.doConnect();
-    logger.info(STR."client is connecting");
+    logger.info("client is connecting");
   }
   
   @Override
