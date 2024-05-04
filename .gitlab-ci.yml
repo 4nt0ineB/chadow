@@ -1,15 +1,10 @@
 stages:
-  - build
   - deploy
-
-build:
-  stage: build
-  script:
-    - docker build -t chadow-image .
 
 deploy:
   stage: deploy
   script:
+    - docker build -t chadow-image .
     - docker run -d --restart always -p 7777:7777 chadow-image
   only:
     - main
