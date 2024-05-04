@@ -1,4 +1,11 @@
 # Chadow-BASTOS-SEBBAH 
+
+<pre>
+┏┓┓
+┃ ┣┓┏┓┏┫┏┓┓┏┏
+┗┛┗┗┗┗┗┗┗┛┗┛┛
+</pre>
+
 [![Public server instance - 217.182.68.48:7777](https://img.shields.io/badge/Public_server_instance-217.182.68.48%3A7777-green?logo=rocket)](https://gitlab.com/4nt0ineB/chadow-bastos-sebbah/)
 
 [Final project](http://igm.univ-mlv.fr/coursprogreseau/tds/projet2024.html) for the Network Programming class in the first year of a Master's degree in computer science.
@@ -6,7 +13,7 @@
 Implementation of the Chadow protocole described in [rfc_chadow.txt](./rfc_chadow.txt) (french)
 
 
-
+<img src="https://gitlab.com/4nt0ineB/chadow-bastos-sebbah/-/raw/b3ad80c5d58557ee1909c365c47786c469218c8b/img/chadow-chat.png" align="center" height="150" width="300"/>
 
 
 
