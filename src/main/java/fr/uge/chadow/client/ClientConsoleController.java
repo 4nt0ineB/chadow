@@ -843,7 +843,11 @@ public class ClientConsoleController {
                 
                 Example:
                   :cdx:2da27a8b8c8e96970bf37fe44ba11945ad2a891f
-                
+                   is equivalent to
+                  :cdx:2da27a8
+                  
+                  Supposing the SHA-1 no other codexes start with 2da27a8
+                  
               :exit - Exit the application
               
             [CHAT]
