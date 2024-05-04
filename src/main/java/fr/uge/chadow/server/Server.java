@@ -602,7 +602,6 @@ public class Server {
 
   public boolean addClient(String login, SocketChannel sc, InetSocketAddress address, ServerContext serverContext) {
     if (clients.containsKey(login)) {
-      logger.warning(STR."Login \{login} already in use");
       return false;
     }
     clients.put(login, new SocketInfo(sc, address, serverContext));

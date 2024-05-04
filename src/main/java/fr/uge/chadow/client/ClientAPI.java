@@ -836,10 +836,10 @@ public class ClientAPI {
     // test codex
     var login = settings.getStr("login");
     if (login.equals("Alan1") || login.equals("Alan2") || login.equals("Alan3")) {
-      //var status = codexController.createFromPath("my codex", "/mnt/d/testReseau2");
+      var status = codexController.createFromPath("my codex", "/mnt/d/testReseau2");
       //var status = codexController.createFromPath("test", "/home/alan1/Documents/tmp/tablette");
       //var status = codexController.createFromPath("test", "/home/alan1/Pictures");
-      var status = codexController.createFromPath("test", "/home/alan1/Downloads/aaa");
+      //var status = codexController.createFromPath("test", "/home/alan1/Downloads/aaa");
       share(status.id());
     }
   }
