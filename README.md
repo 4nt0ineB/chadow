@@ -1,5 +1,3 @@
-# Chadow-BASTOS-SEBBAH 
-
 <pre>
 ┏┓┓
 ┃ ┣┓┏┓┏┫┏┓┓┏┏
@@ -13,7 +11,7 @@
 Implementation of the Chadow protocole described in [rfc_chadow.txt](./rfc_chadow.txt) (french)
 
 
-<img src="https://gitlab.com/4nt0ineB/chadow-bastos-sebbah/-/raw/b3ad80c5d58557ee1909c365c47786c469218c8b/img/chadow-chat.png" align="center" height="150" width="300"/>
+<img src="https://gitlab.com/4nt0ineB/chadow-bastos-sebbah/-/raw/b3ad80c5d58557ee1909c365c47786c469218c8b/img/chadow-chat.png" height="150" width="300"/>
 
 
 
