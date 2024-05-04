@@ -17,9 +17,8 @@ public class CantConnectScreenView implements View {
   }
   
   @Override
-  public void setDimensions(int lines, int cols) {
+  public void setDimensions(int lines, int cols) {}
   
-  }
   public void draw() {
     var logo = List.of("┏┓┓    ┓"
                       ,"┃ ┣┓┏┓┏┫┏┓┓┏┏"

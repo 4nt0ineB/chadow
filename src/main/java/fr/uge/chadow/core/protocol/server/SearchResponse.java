@@ -7,7 +7,6 @@ import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
-import java.util.logging.Logger;
 
 public record SearchResponse(Result[] results) implements Frame {
   private static final Charset UTF8 = StandardCharsets.UTF_8;

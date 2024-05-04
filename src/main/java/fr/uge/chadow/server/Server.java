@@ -1,12 +1,9 @@
 package fr.uge.chadow.server;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 import java.nio.channels.*;
 import java.util.*;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 
@@ -596,23 +593,8 @@ public class Server {
     if(socket.isEmpty()) {
       return false;
     }
-    addContext(socket.orElseThrow(), key -> new ProxyBridgeRightSideContext(key, clientAsServerContext));
+    connectionManager.addContext(socket.orElseThrow(), key -> new ProxyBridgeRightSideContext(key, clientAsServerContext));
     return true;
-  }
-  
-  public void addContext(SocketField socket, Function<SelectionKey, Context> contextSupplier) {
-    InetAddress address;
-    try {
-      address = InetAddress.getByAddress(socket.ip());
-    } catch (UnknownHostException e) {
-      logger.warning("Could not resolve the address of the sharer");
-      return;
-    }
-    var addr = new InetSocketAddress(address, socket.port());
-    connectionManager.supplyConnectionData(key -> {
-      var context = contextSupplier.apply(key);
-      return new TCPConnectionManager.ConnectionData(context, addr);
-    });
   }
   
   // --------------------------------------------------------------------------------------------------

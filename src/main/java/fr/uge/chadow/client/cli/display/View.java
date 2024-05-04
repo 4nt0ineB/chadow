@@ -11,7 +11,6 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.function.Function;
-import java.util.stream.IntStream;
 
 public interface View {
   
@@ -28,7 +27,7 @@ public interface View {
    * Clear the display, everything above the input field.
    */
   static void clearDisplayArea(int lines) {
-    clearDisplayAndMore(lines, lines);
+    clearDisplayAndMore(lines);
   }
   
   static void clear(int lines) {
@@ -39,10 +38,8 @@ public interface View {
   
   /**
    * Clear the display + the other lines
-   *
-   * @param rest
    */
-  static void clearDisplayAndMore(int lines, int rest) {
+  static void clearDisplayAndMore(int lines) {
     //clearAllScreen();
     for (int i = 0; i < lines + lines; i++) {
       View.moveCursorToPosition(1, i + 1);
@@ -54,8 +51,9 @@ public interface View {
    * Calculate the maximum number of lines of content that can be displayed
    * (thus excluding the input field and the header)
    *
-   * @param lines
-   * @return
+   * @param lines the number of lines of the terminal
+   * @return the maximum number of lines of content that can be displayed
+   * (excluding the input field and the header)
    */
   static int maxLinesView(int lines) {
     return lines - 4;
@@ -65,7 +63,6 @@ public interface View {
    * Colorize codex (cdx:SHA-1) links present in string
    */
   static String beautifyCodexLink(String txt) {
-    var sb = new StringBuilder();
     return txt.replaceAll("cdx:([a-fA-F0-9]{40})",
         STR."\{CLIColor.BOLD}\{CLIColor.GREEN}cdx:$1\{CLIColor.RESET}");
   }
@@ -75,9 +72,9 @@ public interface View {
    * or if it contains a newline character.
    * Replace tabulation by 4 spaces.
    *
-   * @param txt
-   * @param maxCharacters
-   * @return
+   * @param txt the string to split
+   * @param maxCharacters the maximum number of characters per line
+   * @return the list of lines
    */
   static List<String> splitAndSanitize(String txt, int maxCharacters) {
     var lines = new ArrayList<String>();
@@ -112,9 +109,9 @@ public interface View {
   /**
    * Split and sanitize a list of strings
    *
-   * @param txt
-   * @param maxCharacters
-   * @return
+   * @param txt the list of strings to split
+   * @param maxCharacters the maximum number of characters per line
+   * @return the list of lines
    */
   static List<String> splitAndSanitize(List<String> txt, int maxCharacters) {
     var lines = new ArrayList<String>();
@@ -127,7 +124,7 @@ public interface View {
   /**
    * Move the cursor to the input field
    *
-   * @param lines
+   * @param lines the number of lines of the terminal
    */
   static void moveToInputField(int lines) {
     View.moveCursorToPosition(3, lines);
@@ -140,8 +137,8 @@ public interface View {
   /**
    * Format the date to HH:mm:ss
    *
-   * @param millis
-   * @return
+   * @param millis the date in milliseconds
+   * @return the formatted date
    */
   static String formatDate(long millis) {
     var date = new Date(millis);
@@ -174,8 +171,8 @@ public interface View {
   /**
    * Convert a fingerprint sha1 to a hexadecimal formatted string
    *
-   * @param bytes
-   * @return
+   * @param bytes the fingerprint
+   * @return the hexadecimal formatted string
    */
   static String bytesToHexadecimal(byte[] bytes) {
     StringBuilder sb = new StringBuilder();
@@ -187,12 +184,6 @@ public interface View {
   
   /**
    * Create a scrollable view from a string
-   *
-   * @param title
-   * @param lines
-   * @param cols
-   * @param help
-   * @return
    */
   static ScrollableView scrollableFromString(String title, int lines, int cols, String help) {
     var textLines = splitAndSanitize(help, cols);
@@ -202,11 +193,12 @@ public interface View {
   /**
    * Create a scrollable view from a list of objects
    * and the given mapper function to convert the object to a string
-   *
-   * @param title
-   * @param lines
-   * @param cols
-   * @return
+   * @param title the title of the view
+   * @param lines the number of lines
+   * @param cols the number of columns
+   * @param list the list of objects
+   * @param mapper the function to convert the object to a string
+   * @return the scrollable view
    */
   static <T> SelectorView<T> selectorFromList(String title, int lines, int cols, List<T> list,
                                               Function<? super T, String> mapper) {
@@ -259,7 +251,7 @@ public interface View {
     return STR."\{username} ─ \{formatDate(message.epoch())} ─ \{message.txt().replace("\\s", "")}";
   }
   
-  public static String[] getDateFormats(Locale locale) {
+  static String[] getDateFormats(Locale locale) {
     String[] dateFormats;
     if (locale.getLanguage().equals("fr")) {
       dateFormats = new String[]{"dd/MM/yyyy HH:mm", "dd/MM/yyyy"};

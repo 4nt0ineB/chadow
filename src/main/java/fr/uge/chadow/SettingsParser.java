@@ -3,8 +3,6 @@ package fr.uge.chadow;
 import java.io.IOException;
 import java.util.*;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
-
 
 public class SettingsParser {
   private static final Logger logger = Logger.getLogger(SettingsParser.class.getName());
@@ -25,38 +23,8 @@ public class SettingsParser {
     return this;
   }
   
-  /**
-   * Add a setting that is expected to be a string.
-   * These a required
-   *
-   * @param names
-   */
-  public SettingsParser addStringSettings(String... names) {
-    Objects.requireNonNull(names);
-    addSettingImpl(String.class, names);
-    return this;
-  }
-  
-  /**
-   * Add a setting that is expected to be an int.
-   * These are required
-   *
-   * @param names
-   */
-  public SettingsParser addIntSettings(String... names) {
-    Objects.requireNonNull(names);
-    addSettingImpl(int.class, names);
-    return this;
-  }
-  
-  private void addSettingImpl(Class<?> expectedType, String... names) {
-    for (var name : names) {
-      addSettingImpl(name, expectedType, null);
-    }
-  }
-  
   private <T> void  addSettingImpl(String name, Class<T> expected, T defaultValue) {
-    var old = settingsReaders.put(name, new Settings.Setting<T>(name, expected, defaultValue));
+    var old = settingsReaders.put(name, new Settings.Setting<>(name, expected, defaultValue));
     if(old != null) {
       throw new IllegalArgumentException(STR."Setting \"\{name}\" already exists");
     }

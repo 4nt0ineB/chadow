@@ -23,7 +23,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
-
+/**
+ * The client console controller is the main class of the client in console mode.
+ * It manages the display, the input, the commands and the user interactions.
+ */
 public class ClientConsoleController {
   public enum Mode {
     CHAT_LIVE_REFRESH,        // default
@@ -64,7 +67,6 @@ public class ClientConsoleController {
     }
     this.lines = lines;
     this.cols = cols;
-    //this.serverAddress = serverAddress;
     this.api = api;
     mainView = new ChatView(lines, cols, api);
     currentView = mainView;
@@ -72,6 +74,12 @@ public class ClientConsoleController {
     mode = Mode.CHAT_LIVE_REFRESH;
   }
   
+  /**
+   * Start the client:
+   * - start the api and wait for the connection to the server
+   * - start the display
+   * - start the input reader
+   */
   public void start() {
     // Starts the api thread
     Thread.ofPlatform().daemon().start(() -> {
@@ -147,9 +155,12 @@ public class ClientConsoleController {
   }
   
   public void clearDisplayAndMore() {
-    View.clearDisplayAndMore(lines, lines);
+    View.clearDisplayAndMore(lines);
   }
   
+  /**
+   * Stop the auto refresh
+   */
   public void stopAutoRefresh() {
     viewCanRefresh.set(false);
     clearDisplayAndMore();
@@ -370,12 +381,15 @@ public class ClientConsoleController {
     var matcher = pattern.matcher(input);
     if (matcher.find()) {
       var hidden = Optional.ofNullable(matcher.group("hidden")).isPresent();
+      var chainSize = Optional.ofNullable(matcher.group("size"))
+                        .map(Integer::parseInt)
+                        .orElse(0);
       var codexId = currentCodex().id();
       if (!currentCodex().isComplete()) {
         if (api.isDownloading(codexId)) {
           api.stopDownloading(currentCodex().id());
         } else {
-          api.download(currentCodex().id(), hidden);
+          api.download(currentCodex().id(), hidden, chainSize);
         }
         mode = Mode.CODEX_DETAILS;
         setCurrentView(new CodexView(selectedCodexForDetails, lines, cols, api));
@@ -635,7 +649,9 @@ public class ClientConsoleController {
       var field = matcher.group("field"); // @Todo handle sorting
       var order = matcher.group("order"); //
       var name = matcher.group("name");
-      
+      logger.info(STR."Local is : \{Locale.getDefault()
+                                          .toString()}");
+      logger.info(STR."Search: \{at} \{range} \{date} \{time} \{field} \{order} \{name}");
       var options = 0;
       if (at != null) {
         options |= Search.Option.AT_DATE.value();
@@ -652,17 +668,21 @@ public class ClientConsoleController {
         var datetimeStr = time == null ? date : STR."\{date} \{time}";
         var simpleFormatter = new SimpleDateFormat();
         var dateFormats = View.getDateFormats(Locale.getDefault());
-        try {
-          for(var format : dateFormats){
+        Long parsedEpoch = null;
+        for(var format : dateFormats){
+          try {
             simpleFormatter.applyPattern(format);
             var parsedDate = simpleFormatter.parse(datetimeStr);
-            epoch = parsedDate.toInstant().getEpochSecond();
-            break;
+            parsedEpoch = parsedDate.toInstant().getEpochSecond();
+          } catch (DateTimeParseException | ParseException e) {
+            logger.warning(STR."Error while parsing date: \{e.getMessage()}");
           }
-          logger.info(STR."Parsed date: \{epoch}");
-        } catch (DateTimeParseException | ParseException e) {
+        }
+        if(parsedEpoch == null){
           return Optional.of(false);
         }
+        epoch = parsedEpoch;
+        logger.info(STR."Parsed date: \{epoch}");
       }
       var search = new Search(name, options, epoch, View.maxLinesView(lines), 0);
       var response = api.searchCodexes(search);
@@ -673,6 +693,23 @@ public class ClientConsoleController {
       lastSearch = search;
       lastSearchResults.clear();
       lastSearchResults.addAll(Arrays.asList(results.results()));
+      
+      if(field != null){
+        Comparator<SearchResponse.Result> comparator;
+        List<SearchResponse.Result> sortedResults;
+        if(field.equals("date")){
+          comparator = Comparator.comparing(SearchResponse.Result::creationDate);
+        } else {
+          comparator =  Comparator.comparing(SearchResponse.Result::codexName);
+        }
+        sortedResults = lastSearchResults.stream().sorted(comparator).toList();
+        if(order != null && order.equals("desc")){
+          sortedResults = sortedResults.reversed();
+        }
+        lastSearchResults.clear();
+        lastSearchResults.addAll(sortedResults);
+      }
+      
       mode = Mode.CODEX_SEARCH;
       currentSelector = View.selectorFromList("Search results", lines, cols, lastSearchResults, View::codexSearchResultShortDescription);
       setCurrentView(currentSelector);
@@ -697,7 +734,7 @@ public class ClientConsoleController {
    */
   public void startReader() throws IOException {
     var reader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
-    StringBuilder inputField = new StringBuilder();
+    var inputField = new StringBuilder();
     var c = 0;
     var escape = false;
     while ((c = reader.read()) != -1 && isAlive()) {
@@ -780,7 +817,21 @@ public class ClientConsoleController {
               :f, :find [:at(:before|:after)) <date>] [(name|date):(asc|desc)] <name>
                 Interrogate the server for codexes
                 
-              :f - Back to the last search results
+                :at - Search at a specific date
+                :before - Search before a specific date
+                :after - Search after a specific date
+                <date> - The date to search (dd/MM/yyyy or MM/dd/yyyy with optionally HH:mm)
+                name/date - Sort by name or date
+                asc/desc - Sort ascending or descending. Default is ascending
+                
+                Examples:
+                  :f :at:before 12/12/2021 name:asc my road trip photos
+                  :f date:desc the.matrix.1999
+                 
+                  To search all codexes
+                  :f <space>
+                
+              :f - Go back to the last search results
               
               :mycdx
                 Display the [CODEX LIST]

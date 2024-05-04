@@ -7,10 +7,8 @@ import fr.uge.chadow.client.cli.display.View;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
-import java.util.logging.Logger;
 
 public class SelectorView<T> implements Selectable<T>, View {
-  private static final Logger logger = Logger.getLogger(SelectorView.class.getName());
   private final List<Map.Entry<T, List<String>>> linesByItem;
   private final String title;
   private final int lines;
@@ -42,11 +40,6 @@ public class SelectorView<T> implements Selectable<T>, View {
   private void selectFirstInPage() {
     itemPointerIndex = scrollableView.getScroller().getA();
   }
-  
-  private void selectLastInPage() {
-    itemPointerIndex = scrollableView.getScroller().getB() - 1;
-  }
-  
   @Override
   public T get() {
     return linesByItem.get(itemPointerIndex)

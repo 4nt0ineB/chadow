@@ -27,7 +27,7 @@ public class DirectMessages {
     Objects.requireNonNull(username);
     this.id = id;
     this.username = username;
-    logger.info("New dm with " + username);
+    logger.info(STR."New dm with \{username}");
   }
   
   public UUID id() {
@@ -102,15 +102,6 @@ public class DirectMessages {
     }
   }
   
-  public void clearMessages() {
-    lock.lock();
-    try {
-      messages.clear();
-    } finally {
-      lock.unlock();
-    }
-  }
-  
   /**
    * Change the username of the recipient.
    * This will also change the username of all the messages
@@ -120,7 +111,7 @@ public class DirectMessages {
   void changeUsername(String newUsername) {
     lock.lock();
     try {
-      messages.stream().map(message -> {
+      messages.replaceAll(message -> {
         if(message.username().equals(username)) {
           return  new WhisperMessage(newUsername, message.txt(), message.epoch());
         }

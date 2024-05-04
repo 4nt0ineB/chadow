@@ -38,9 +38,9 @@ public class CodexView implements View {
   
   @Override
   public void draw() throws IOException {
-    var newview = toView(codexStatus, lines, cols);
-    newview.setAsSamePosition(scrollableView);
-    scrollableView = newview;
+    var newView = toView(codexStatus, lines, cols);
+    newView.setAsSamePosition(scrollableView);
+    scrollableView = newView;
     scrollableView.draw();
     logger.info("Drawing CodexView");
   }

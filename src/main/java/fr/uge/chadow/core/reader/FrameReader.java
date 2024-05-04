@@ -2,8 +2,6 @@ package fr.uge.chadow.core.reader;
 
 
 import fr.uge.chadow.core.protocol.*;
-import fr.uge.chadow.core.protocol.client.*;
-import fr.uge.chadow.core.protocol.server.*;
 
 import java.nio.ByteBuffer;
 import java.util.HashMap;

@@ -33,15 +33,8 @@ public class Display {
     this.cols = cols;
   }
   
-  static String lowInfoBar(int columns) {
-    return STR."\{String.valueOf(CLIColor.CYAN)}\{CLIColor.BOLD}\{"\u25A0".repeat(columns)}\{CLIColor.RESET}\n";
-  }
-  
   /**
    * Set the dimensions of the view
-   *
-   * @param lines
-   * @param cols
    */
   public void setDimensions(int lines, int cols) {
     if (lines <= 0 || cols <= 0) {

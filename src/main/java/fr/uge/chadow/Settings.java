@@ -23,7 +23,7 @@ public class Settings {
   public static String randomLogin()  {
     var login = "user";
     // digest the env vars with a loop
-    MessageDigest digest = null;
+    MessageDigest digest;
     try {
       digest = MessageDigest.getInstance("SHA-1");
       Map<String, String> env = System.getenv();
@@ -36,7 +36,7 @@ public class Settings {
       Logger.getLogger(Settings.class.getName()).severe("SHA-1 algorithm not found");
     }
     var random = new Random();
-    return login + random.nextInt(1000);
+    return login + random.nextInt(10000);
   }
   
   public void addStringSettings(String name, String s) {
@@ -130,7 +130,7 @@ public class Settings {
       }
       intSettings.put(name, intValue);
     } else if (expectedType == boolean.class) {
-      if (!Pattern.compile("true|false|1|0").matcher((CharSequence) value).matches()) {
+      if (!Pattern.compile("true|false|1|0").matcher(value).matches()) {
         throw new IOException(STR."Invalid boolean value \"\{value}\" for setting \"\{name}\"");
       }
       stringSettings.put(name, value);

@@ -2,7 +2,6 @@ package fr.uge.chadow.client;
 
 
 import fr.uge.chadow.Settings;
-import fr.uge.chadow.SettingsParser;
 import fr.uge.chadow.core.ProxyManager;
 import fr.uge.chadow.core.context.*;
 import fr.uge.chadow.core.TCPConnectionManager;
@@ -129,8 +128,8 @@ public class ClientAPI {
    * Start the downloader runner
    * This method will wait for sockets requested by the client to download a codex.
    * When sockets is received, will create a downloader context for each socket
-   * @throws IOException
-   * @throws InterruptedException
+   * @throws IOException if an I/O error occurs when creating the codex file tree
+   * @throws InterruptedException if the client was interrupted while waiting for the sockets
    */
   private void startDownloaderRunner() throws IOException, InterruptedException {
     while (!Thread.interrupted() && status.equals(STATUS.CONNECTED)) {
@@ -179,7 +178,7 @@ public class ClientAPI {
           continue;
         }
         var downloadIsHidden = codexController.getCodexStatus(codexId).orElseThrow().isDownloadingHidden();
-        requestSocketForDownload(codexId, downloadIsHidden);
+        requestSocketForDownload(codexId, downloadIsHidden, settings.getInt("proxyChainSize"));
       }
       toRemove.forEach(currentDownloads::remove);
     }
@@ -195,10 +194,9 @@ public class ClientAPI {
     if(socket.isEmpty()) {
       return false;
     }
-    addContext(socket.orElseThrow(), key -> new ProxyBridgeRightSideContext(key, clientAsServerContext));
+    connectionManager.addContext(socket.orElseThrow(), key -> new ProxyBridgeRightSideContext(key, clientAsServerContext));
     return true;
   }
-  
   
   /**
    * Register a downloader context.
@@ -230,7 +228,8 @@ public class ClientAPI {
   public int howManyDownloaders(String codexId) {
     lock.lock();
     try {
-      logger.info(STR."NUMBER OF DOWNLOADERS : " + currentDownloads.getOrDefault(codexId, Set.of()).size());
+      logger.info(STR."NUMBER OF DOWNLOADERS : \{currentDownloads.getOrDefault(codexId, Set.of())
+                                                                 .size()}");
       return currentDownloads.getOrDefault(codexId, Set.of()).size();
     } finally {
       lock.unlock();
@@ -245,7 +244,7 @@ public class ClientAPI {
   public void registerSharer(String codexId) {
     lock.lock();
     try {
-      currentSharing.computeIfAbsent(codexId, k -> 0);
+      currentSharing.putIfAbsent(codexId, 0);
       currentSharing.compute(codexId, (k, v) -> v + 1);
     } finally {
       lock.unlock();
@@ -307,12 +306,6 @@ public class ClientAPI {
     }
   }
   private record SocketResponse(SocketField[] sockets, int[] chainId) {
-    public SocketResponse {
-      if (chainId != null && chainId.length != chainId.length) {
-        throw new IllegalArgumentException("The number of chain ids must be equal to the number of sockets");
-      }
-    }
-  
   }
   
   /**
@@ -326,23 +319,9 @@ public class ClientAPI {
     if(codexStatus.isEmpty()) {
       return;
     }
-    addContext(socket, key -> new DownloaderContext(key, this, codexStatus.orElseThrow(), chainId));
+    connectionManager.addContext(socket, key -> new DownloaderContext(key, this, codexStatus.orElseThrow(), chainId));
   }
   
-  private void addContext(SocketField socket, Function<SelectionKey, Context> contextSupplier) {
-    InetAddress address;
-    try {
-      address = InetAddress.getByAddress(socket.ip());
-    } catch (UnknownHostException e) {
-      logger.warning("Could not resolve the address of the sharer");
-      return;
-    }
-    var addr = new InetSocketAddress(address, socket.port());
-    connectionManager.supplyConnectionData(key -> {
-      var context = contextSupplier.apply(key);
-      return new TCPConnectionManager.ConnectionData(context, addr);
-    });
-  }
   
   public void close() {
     lock.lock();
@@ -628,20 +607,20 @@ public class ClientAPI {
    * @param id the id of the codex
    * @param hidden if the codex must be downloaded in hidden mode
    */
-  public void download(String id, boolean hidden) {
+  public void download(String id, boolean hidden, int chainSize) {
     lock.lock();
     try {
       codexController.download(id, hidden);
-      requestSocketForDownload(id, hidden);
+      requestSocketForDownload(id, hidden, chainSize);
     } finally {
       lock.unlock();
     }
   }
   
-  private void requestSocketForDownload(String codexId, boolean hidden) {
+  private void requestSocketForDownload(String codexId, boolean hidden, int chainSize) {
     clientContext.queueFrame(new RequestDownload(codexId, (byte) (hidden ? 1 : 0),
         settings.getInt("sharersRequired"),
-        settings.getInt("proxyChainSize")));
+        chainSize != 0 ? chainSize : settings.getInt("proxyChainSize")));
     codexIdOfAskedDownload.addLast(codexId);
   }
   
@@ -800,8 +779,7 @@ public class ClientAPI {
       searchResponseQueue.clear();
       clientContext.queueFrame(search);
       logger.info(STR."(searchCodexes) searching for codexes with name \{search.codexName()}");
-      SearchResponse response = null;
-      response = searchResponseQueue.poll(settings.getInt("searchTimeout"), java.util.concurrent.TimeUnit.SECONDS);
+      SearchResponse response = searchResponseQueue.poll(settings.getInt("searchTimeout"), java.util.concurrent.TimeUnit.SECONDS);
       if (response == null) {
         return Optional.empty();
       }

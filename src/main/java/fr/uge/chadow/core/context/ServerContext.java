@@ -45,7 +45,7 @@ public final class ServerContext extends Context implements ProxyBridgeLeftSideC
           silentlyClose();
           return;
         }
-  
+        // TODO : Send error
         login = register.username();
         if(login.length() > settings.getInt("maxLoginLength")) {
           silentlyClose();

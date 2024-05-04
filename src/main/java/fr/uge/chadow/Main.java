@@ -83,7 +83,7 @@ public class Main {
             
           --maxLoginLength:<int>
             Maximum length of a username.
-            Default is 20.
+            Default is 16.
           
         """;
     System.out.println(str);
@@ -93,7 +93,7 @@ public class Main {
     // parse args
     var sp = new SettingsParser()
         .addAsInt("port", 7777)
-        .addAsInt("maxLoginLength", 20)
+        .addAsInt("maxLoginLength", 16)
         .addAsString("downloadPath", Settings.defaultDownloadPath())
         .addAsBoolean("log", false);
     

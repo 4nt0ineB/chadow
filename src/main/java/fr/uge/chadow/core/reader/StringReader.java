@@ -63,6 +63,6 @@ public class StringReader implements Reader<String> {
 		expectedSize = -1;
 		intReader.reset();
 		internalBuffer.clear();
-	};
+	}
 	
 }

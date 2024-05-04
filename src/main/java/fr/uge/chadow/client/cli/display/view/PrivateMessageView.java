@@ -8,7 +8,6 @@ import fr.uge.chadow.client.ClientConsoleController;
 import fr.uge.chadow.client.DirectMessages;
 import fr.uge.chadow.core.protocol.WhisperMessage;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -54,9 +53,6 @@ public class PrivateMessageView implements View {
   
   /**
    * Set the dimensions of the view
-   *
-   * @param lines
-   * @param cols
    */
   public void setDimensions(int lines, int cols) {
     if (lines <= 0 || cols <= 0) {
@@ -77,10 +73,8 @@ public class PrivateMessageView implements View {
   
   /**
    * Draw the view in the current mode
-   *
-   * @throws IOException
    */
-  public void draw() throws IOException {
+  public void draw(){
     if (mode == ClientConsoleController.Mode.DIRECT_MESSAGES_LIVE) {
       updateMessages();
       
@@ -94,7 +88,7 @@ public class PrivateMessageView implements View {
    * Get the max length of the usernames
    * Default size is 5
    *
-   * @return
+   * @return the max length of the usernames
    */
   private int getMaxUserLength() {
     return Math.max(5, Math.max(privateDiscussion.username().length(), api.login().length()));
@@ -106,9 +100,8 @@ public class PrivateMessageView implements View {
    * where each line is formatted as follow:
    * <[date] [userx] | [message] > | [usery presence if any]
    *
-   * @throws IOException
    */
-  private String chatDisplay() throws IOException {
+  private String chatDisplay() {
     var sb = new StringBuilder();
     var maxUserLength = getMaxUserLength();
     var lineIndex = 0;
@@ -157,7 +150,7 @@ public class PrivateMessageView implements View {
     var sb = new StringBuilder();
     sb.append(CLIColor.CYAN_BACKGROUND);
     sb.append(CLIColor.WHITE);
-    var title = (STR."%-\{cols - 1}s ").formatted(STR."CHADOW CLIENT (" + lines + "x" + cols + STR.") Direct messages with \{privateDiscussion.username()}");
+    var title = (STR."%-\{cols - 1}s ").formatted(STR."CHADOW CLIENT (\{lines},\{cols}) Direct messages with \{privateDiscussion.username()}");
     sb.append(title);
     sb.append(CLIColor.RESET);
     sb.append('\n');
@@ -167,7 +160,7 @@ public class PrivateMessageView implements View {
   /**
    * Get the last messages to display
    *
-   * @return
+   * @return the last messages to display
    */
   private List<WhisperMessage> getFormattedMessages() {
     var subList = getMessagesToDisplay();
@@ -200,9 +193,9 @@ public class PrivateMessageView implements View {
    * the first line will contain the user login and date, the following lines will only contain the message.
    * This allows to display the message in a more readable way.
    *
-   * @param message
-   * @param lineLength
-   * @return
+   * @param message the message to format
+   * @param lineLength the max length of a line
+   * @return a stream of formatted messages
    */
   private Stream<WhisperMessage> formatMessage(WhisperMessage message, int lineLength) {
     

@@ -2,10 +2,13 @@ package fr.uge.chadow.core;
 
 import fr.uge.chadow.core.context.Context;
 import fr.uge.chadow.core.protocol.Frame;
+import fr.uge.chadow.core.protocol.field.SocketField;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
@@ -55,6 +58,21 @@ public class TCPConnectionManager {
   public void supplyConnectionData(Function<SelectionKey, ConnectionData> connectionDataSupplier) {
     contextQueue.add(connectionDataSupplier);
     selector.wakeup();
+  }
+  
+  public void addContext(SocketField socket, Function<SelectionKey, Context> contextSupplier) {
+    InetAddress address;
+    try {
+      address = InetAddress.getByAddress(socket.ip());
+    } catch (UnknownHostException e) {
+      logger.warning("Could not resolve the address of the sharer");
+      return;
+    }
+    var addr = new InetSocketAddress(address, socket.port());
+    supplyConnectionData(key -> {
+      var context = contextSupplier.apply(key);
+      return new TCPConnectionManager.ConnectionData(context, addr);
+    });
   }
   
   public void launch() throws IOException {
@@ -119,8 +137,8 @@ public class TCPConnectionManager {
     }
     sc.configureBlocking(false);
     logger.info(STR."Connection accepted from: \{sc.getRemoteAddress()}");
-    var sckey = sc.register(selector, SelectionKey.OP_READ);
-    sckey.attach(sharerContextFactory.apply(sckey));
+    var serverSocketKey = sc.register(selector, SelectionKey.OP_READ);
+    serverSocketKey.attach(sharerContextFactory.apply(serverSocketKey));
   }
   
   public int listeningPort() {

@@ -57,15 +57,15 @@ public enum CLIColor {
    * @return an ansi escape sequence
    */
   public static String rgb(int r, int g, int b) {
-    return "\033[38;2;" + (r & 0xFF) + ";" + (g & 0xFF) + ";" + (b & 0xFF) + "m";
+    return STR."\033[38;2;\{r & 0xFF};\{g & 0xFF};\{b & 0xFF}m";
   }
 
   /**
    * Generate a fancy random ansi color
    * based on the hashcode of a string
    *
-   * @param input
-   * @return
+   * @param input the string to hash
+   * @return an ansi escape sequence
    */
   public static String stringToColor(String input) {
     Objects.requireNonNull(input);

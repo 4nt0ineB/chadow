@@ -3,19 +3,15 @@ package fr.uge.chadow.core.reader;
 import fr.uge.chadow.core.protocol.field.Codex;
 import fr.uge.chadow.core.protocol.field.ProxyNodeSocket;
 import fr.uge.chadow.core.protocol.field.SocketField;
-import fr.uge.chadow.core.protocol.server.DiscoveryResponse;
 import fr.uge.chadow.core.protocol.server.SearchResponse;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.RecordComponent;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.logging.Logger;
 
 public class GlobalReader<T extends Record> implements Reader<T> {
-  private static final Logger logger = Logger.getLogger(GlobalReader.class.getName());
 
   private enum State {
     DONE, WAITING, ERROR

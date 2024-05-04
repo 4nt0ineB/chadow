@@ -1,7 +1,6 @@
 package fr.uge.chadow.core.reader;
 
 import fr.uge.chadow.core.protocol.field.SocketField;
-import fr.uge.chadow.core.protocol.server.DiscoveryResponse;
 import fr.uge.chadow.core.protocol.server.Event;
 import org.junit.Test;
 
@@ -10,7 +9,6 @@ import java.util.Arrays;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
 
 public class ArrayReaderTest {
   @Test

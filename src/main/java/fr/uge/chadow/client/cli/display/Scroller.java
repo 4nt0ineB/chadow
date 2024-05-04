@@ -9,7 +9,6 @@ public class Scroller {
   private int currentLine;
   private int lines;
   
-  
   public Scroller(int lines, int pageHeight) {
     this.pageHeight = pageHeight;
     this.lines = lines;

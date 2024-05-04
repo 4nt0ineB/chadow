@@ -177,7 +177,7 @@ public sealed abstract class Context permits ClientAsServerContext, ClientContex
    * The convention is that both buffers are in write-mode before the call to
    * doRead and after the call
    *
-   * @throws IOException
+   * @throws IOException if an I/O error occurs while reading
    */
   public void doRead() throws IOException {
     if (sc.read(bufferIn) == -1) {
@@ -194,11 +194,11 @@ public sealed abstract class Context permits ClientAsServerContext, ClientContex
    * The convention is that both buffers are in write-mode before the call to
    * doWrite and after the call
    *
-   * @throws IOException
+   * @throws IOException if an I/O error occurs while writing
    */
   
   public void doWrite() throws IOException {
-    var r = sc.write(bufferOut.flip());
+    sc.write(bufferOut.flip());
     bufferOut.compact();
     processOut();
     updateInterestOps();

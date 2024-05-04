@@ -7,7 +7,6 @@ import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.client.ClientConsoleController;
 import fr.uge.chadow.core.protocol.YellMessage;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -44,8 +43,8 @@ public class ChatView implements View {
   /**
    * Set the dimensions of the view
    *
-   * @param lines
-   * @param cols
+   * @param lines the number of lines
+   * @param cols the number of columns
    */
   public void setDimensions(int lines, int cols) {
     if (lines <= 0 || cols <= 0) {
@@ -68,23 +67,18 @@ public class ChatView implements View {
   
   /**
    * Draw the view in the current mode
-   *
-   * @throws IOException
    */
-  public void draw() throws IOException {
+  public void draw() {
     clear();
     System.out.print(chatHeader());
     System.out.print(chatDisplay());
-    if (mode == ClientConsoleController.Mode.CHAT_LIVE_REFRESH) {
-      //messageScroller.setLines(formattedMessages.size());
-    }
   }
   
   /**
    * Get the max length of the usernames
    * Default size is 5
    *
-   * @return
+   * @return the length of the longest username
    */
   private int getMaxUserLength() {
     return clientAPI.users()
@@ -186,7 +180,7 @@ public class ChatView implements View {
   /**
    * Get the last messages to display
    *
-   * @return
+   * @return the list of messages to display
    */
   private List<YellMessage> getFormattedMessages() {
     var list = getMessagesToDisplay();
@@ -232,9 +226,9 @@ public class ChatView implements View {
    * the first line will contain the user login and date, the following lines will only contain the message.
    * This allows to display the message in a more readable way.
    *
-   * @param message
-   * @param lineLength
-   * @return
+   * @param message the message to format
+   * @param lineLength the max length of a line
+   * @return a stream of formatted messages
    */
   private Stream<YellMessage> formatMessage(YellMessage message, int lineLength) {
     

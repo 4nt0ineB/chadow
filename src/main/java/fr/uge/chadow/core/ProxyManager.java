@@ -1,7 +1,5 @@
 package fr.uge.chadow.core;
 
-import fr.uge.chadow.core.context.ClientAsServerContext;
-import fr.uge.chadow.core.context.ProxyBridgeRightSideContext;
 import fr.uge.chadow.core.protocol.field.SocketField;
 
 import java.util.HashMap;

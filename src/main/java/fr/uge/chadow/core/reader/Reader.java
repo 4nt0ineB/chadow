@@ -3,13 +3,8 @@ package fr.uge.chadow.core.reader;
 import java.nio.ByteBuffer;
 
 public interface Reader<T> {
-
-    public static enum ProcessStatus { DONE, REFILL, ERROR };
-
-    public ProcessStatus process(ByteBuffer bb);
-
-    public T get();
-
-    public void reset();
-
+    enum ProcessStatus { DONE, REFILL, ERROR }
+    ProcessStatus process(ByteBuffer bb);
+    T get();
+    void reset();
 }

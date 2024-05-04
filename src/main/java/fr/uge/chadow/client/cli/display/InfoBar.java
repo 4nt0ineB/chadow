@@ -11,7 +11,6 @@ public class InfoBar {
   private final Consumer<InfoBar> updater;
   private int cols;
   
-  
   public InfoBar(int cols, Consumer<InfoBar> updater) {
     this.cols = cols;
     this.updater = updater;

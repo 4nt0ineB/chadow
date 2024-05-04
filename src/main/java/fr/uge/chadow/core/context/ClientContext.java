@@ -4,7 +4,6 @@ import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.core.TCPConnectionManager;
 import fr.uge.chadow.core.protocol.*;
 import fr.uge.chadow.core.protocol.client.Discovery;
-import fr.uge.chadow.core.protocol.client.HereChunk;
 import fr.uge.chadow.core.protocol.client.ProxyOk;
 import fr.uge.chadow.core.protocol.client.Register;
 import fr.uge.chadow.core.protocol.field.SocketField;
@@ -73,7 +72,6 @@ public final class ClientContext extends Context {
         if(response) {
           queueFrame(new ProxyOk(proxy.chainId()));
         }
-        // todo answer KO ??
       }
       default -> {
         logger.warning("No action for the received frame");

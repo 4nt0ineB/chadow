@@ -70,9 +70,7 @@ public class GlobalReaderTest {
   @Test
   public void errorGet() {
     var reader = new GlobalReader<>(YellMessage.class);
-    assertThrows(IllegalStateException.class, () -> {
-      var res = reader.get();
-    });
+    assertThrows(IllegalStateException.class, reader::get);
   }
 
   @Test
