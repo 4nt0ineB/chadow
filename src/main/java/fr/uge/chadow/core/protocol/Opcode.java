@@ -5,13 +5,13 @@ import fr.uge.chadow.core.protocol.client.Propose;
 import fr.uge.chadow.core.protocol.client.Request;
 import fr.uge.chadow.core.protocol.server.*;
 import fr.uge.chadow.core.protocol.client.Register;
+import fr.uge.chadow.core.protocol.server.Error;
 import fr.uge.chadow.core.reader.GlobalReader;
 
 import java.util.HashMap;
 import java.util.Optional;
 
 public enum Opcode {
-  // ERROR
   REGISTER(Register.class),
   OK(OK.class),
   DISCOVERY(Discovery.class),
@@ -37,6 +37,7 @@ public enum Opcode {
   PROXYOK(ProxyOk.class),
   HIDDEN(Hidden.class),
   UPDATE(Update.class),
+  ERROR(Error.class),
   ;
 
   private static final HashMap<Class<? extends Record>, Opcode> classMap = new HashMap<>();

@@ -19,6 +19,7 @@ import fr.uge.chadow.core.protocol.field.Codex;
 import fr.uge.chadow.core.protocol.field.ProxyNodeSocket;
 import fr.uge.chadow.core.protocol.field.SocketField;
 import fr.uge.chadow.core.protocol.server.*;
+import fr.uge.chadow.core.protocol.server.Error;
 
 public class Server {
   /**
@@ -72,8 +73,7 @@ public class Server {
       logger.info(STR."Possible sharers: \{possibleSharers}");
 
       if (possibleSharers <= 0) {
-        // TODO : send an error message
-        // serverContext.queueFrame(new Error("Not enough proxies available"));
+        serverContext.queueFrame(new Error("Not enough proxies available"));
         return;
       }
 
