@@ -1,3 +1,7 @@
+image: docker:latest
+services:
+  - docker:dind
+
 stages:
   - build
   - deploy
@@ -6,8 +10,6 @@ build:
   stage: build
   script:
     - docker build -t chadow-image .
-  only:
-    - main
 
 deploy:
   stage: deploy
@@ -16,4 +18,5 @@ deploy:
   only:
     - main
   tags:
-    - docker
+    - shell
+  shell: bash
