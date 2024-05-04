@@ -12,6 +12,6 @@ deploy:
         docker rm $CONTAINER_ID
       fi
     - docker build -t chadow-image .
-    - docker run -d --restart always -p 7777:7777 chadow-image
+    - docker run -d --restart unless-stopped -p 7777:7777 chadow-image
   only:
     - main
