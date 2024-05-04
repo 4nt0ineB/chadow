@@ -389,12 +389,12 @@ public class Server {
   private ServerProxyDetails serverProxyDetails;
   private final Settings settings;
   
-  public Server(Settings settings) throws IOException {
+  public Server(Settings settings)  {
     this.settings = settings;
   }
 
   public void start() throws IOException {
-    this.connectionManager = new TCPConnectionManager(settings.getInt("port"), key -> new ServerContext(this, key));
+    this.connectionManager = new TCPConnectionManager(settings.getInt("port"), key -> new ServerContext(this, key, settings));
     connectionManager.launch();
   }
 
@@ -635,23 +635,5 @@ public class Server {
     clients.remove(login);
     proxyHandler.removeAllInstancesOfClient(login);
     broadcast(new Event((byte) 0, login));
-  }
-
-/*
-  public static void main(String[] args) {
-    if (args.length != 1) {
-      usage();
-      return;
-    }
-    try {
-      new Server(Integer.parseInt(args[0])).start();
-    } catch (IOException e) {
-      logger.severe(STR."Error while launching server: \{e.getMessage()}");
-    }
-  }
-*/
-
-  private static void usage() {
-    System.out.println("Usage : ServerSumBetter port");
   }
 }

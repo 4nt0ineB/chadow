@@ -1,5 +1,6 @@
 package fr.uge.chadow.core.context;
 
+import fr.uge.chadow.Settings;
 import fr.uge.chadow.core.protocol.*;
 import fr.uge.chadow.core.protocol.client.*;
 import fr.uge.chadow.core.protocol.field.SocketField;
@@ -16,6 +17,7 @@ import java.util.logging.Logger;
 public final class ServerContext extends Context implements ProxyBridgeLeftSideContext {
   private static final Logger logger = Logger.getLogger(Server.class.getName());
   private static final int BUFFER_SIZE = 1_024;
+  private final Settings settings;
   private final Server server;
   private boolean closed = false;
   private String login;
@@ -28,9 +30,10 @@ public final class ServerContext extends Context implements ProxyBridgeLeftSideC
   private boolean isProxy = false;
   
 
-  public ServerContext(Server server, SelectionKey key) {
+  public ServerContext(Server server, SelectionKey key, Settings settings) {
     super(key, BUFFER_SIZE);
     this.server = server;
+    this.settings= settings;
   }
 
   @Override
@@ -42,8 +45,12 @@ public final class ServerContext extends Context implements ProxyBridgeLeftSideC
           silentlyClose();
           return;
         }
-
+  
         login = register.username();
+        if(login.length() > settings.getInt("maxLoginLength")) {
+          silentlyClose();
+          return;
+        }
         serverPublicAddress = register.serverPublicAddress();
         var remoteInetSocketAddress = (InetSocketAddress) super.getSocket().getRemoteAddress();
         var listeningAddress = new InetSocketAddress(remoteInetSocketAddress.getAddress(), register.listenerPort());

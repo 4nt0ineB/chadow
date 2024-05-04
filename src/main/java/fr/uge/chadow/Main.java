@@ -7,7 +7,6 @@ import fr.uge.chadow.server.Server;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
@@ -82,7 +81,7 @@ public class Main {
             Start the server on the given port.
             Default is 7777.
             
-          --maxUsernameLength:<int>
+          --maxLoginLength:<int>
             Maximum length of a username.
             Default is 20.
           
@@ -94,7 +93,7 @@ public class Main {
     // parse args
     var sp = new SettingsParser()
         .addAsInt("port", 7777)
-        .addAsInt("maxUsernameLength", 20)
+        .addAsInt("maxLoginLength", 20)
         .addAsString("downloadPath", Settings.defaultDownloadPath())
         .addAsBoolean("log", false);
     
