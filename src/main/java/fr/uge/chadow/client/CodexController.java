@@ -144,6 +144,12 @@ public class CodexController {
     return codexes.values().stream().toList();
   }
   
+  public Optional<CodexStatus> findFirstStartingWith(String idPrefix) {
+    return codexes.values().stream()
+                   .filter(codex -> codex.codex().id().startsWith(idPrefix))
+                   .findFirst();
+  }
+  
   /**
    * Check if a codex exists locally
    * @param id the id of the codex

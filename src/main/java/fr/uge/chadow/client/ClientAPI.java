@@ -482,15 +482,15 @@ public class ClientAPI {
     return List.copyOf(codexController.codexesStatus());
   }
   
-  public Optional<CodexStatus> getCodex(String id) {
-    var codex = codexController.getCodexStatus(id);
+  public Optional<CodexStatus> getCodex(String codexId) {
+    var codex = codexController.getCodexStatus(codexId);
     if (codex.isPresent()) {
       return Optional.of(codex.orElseThrow());
     }
     // didn't find the codex, request it
     requestCodexResponseQueue.clear();
-    clientContext.queueFrame(new Request(id));
-    logger.info(STR."(getCodex) requesting codex (id: \{id})");
+    clientContext.queueFrame(new Request(codexId));
+    logger.info(STR."(getCodex) requesting codex (id: \{codexId})");
     Optional<Codex> fetchedCodex = null;
     try {
       fetchedCodex = requestCodexResponseQueue.poll(settings.getInt("requestCodexTimeout"), java.util.concurrent.TimeUnit.SECONDS);
@@ -502,6 +502,21 @@ public class ClientAPI {
       return Optional.empty();
     }
     return Optional.of(codexController.addFromFetchedCodex(fetchedCodex.orElseThrow()));
+  }
+  
+  
+  public String codexIdOrFirstGuess(String codexId) {
+    lock.lock();
+    try {
+      var codex = codexController.getCodexStatus(codexId);
+      if (codex.isPresent()) {
+        return codexId;
+      }
+      var firstGuess = codexController.findFirstStartingWith(codexId);
+      return firstGuess.isPresent() ? firstGuess.orElseThrow().codex().id() : codexId;
+    } finally {
+      lock.unlock();
+    }
   }
   
   public void saveFetchedCodex(Codex codex) {
@@ -836,10 +851,10 @@ public class ClientAPI {
     // test codex
     var login = settings.getStr("login");
     if (login.equals("Alan1") || login.equals("Alan2") || login.equals("Alan3")) {
-      var status = codexController.createFromPath("my codex", "/mnt/d/testReseau2");
+      //var status = codexController.createFromPath("my codex", "/mnt/d/testReseau2");
       //var status = codexController.createFromPath("test", "/home/alan1/Documents/tmp/tablette");
       //var status = codexController.createFromPath("test", "/home/alan1/Pictures");
-      //var status = codexController.createFromPath("test", "/home/alan1/Downloads/aaa");
+      var status = codexController.createFromPath("test", "/home/alan1/Downloads/aaa");
       share(status.id());
     }
   }

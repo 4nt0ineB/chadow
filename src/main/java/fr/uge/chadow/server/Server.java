@@ -441,7 +441,7 @@ public class Server {
     //logger.info(STR."map : \{codexes}");
     var codex = codexes.keySet().stream()
             .map(CodexRecord::codex)
-            .filter(c -> c.id().equals(codexId))
+            .filter(c -> c.id().startsWith(codexId))
             .findFirst()
             .orElse(null);
     if (codex == null) {

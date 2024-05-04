@@ -624,11 +624,12 @@ public class ClientConsoleController {
     if (matcherRetrieve.find()) {
       var fingerprint = matcherRetrieve.group(1);
       logger.info(STR.":cdx: \{fingerprint}\n");
-      Optional<CodexStatus> codex = api.getCodex(fingerprint);
+      Optional<CodexStatus> codex = api.getCodex(api.codexIdOrFirstGuess(fingerprint));
       if(codex.isEmpty()){
         return Optional.of(true);
       }
       selectedCodexForDetails = codex.orElseThrow();
+      logger.info(STR."Codex: \{selectedCodexForDetails.id()}");
       mode = Mode.CODEX_DETAILS;
       setCurrentView(new CodexView(selectedCodexForDetails, lines, cols, api));
       currentView.scrollTop();
@@ -840,6 +841,9 @@ public class ClientConsoleController {
                 Retrieves and display the [CODEX] info with the given SHA-1
                 if the codex is not present locally, the server will be interrogated
                 
+                Example:
+                  :cdx:2da27a8b8c8e96970bf37fe44ba11945ad2a891f
+                
               :exit - Exit the application
               
             [CHAT]
@@ -862,8 +866,10 @@ public class ClientConsoleController {
             [CODEX]
               (scrollable)
               :share - Share/stop sharing the codex
-              :dl, :download (h|hidden)
+              :dl, :download (h|hidden) (size)
                 Download/stop downloading the codex, when downloading live refresh is enabled
+                When start downloading goes into live refresh to see the download progress
+                
               :live - Switch to live refresh to see the changes in real time
             """;
     
