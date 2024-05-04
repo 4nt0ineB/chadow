@@ -591,10 +591,6 @@ public class Server {
     proxyHandler.removeCodexId(codexId);
   }
   
-  public boolean saveProxyRoute(int chainId, SocketField socket) {
-    return proxyManager.saveProxyRoute(chainId, socket);
-  }
-  
   public boolean setUpBridge(int chainId, ProxyBridgeLeftSideContext clientAsServerContext) {
     var socket = proxyManager.getNextHopSocket(chainId);
     if(socket.isEmpty()) {
