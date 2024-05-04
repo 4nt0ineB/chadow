@@ -1,14 +1,19 @@
 stages:
+  - build
   - deploy
+
+build:
+  stage: build
+  script:
+    - docker build -t chadow-image .
+  only:
+    - main
 
 deploy:
   stage: deploy
   script:
-    - git pull origin main
-    - mvn package -DskipTests
-    - pgrep -f "java.*chadow" > /dev/null && kill $(pgrep -f "java.*chadow") || true
-    - nohup java -jar --enable-preview target/chadow-1.0.0.jar --server 7777 > /dev/null 2>&1 &
+    - docker run -d --restart always -p 7777:7777 chadow-image
   only:
     - main
   tags:
-    - shell
+    - docker
