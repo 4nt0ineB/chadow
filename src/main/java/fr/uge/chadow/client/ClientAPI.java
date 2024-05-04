@@ -558,25 +558,35 @@ public class ClientAPI {
     }
   }
   
+  String getUserOrFirstGuess(String username) {
+    var usernameAsked = username;
+    if(!users.contains(username)) {
+      usernameAsked = users.stream()
+                           .filter(u -> u.startsWith(username))
+                           .findFirst().orElse(username);
+    }
+    return usernameAsked;
+  }
+  
   public Optional<DirectMessages> getDirectMessagesOf(String username) {
     lock.lock();
     try {
-      var recipient = directMessages.values()
+      var dm = directMessages.values()
                                     .stream()
                                     .filter(u -> u.username()
                                                   .equals(username))
                                     .findFirst();
-      recipient.ifPresent(r -> {
+      dm.ifPresent(r -> {
         if (!r.hasMessages()) {
           r.addMessage(new WhisperMessage("(info)", STR."This is the beginning of your direct message history with \{username}", System.currentTimeMillis()));
         }
       });
-      if (recipient.isEmpty()) {
-        var dm = DirectMessages.create(username);
-        directMessages.put(dm.id(), dm);
-        return Optional.of(dm);
+      if (dm.isEmpty() && users.contains(username)) {
+        var newDM = DirectMessages.create(username);
+        directMessages.put(newDM.id(), newDM);
+        return Optional.of(newDM);
       }
-      return recipient;
+      return dm;
     } finally {
       lock.unlock();
     }

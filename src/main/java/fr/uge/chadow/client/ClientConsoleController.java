@@ -549,7 +549,7 @@ public class ClientConsoleController {
       var receiverUsername = matcherWhisper.group(1);
       var eventualMessage = matcherWhisper.group(3);
       mode = Mode.DIRECT_MESSAGES_LIVE;
-      var receiver = api.getDirectMessagesOf(receiverUsername);
+      var receiver = api.getDirectMessagesOf(api.getUserOrFirstGuess(receiverUsername));
       if (receiver.isEmpty()) {
         return Optional.of(true);
       }
