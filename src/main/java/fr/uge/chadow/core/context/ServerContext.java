@@ -15,7 +15,7 @@ import java.util.ArrayDeque;
 import java.util.logging.Logger;
 
 public final class ServerContext extends Context implements ProxyBridgeLeftSideContext {
-  private static final Logger logger = Logger.getLogger(Server.class.getName());
+  private static final Logger logger = Logger.getLogger(ServerContext.class.getName());
   private static final int BUFFER_SIZE = 1_024;
   private final Settings settings;
   private final Server server;
@@ -57,6 +57,7 @@ public final class ServerContext extends Context implements ProxyBridgeLeftSideC
 
         if (!server.addClient(login, super.getSocket(), listeningAddress, this)) {
           logger.warning(STR."Login \{login} already in use");
+          login = null; // reset login
           silentlyClose();
           return;
         }

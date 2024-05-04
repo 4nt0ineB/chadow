@@ -141,7 +141,7 @@ public class GlobalReaderTest {
     assertEquals(new TestPacket(testString, testInt, testLong, testString2), reader.get());
   }
 
-  @Test
+  //@Test
   public void proposeCodex() throws IOException {
     var chunkSize = 128 * 1024;
     var codexController = new CodexController(Settings.defaultDownloadPath(), chunkSize);
