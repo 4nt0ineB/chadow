@@ -19,4 +19,3 @@ deploy:
     - main
   tags:
     - shell
-  shell: bash
