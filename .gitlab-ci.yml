@@ -13,3 +13,5 @@ deploy:
     - docker run -d --restart always -p 7777:7777 chadow-image
   only:
     - main
+  tags:
+    - shell
