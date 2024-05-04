@@ -4,6 +4,13 @@ stages:
 deploy:
   stage: deploy
   script:
+    - |
+      CONTAINER_ID=$(docker ps -a -q -f name=chadow-image)
+      if [ -n "$CONTAINER_ID" ]; then
+        echo "Stopping and removing existing container"
+        docker stop $CONTAINER_ID
+        docker rm $CONTAINER_ID
+      fi
     - docker build -t chadow-image .
     - docker run -d --restart always -p 7777:7777 chadow-image
   only:
