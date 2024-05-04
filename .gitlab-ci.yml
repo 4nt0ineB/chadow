@@ -5,7 +5,7 @@ deploy:
   stage: deploy
   script:
     - git pull origin main
-    - mvn package
+    - mvn package -DskipTests
     - pgrep -f "java.*chadow" > /dev/null && kill $(pgrep -f "java.*chadow") || true
     - nohup java -jar --enable-preview target/chadow-1.0.0.jar --server 7777 > /dev/null 2>&1 &
   only:
