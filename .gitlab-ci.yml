@@ -4,7 +4,11 @@ stages:
 deploy:
   stage: deploy
   script:
-    - docker stop $(docker ps -a -q)
+    - |
+      CONTAINERS_TO_STOP=$(docker ps -a -q)
+      if [ -n "$CONTAINERS_TO_STOP" ]; then
+        docker stop $CONTAINERS_TO_STOP
+      fi
     - docker build -t chadow-image .
     - docker run -d --restart unless-stopped -p 7777:7777 chadow-image
   only:
