@@ -1,6 +1,6 @@
 package fr.uge.chadow.core.reader;
 
-import fr.uge.chadow.SettingsParser;
+import fr.uge.chadow.Settings;
 import fr.uge.chadow.client.CodexController;
 import fr.uge.chadow.client.CodexStatus;
 import fr.uge.chadow.core.protocol.YellMessage;
@@ -146,7 +146,7 @@ public class GlobalReaderTest {
   @Test
   public void proposeCodex() throws IOException {
     var chunkSize = 128 * 1024;
-    var codexController = new CodexController(SettingsParser.Settings.defaultDownloadPath(), chunkSize);
+    var codexController = new CodexController(Settings.defaultDownloadPath(), chunkSize);
     CodexStatus codexStatus;
     try {
       codexStatus = codexController.createFromPath("my codex", "/home/alan1/Pictures");

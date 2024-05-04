@@ -7,9 +7,11 @@ import fr.uge.chadow.core.protocol.client.Discovery;
 import fr.uge.chadow.core.protocol.client.HereChunk;
 import fr.uge.chadow.core.protocol.client.ProxyOk;
 import fr.uge.chadow.core.protocol.client.Register;
+import fr.uge.chadow.core.protocol.field.SocketField;
 import fr.uge.chadow.core.protocol.server.*;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.util.List;
 import java.util.logging.Logger;
@@ -81,13 +83,15 @@ public final class ClientContext extends Context {
   }
   
   @Override
-  public void doConnect() {
+  public void doConnect() throws IOException {
     try {
       super.doConnect();
     } catch (IOException e) {
       api.close();
     }
-    super.addFrame(new Register(api.login(), api.listeningPort()));
+    var address = (InetSocketAddress) super.getSocket().getRemoteAddress();
+    var socket = new SocketField(address.getAddress().getAddress(), address.getPort());
+    super.addFrame(new Register(api.login(), api.listeningPort(), socket));
     getKey().interestOps(SelectionKey.OP_WRITE);
     super.processOut();
   }

@@ -1,6 +1,7 @@
 package fr.uge.chadow.client;
 
 
+import fr.uge.chadow.Settings;
 import fr.uge.chadow.SettingsParser;
 import fr.uge.chadow.core.ProxyManager;
 import fr.uge.chadow.core.context.*;
@@ -44,28 +45,23 @@ public class ClientAPI {
   private final Condition connectionCondition = lock.newCondition();
   private final CodexController codexController;
   private final InetSocketAddress serverAddress;
-  private final String login;
   private final ArrayList<YellMessage> publicMessages = new ArrayList<>();
   private final HashMap<UUID, DirectMessages> directMessages = new HashMap<>();
   private final SortedSet<String> users = new TreeSet<>();
-  private final SettingsParser.Settings settings;
+  private final Settings settings;
+  private final ProxyManager proxyManager = new ProxyManager();
   
   // Blocking Queue that will contain the fetched codex
-  private final long REQUEST_CODEX_TIMEOUT = 5; // todo add in settings
   private final ArrayBlockingQueue<Optional<Codex>> requestCodexResponseQueue = new ArrayBlockingQueue<>(1);
   
   // Manage request and answer of open download -- Maybe change the way to handle this
-  private final long DOWNLOAD_REQUEST_TIMEOUT = 5; // todo add in settings
   private final LinkedBlockingQueue<SocketResponse> sharersSocketQueue = new LinkedBlockingQueue<>();
   private final ArrayDeque<String> codexIdOfAskedDownload = new ArrayDeque<>();
   private final HashMap<String, Set<InetSocketAddress>> currentDownloads = new HashMap<>();
   private final HashMap<String, Integer> currentSharing = new HashMap<>();
   private int proxyiedConnection = 0;
   
-  private final ProxyManager proxyManager = new ProxyManager();
-  
   // Manage request and response of search
-  private final long SEARCH_TIMEOUT = 5; // todo add in settings
   private final ArrayBlockingQueue<SearchResponse> searchResponseQueue = new ArrayBlockingQueue<>(1);
   
   // The context handler that will manage the client contexts
@@ -73,9 +69,7 @@ public class ClientAPI {
   private ClientContext clientContext;
   private STATUS status = STATUS.CONNECTING;
   
-  public ClientAPI(String login, InetSocketAddress serverAddress, CodexController codexController, SettingsParser.Settings settings) {
-    Objects.requireNonNull(login);
-    this.login = login;
+  public ClientAPI(InetSocketAddress serverAddress, CodexController codexController, Settings settings) {
     this.serverAddress = serverAddress;
     this.codexController = codexController;
     this.settings = settings;
@@ -140,7 +134,7 @@ public class ClientAPI {
    */
   private void startDownloaderRunner() throws IOException, InterruptedException {
     while (!Thread.interrupted() && status.equals(STATUS.CONNECTED)) {
-      var socketResponse = sharersSocketQueue.poll(DOWNLOAD_REQUEST_TIMEOUT, java.util.concurrent.TimeUnit.SECONDS);
+      var socketResponse = sharersSocketQueue.poll(settings.getInt("downloadRequestTimeout"), java.util.concurrent.TimeUnit.SECONDS);
       if (socketResponse != null) {
         var codexId = codexIdOfAskedDownload.pollFirst();
         if(!currentDownloads.containsKey(codexId)) {
@@ -168,9 +162,10 @@ public class ClientAPI {
    * each minute
    */
   private void periodicSocketRequest() {
+    var timeout = 1000 * settings.getInt("newSocketRequestTimeout");
     while (!Thread.interrupted() && status.equals(STATUS.CONNECTED)) {
       try {
-        Thread.sleep(1000 * 60);
+        Thread.sleep(timeout);
         logger.info("Requesting more sockets for current downloads");
       } catch (InterruptedException e) {
         logger.severe(STR."The client was interrupted while sleeping.\{e.getCause()}");
@@ -364,10 +359,7 @@ public class ClientAPI {
   public String login() {
     lock.lock();
     try {
-      if (!isLogged()) {
-        throw new IllegalStateException("Not logged in");
-      }
-      return login;
+      return settings.getStr("login");
     } finally {
       lock.unlock();
     }
@@ -401,14 +393,10 @@ public class ClientAPI {
       clientContext = context;
       connectionCondition.signalAll();
       status = STATUS.CONNECTED;
-      logger.info(STR."Connection established, authenticated on the server as \{login}");
+      logger.info(STR."Connection established, authenticated on the server as \{settings.getStr("login")}");
     } finally {
       lock.unlock();
     }
-  }
-  
-  public boolean isLogged() {
-    return login != null;
   }
   
   /**
@@ -478,7 +466,7 @@ public class ClientAPI {
     lock.lock();
     try {
       logger.info(STR."(yell) message queued of length \{msg.length()}");
-      clientContext.queueFrame(new YellMessage(login, msg, 0L));
+      clientContext.queueFrame(new YellMessage(settings.getStr("login"), msg, 0L));
     } finally {
       lock.unlock();
     }
@@ -526,7 +514,7 @@ public class ClientAPI {
     logger.info(STR."(getCodex) requesting codex (id: \{id})");
     Optional<Codex> fetchedCodex = null;
     try {
-      fetchedCodex = requestCodexResponseQueue.poll(REQUEST_CODEX_TIMEOUT, java.util.concurrent.TimeUnit.SECONDS);
+      fetchedCodex = requestCodexResponseQueue.poll(settings.getInt("requestCodexTimeout"), java.util.concurrent.TimeUnit.SECONDS);
     } catch (InterruptedException e) {
       logger.severe(e.getMessage());
       close();
@@ -563,7 +551,7 @@ public class ClientAPI {
     clientContext.queueFrame(new WhisperMessage(recipientUsername, message, 0L));
     logger.info(STR."(whisper) message to \{recipientUsername} of length \{message.length()} queued");
     dm.orElseThrow()
-      .addMessage(new WhisperMessage(login, message, System.currentTimeMillis()));
+      .addMessage(new WhisperMessage(settings.getStr("login"), message, System.currentTimeMillis()));
   }
   
   public Optional<DirectMessages> getPrivateDiscussionByRecipientId(UUID recipientId) {
@@ -813,7 +801,7 @@ public class ClientAPI {
       clientContext.queueFrame(search);
       logger.info(STR."(searchCodexes) searching for codexes with name \{search.codexName()}");
       SearchResponse response = null;
-      response = searchResponseQueue.poll(SEARCH_TIMEOUT, java.util.concurrent.TimeUnit.SECONDS);
+      response = searchResponseQueue.poll(settings.getInt("searchTimeout"), java.util.concurrent.TimeUnit.SECONDS);
       if (response == null) {
         return Optional.empty();
       }
@@ -858,6 +846,7 @@ public class ClientAPI {
     //var userId = UUID.randomUUID();
     //this.directMessages.put(userId, new DirectMessages(userId, "Alan1"));
     // test codex
+    var login = settings.getStr("login");
     if (login.equals("Alan1") || login.equals("Alan2") || login.equals("Alan3")) {
       //var status = codexController.createFromPath("my codex", "/mnt/d/testReseau2");
       //var status = codexController.createFromPath("test", "/home/alan1/Documents/tmp/tablette");

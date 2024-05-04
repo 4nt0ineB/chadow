@@ -2,6 +2,7 @@ package fr.uge.chadow.core.context;
 
 import fr.uge.chadow.core.protocol.*;
 import fr.uge.chadow.core.protocol.client.*;
+import fr.uge.chadow.core.protocol.field.SocketField;
 import fr.uge.chadow.core.protocol.server.Event;
 import fr.uge.chadow.core.protocol.server.OK;
 import fr.uge.chadow.server.Server;
@@ -18,12 +19,14 @@ public final class ServerContext extends Context implements ProxyBridgeLeftSideC
   private final Server server;
   private boolean closed = false;
   private String login;
+  private SocketField serverPublicAddress;
   // proxy
   private Integer chainId;
   private Context bridgeRightSide;
   private boolean isClosed;
   private final ArrayDeque<Frame> framesForTheNextHop = new ArrayDeque<>();
   private boolean isProxy = false;
+  
 
   public ServerContext(Server server, SelectionKey key) {
     super(key, BUFFER_SIZE);
@@ -41,6 +44,7 @@ public final class ServerContext extends Context implements ProxyBridgeLeftSideC
         }
 
         login = register.username();
+        serverPublicAddress = register.serverPublicAddress();
         var remoteInetSocketAddress = (InetSocketAddress) super.getSocket().getRemoteAddress();
         var listeningAddress = new InetSocketAddress(remoteInetSocketAddress.getAddress(), register.listenerPort());
 
@@ -161,6 +165,15 @@ public final class ServerContext extends Context implements ProxyBridgeLeftSideC
         }
       }
       
+      case Update update -> {
+        if (!isAuthenticated()) {
+          logger.warning(STR."Client \{super.getSocket().getRemoteAddress()} is not authenticated");
+          silentlyClose();
+          return;
+        }
+        server.update(update.codexId(), login);
+      }
+      
       default -> {
         logger.warning("No action for the received frame ");
         silentlyClose();
@@ -170,6 +183,10 @@ public final class ServerContext extends Context implements ProxyBridgeLeftSideC
 
   public String login() {
     return login;
+  }
+  
+  public SocketField getServerPublicAddress() {
+    return serverPublicAddress;
   }
 
   private boolean isAuthenticated() {
@@ -193,7 +210,9 @@ public final class ServerContext extends Context implements ProxyBridgeLeftSideC
   
   @Override
   public void silentlyClose() {
-    server.removeClient(login);
+    if (login != null) { // when the client is a downloader
+      server.removeClient(login);
+    }
     if(!isClosed && chainId != null && bridgeRightSide != null) {
       // close the bridge
       isClosed = true;

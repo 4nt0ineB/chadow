@@ -165,9 +165,12 @@ encodé de la manière suivante :
   utiliser pour la session ainsi que son socket d'écoute. 
   Voici le format de la trame pour cette demande : 
 
-      +--------------------------------+
-      | (register) | username | socket |
-      +--------------------------------+
+      +------------------------------------------+
+      | (register) | username | socket | socket  |
+      +------------------------------------------+
+
+  ServerPublicAddress : le socket (ip:port) du serveur que le client à utilisé pour se connecter.
+    Permet au serveur de faire proxy en lui envoyant ce socket, étant son adresse publique.
 
   Le serveur répond au client pour indiquer si le nom d'utilisateur est 
   disponible ou non :

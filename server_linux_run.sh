@@ -1,2 +1,2 @@
 #!/bin/sh
-java -jar --enable-preview target/chadow-1.0.0.jar --server 7777
+java -jar --enable-preview target/chadow-1.0.0.jar --server --log:true

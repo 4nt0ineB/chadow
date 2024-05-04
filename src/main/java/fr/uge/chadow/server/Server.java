@@ -10,6 +10,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 
+import fr.uge.chadow.Settings;
 import fr.uge.chadow.core.ProxyManager;
 import fr.uge.chadow.core.TCPConnectionManager;
 import fr.uge.chadow.core.context.*;
@@ -308,6 +309,40 @@ public class Server {
 
       requestsToRemove.forEach(requests::remove);
     }
+    
+    /**
+     * Saves the server as a proxy for a given chain ID, sharer, and codex ID.
+     * This method is called when the server needs to act as a proxy for a specific client and codex.
+     *
+     * @param chainId       The ID of the chain for which the server is acting as a proxy.
+     * @param serverContext The server context associated with the server acting as a proxy.
+     * @param sharer        The username of the sharer involved in the chain.
+     * @param codexId       The ID of the codex for which the server is acting as a proxy.
+     */
+    private void saveServerAsProxy(int chainId, ServerContext serverContext, String sharer, String codexId) {
+      var clientRequest = new ClientRequest(serverContext, codexId);
+      // Create proxy details for the server acting as a proxy
+      var proxiesDetails = new ProxiesDetails(1, 1, new HashMap<>());
+      var chainDetails = new ChainDetails(new ArrayList<>(List.of("server", sharer)), new HashSet<>(List.of("server")));
+      
+      proxiesDetails.chains.put(chainId, chainDetails);
+      requests.put(clientRequest, proxiesDetails);
+      chainIdToRequest.put(chainId, clientRequest);
+    }
+    
+    /**
+     * Removes all requests and associated chain IDs for a given codex ID.
+     * This method is called when a client has finished downloading a codex.
+     *
+     * @param codexId The ID of the codex for which to remove requests and associated chain IDs.
+     */
+    public void removeCodexId(String codexId) {
+      // Remove all chain IDs associated with the codex ID
+      chainIdToRequest.entrySet().removeIf(entry -> entry.getValue().codexId().equals(codexId));
+      
+      // Remove all requests associated with the codex ID
+      requests.entrySet().removeIf(entry -> entry.getKey().codexId().equals(codexId));
+    }
   }
 
   /**
@@ -334,17 +369,32 @@ public class Server {
   private static final Logger logger = Logger.getLogger(Server.class.getName());
   private final Map<String, SocketInfo> clients = new HashMap<>();
   private final Map<CodexRecord, List<String>> codexes = new HashMap<>(); // codex -> list of usernames
-  private final ProxyHandler proxyHandler = new ProxyHandler();
   private TCPConnectionManager connectionManager;
-  private final ProxyManager proxyManager = new ProxyManager(); // when server is a proxy
-  private final int port;
-
-  public Server(int port) throws IOException {
-    this.port = port;
+  
+  // Proxy part
+  /**
+   * Represents the details of the server acting as a proxy in a closed download request.
+   * This record encapsulates information such as the codex ID, chain ID, client, and sharer involved.
+   *
+   * @param codexId The ID of the codex requested in the closed download.
+   * @param chainId The ID of the chain for which the server is acting as a proxy.
+   * @param client  The username of the client initiating the closed download request.
+   * @param sharer  The username of the sharer providing the requested codex.
+   */
+  private record ServerProxyDetails(String codexId, int chainId, String client, String sharer) {
+  }
+  
+  private final ProxyHandler proxyHandler = new ProxyHandler(); // handle the different proxies routes
+  private final ProxyManager proxyManager = new ProxyManager(); // when server is a
+  private ServerProxyDetails serverProxyDetails;
+  private final Settings settings;
+  
+  public Server(Settings settings) throws IOException {
+    this.settings = settings;
   }
 
   public void start() throws IOException {
-    this.connectionManager = new TCPConnectionManager(port, key -> new ServerContext(this, key));
+    this.connectionManager = new TCPConnectionManager(settings.getInt("port"), key -> new ServerContext(this, key));
     connectionManager.launch();
   }
 
@@ -402,6 +452,39 @@ public class Server {
     }
     serverContext.queueFrame(new RequestResponse(codex));
   }
+  
+  public SearchResponse search(Search search) {
+    Predicate<CodexRecord> dateFilter = c -> {
+      if (search.options() == 0) {
+        return true;
+      }
+      var result = false;
+      if ((search.options() & Search.Option.AT_DATE.value()) != 0) {
+        result |= c.registrationDate == search.date();
+      }
+      if ((search.options() & Search.Option.BEFORE_DATE.value()) != 0) {
+        result |= c.registrationDate < search.date();
+      }
+      if ((search.options() & Search.Option.AFTER_DATE.value()) != 0) {
+        result |= c.registrationDate > search.date();
+      }
+      return result;
+    };
+    
+    logger.info(STR."Searching for \{search.codexName()}");
+    var filteredCodexes = codexes.keySet().stream()
+                                 .filter(dateFilter)
+                                 .filter(c -> c.codex().name().contains(search.codexName()))
+                                 .skip(search.offset())
+                                 .limit(search.results())
+                                 .map(codexRegistration -> {
+                                   var codex = codexRegistration.codex();
+                                   return new SearchResponse.Result(codex.name(), codex.id(), codexRegistration.registrationDate,
+                                       codexes.get(codexRegistration).size());
+                                 })
+                                 .toArray(SearchResponse.Result[]::new);
+    return new SearchResponse(filteredCodexes);
+  }
 
   public void requestOpenDownload(ServerContext serverContext, String codexId, int numberOfSharers) {
     var sharersList = codexes.entrySet().stream()
@@ -421,78 +504,91 @@ public class Server {
     serverContext.queueFrame(new RequestOpenDownload(sharersSocketFieldArray));
   }
 
+  // -------------------------------- Proxy part / Closed download --------------------------------
+  
+  /**
+   * Handles a request for a closed download initiated by a client.
+   * If the number of proxies requested is 1 and there are only 2 clients connected to the server,
+   * the server acts as a proxy. Otherwise, the request is initialized by the ProxyHandler.
+   *
+   * @param serverContext   The server context associated with the request.
+   * @param requestDownload The request for a closed download initiated by the client.
+   */
   public void requestClosedDownload(ServerContext serverContext, RequestDownload requestDownload) {
-    proxyHandler.initRequest(requestDownload, serverContext);
+    if (requestDownload.numberOfProxies() == 1 && clients.size() == 2) {
+      // The Server is used as a proxy
+      // Save the proxy route
+      var chainId = proxyHandler.generateUniqueInt(proxyHandler.chainIdToRequest);
+      saveServerProxyRoute(chainId, requestDownload, serverContext);
+      
+      // Send the server as a proxy to the client requesting the download
+      sendServerAsProxy(serverContext, chainId);
+    } else {
+      // The Server is not used as a proxy
+      // Initialize the request
+      proxyHandler.initRequest(requestDownload, serverContext);
+    }
+  }
+  
+  /**
+   * Saves the server as a proxy for a given chain ID, request download, and server context.
+   * This method is called when the server needs to act as a proxy for a specific client and request download.
+   *
+   * @param chainId         The ID of the chain for which the server is acting as a proxy.
+   * @param requestDownload The request for a closed download for which the server is acting as a proxy.
+   * @param serverContext   The server context associated with the server acting as a proxy.
+   */
+  private void saveServerProxyRoute(int chainId, RequestDownload requestDownload, ServerContext serverContext) {
+    var sharerName = codexes.entrySet().stream()
+                            .filter(e -> e.getKey().codex().id().equals(requestDownload.codexId()))
+                            .map(Map.Entry::getValue)
+                            .findFirst()
+                            .orElseThrow()
+                            .getFirst();
+    var sharerSocket = new SocketField(clients.get(sharerName).address().getAddress().getAddress(),
+        clients.get(sharerName).address().getPort());
+    
+    serverProxyDetails = new ServerProxyDetails(requestDownload.codexId(), chainId, serverContext.login(), sharerName);
+    
+    
+    // Save the proxy route for the server.
+    // This should be the initial route established for the chain.
+    proxyManager.saveProxyRoute(chainId, sharerSocket);
+    
+    // Save the proxy route for the ProxyHandler.
+    // This is done to handle potential future requests for closed downloads from other clients.
+    proxyHandler.saveServerAsProxy(chainId, serverContext, sharerName, requestDownload.codexId());
+  }
+  
+  /**
+   * Sends the server information as a proxy to the client for a given chain ID.
+   *
+   * @param serverContext The server context associated with the server.
+   * @param chainId       The ID of the chain for which the server is acting as a proxy.
+   */
+  private void sendServerAsProxy(ServerContext serverContext, int chainId) {
+    // Create a ProxyNodeSocket for the server acting as a proxy
+    var serverProxyNodeSocket = new ProxyNodeSocket(serverContext.getServerPublicAddress(), chainId);
+    
+    // Send a ClosedDownloadResponse containing the server as a proxy to the client
+    serverContext.queueFrame(new ClosedDownloadResponse(new ProxyNodeSocket[]{serverProxyNodeSocket}));
   }
 
   public void proxyOk(ServerContext serverContext, int chainId) {
     logger.info(STR."Proxy \{serverContext.login()} confirmed chain \{chainId}");
-    proxyHandler.proxyConfirmed(serverContext, chainId);
-  }
-
-  public SearchResponse search(Search search) {
-    Predicate<CodexRecord> dateFilter = c -> {
-      if (search.options() == 0) {
-        return true;
-      }
-      var result = false;
-      if ((search.options() & Search.Option.AT_DATE.value()) != 0) {
-        result |= c.registrationDate == search.date();
-      }
-      if ((search.options() & Search.Option.BEFORE_DATE.value()) != 0) {
-        result |= c.registrationDate < search.date();
-      }
-      if ((search.options() & Search.Option.AFTER_DATE.value()) != 0) {
-        result |= c.registrationDate > search.date();
-      }
-      return result;
-    };
-
-    logger.info(STR."Searching for \{search.codexName()}");
-    var filteredCodexes = codexes.keySet().stream()
-            .filter(dateFilter)
-            .filter(c -> c.codex().name().contains(search.codexName()))
-            .skip(search.offset())
-            .limit(search.results())
-            .map(codexRegistration -> {
-              var codex = codexRegistration.codex();
-              return new SearchResponse.Result(codex.name(), codex.id(), codexRegistration.registrationDate,
-                      codexes.get(codexRegistration).size());
-            })
-            .toArray(SearchResponse.Result[]::new);
-    return new SearchResponse(filteredCodexes);
-  }
-
-  public boolean addClient(String login, SocketChannel sc, InetSocketAddress address, ServerContext serverContext) {
-    if (clients.containsKey(login)) {
-      return false;
-    }
-    clients.put(login, new SocketInfo(sc, address, serverContext));
-    proxyHandler.proxyScores.put(login, 0);
-    return true;
-  }
-
-  public void removeClient(String login) {
-    logger.info(STR."Client \{login} has disconnected");
-    clients.remove(login);
-    proxyHandler.removeAllInstancesOfClient(login);
-    broadcast(new Event((byte) 0, login));
-  }
-
-  public static void main(String[] args) {
-    if (args.length != 1) {
-      usage();
-      return;
-    }
-    try {
-      new Server(Integer.parseInt(args[0])).start();
-    } catch (IOException e) {
-      logger.severe(STR."Error while launching server: \{e.getMessage()}");
+    if (serverProxyDetails != null && serverProxyDetails.chainId() == chainId) {
+      logger.info(STR."Server is acting as a proxy for chain \{chainId}");
+    } else {
+      proxyHandler.proxyConfirmed(serverContext, chainId);
     }
   }
-
-  private static void usage() {
-    System.out.println("Usage : ServerSumBetter port");
+  
+  public void update(String codexId, String client) {
+    if (serverProxyDetails != null && serverProxyDetails.codexId().equals(codexId) && serverProxyDetails.client().equals(client)) {
+      logger.info(STR."Server is no more a proxy for \{codexId}");
+      serverProxyDetails = null;
+    }
+    proxyHandler.removeCodexId(codexId);
   }
   
   public boolean saveProxyRoute(int chainId, SocketField socket) {
@@ -521,5 +617,41 @@ public class Server {
       var context = contextSupplier.apply(key);
       return new TCPConnectionManager.ConnectionData(context, addr);
     });
+  }
+  
+  // --------------------------------------------------------------------------------------------------
+  
+  public boolean addClient(String login, SocketChannel sc, InetSocketAddress address, ServerContext serverContext) {
+    if (clients.containsKey(login)) {
+      return false;
+    }
+    clients.put(login, new SocketInfo(sc, address, serverContext));
+    proxyHandler.proxyScores.put(login, 0);
+    return true;
+  }
+
+  public void removeClient(String login) {
+    logger.info(STR."Client \{login} has disconnected");
+    clients.remove(login);
+    proxyHandler.removeAllInstancesOfClient(login);
+    broadcast(new Event((byte) 0, login));
+  }
+
+/*
+  public static void main(String[] args) {
+    if (args.length != 1) {
+      usage();
+      return;
+    }
+    try {
+      new Server(Integer.parseInt(args[0])).start();
+    } catch (IOException e) {
+      logger.severe(STR."Error while launching server: \{e.getMessage()}");
+    }
+  }
+*/
+
+  private static void usage() {
+    System.out.println("Usage : ServerSumBetter port");
   }
 }

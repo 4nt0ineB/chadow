@@ -36,6 +36,7 @@ public enum Opcode {
   PROXYOPEN(ProxyOpen.class),
   PROXYOK(ProxyOk.class),
   HIDDEN(Hidden.class),
+  UPDATE(Update.class),
   ;
 
   private static final HashMap<Class<? extends Record>, Opcode> classMap = new HashMap<>();
