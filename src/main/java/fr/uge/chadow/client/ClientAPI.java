@@ -1,7 +1,7 @@
 package fr.uge.chadow.client;
 
 
-import fr.uge.chadow.Settings;
+import fr.uge.chadow.core.Settings;
 import fr.uge.chadow.core.ProxyManager;
 import fr.uge.chadow.core.context.*;
 import fr.uge.chadow.core.TCPConnectionManager;
@@ -20,15 +20,12 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
-import java.nio.channels.SelectionKey;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Function;
 import java.util.logging.Logger;
 
 /**
@@ -504,7 +501,11 @@ public class ClientAPI {
     return Optional.of(codexController.addFromFetchedCodex(fetchedCodex.orElseThrow()));
   }
   
-  
+  /**
+   * Get the codex id or the first guess if the codex does not exist
+   * @param codexId the id of the codex
+   * @return the given codex id or the first guess
+   */
   public String codexIdOrFirstGuess(String codexId) {
     lock.lock();
     try {
@@ -698,6 +699,11 @@ public class ClientAPI {
     }
   }
   
+  /**
+   * Share a codex
+   * changes the status of the codex to shared
+   * and send a propose message to the server
+   */
   public void share(String codexId) {
     codexController.share(codexId);
     propose(codexId);
@@ -737,6 +743,10 @@ public class ClientAPI {
     }
   }
   
+  /**
+   * Remove a user from the chat
+   * @param username the username of the user
+   */
   public void removeUser(String username) {
     lock.lock();
     try {
@@ -755,7 +765,11 @@ public class ClientAPI {
     }
   }
   
-  public void addUserFromDiscovery(List<String> usernames) {
+  /**
+   * Update the presence of users
+   * @param usernames the list of users
+   */
+  public void addUsersFromDiscovery(List<String> usernames) {
     lock.lock();
     try {
       users.addAll(usernames);
@@ -764,15 +778,27 @@ public class ClientAPI {
     }
   }
   
+  /**
+   * Get the listening port of the client
+   */
   public int listeningPort() {
     return connectionManager.listeningPort();
   }
   
+  /**
+   * Save received sockets for the request of an open download.
+   * @param sockets the sockets of the sharers
+   */
   public void addSocketsOpenDownload(SocketField[] sockets) {
     sharersSocketQueue.add(new SocketResponse(sockets, null));
   }
   
-  public void addSocketsClosedDownload(ProxyNodeSocket[] proxySockets) {
+  /**
+   * Save received sockets for the request of a hidden download.
+   * Used by the client context
+   * @param proxySockets the sockets of proxy nodes
+   */
+  public void addSocketsHiddenDownload(ProxyNodeSocket[] proxySockets) {
     var sockets = new SocketField[proxySockets.length];
     var chainId = new int[proxySockets.length];
     for (int i = 0; i < proxySockets.length; i++) {
@@ -798,7 +824,11 @@ public class ClientAPI {
     }
   }
   
-  
+  /**
+   * Search for codexes with a specific name on the server
+   * @param search the search query
+   * @return the search response
+   */
   public Optional<SearchResponse> searchCodexes(Search search) {
     try {
       searchResponseQueue.clear();
@@ -815,6 +845,11 @@ public class ClientAPI {
     }
   }
   
+  /**
+   * Save the search response in the queue
+   * Used by the client context
+   * @param response the search response
+   */
   public void saveSearchResponse(SearchResponse response) {
     lock.lock();
     try {
@@ -856,6 +891,12 @@ public class ClientAPI {
       //var status = codexController.createFromPath("test", "/home/alan1/Pictures");
       var status = codexController.createFromPath("test", "/home/alan1/Downloads/aaa");
       share(status.id());
+      try {
+        var status2 = codexController.createFromPath("test2", "/home/alan1/Downloads/u7xn3f.mp4");
+        share(status2.id());
+      } catch (IOException e) {
+        logger.warning(e.getMessage());
+      }
     }
   }
   

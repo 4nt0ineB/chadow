@@ -5,6 +5,7 @@ import fr.uge.chadow.core.protocol.field.Codex;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.locks.ReentrantLock;
@@ -24,6 +25,7 @@ public class CodexStatus {
   private boolean downloading = false;
   private boolean downloadHidden = false;
   private boolean sharing = false;
+  private final boolean isDir;
   // caching a file reader, 1 because we download the codex sequentially
   private RandomAccessFile currentDownloadingFile = null;
   
@@ -31,7 +33,7 @@ public class CodexStatus {
   private long totalBytesPassed = 0;
   private long downloadStartTime;
   
-  CodexStatus(Codex codex, String root, int chunkSize) {
+  CodexStatus(Codex codex, String root, int chunkSize, boolean isDir) {
     this.codex = codex;
     this.root = root;
     this.chunkSize = chunkSize;
@@ -41,6 +43,7 @@ public class CodexStatus {
       chunks.put(file, new BitSet(numberOfChunks(file)));
     }
     sharedFiles = new RandomAccessFile[files.length];
+    this.isDir = isDir;
   }
   
   public int numberOfChunks(Codex.FileInfo file) {
@@ -252,7 +255,12 @@ public class CodexStatus {
     try {
       var fileIndex = fileIndex(offsetInCodex, length);
       var file = codex.files()[fileIndex];
-      var path = Paths.get(root, file.relativePath(), file.filename());
+      Path path = null;
+      if(isDir) {
+         path = Paths.get(root, file.relativePath(), file.filename());
+      } else {
+          path = Paths.get(root);
+      }
       var fileOffset = offsetInCodex - fileOffset(fileIndex);
       var data = new byte[length];
       var raf = sharedFiles[fileIndex];

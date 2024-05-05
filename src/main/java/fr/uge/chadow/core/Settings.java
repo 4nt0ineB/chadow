@@ -1,4 +1,4 @@
-package fr.uge.chadow;
+package fr.uge.chadow.core;
 
 import fr.uge.chadow.client.cli.display.View;
 

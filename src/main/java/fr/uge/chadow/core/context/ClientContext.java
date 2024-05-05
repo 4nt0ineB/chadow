@@ -43,7 +43,7 @@ public final class ClientContext extends Context {
       }
       case DiscoveryResponse discoveryResponse -> {
         logger.info(STR."Received discovery response (\{discoveryResponse.usernames().length} users)");
-        api.addUserFromDiscovery(List.of(discoveryResponse.usernames()));
+        api.addUsersFromDiscovery(List.of(discoveryResponse.usernames()));
       }
       case RequestOpenDownload requestOpenDownload -> {
         logger.info(STR."Received request open download  \{requestOpenDownload.sockets().length} sockets");
@@ -55,7 +55,7 @@ public final class ClientContext extends Context {
       }
       case ClosedDownloadResponse closedDownloadResponse -> {
         logger.info(STR."Received \{closedDownloadResponse.proxies().length} proxy sockets");
-        api.addSocketsClosedDownload(closedDownloadResponse.proxies());
+        api.addSocketsHiddenDownload(closedDownloadResponse.proxies());
       }
       case Event event -> {
         if(event.code() == (byte) 0) {

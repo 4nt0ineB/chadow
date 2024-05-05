@@ -1,6 +1,6 @@
 package fr.uge.chadow.core.context;
 
-import fr.uge.chadow.Settings;
+import fr.uge.chadow.core.Settings;
 import fr.uge.chadow.core.protocol.*;
 import fr.uge.chadow.core.protocol.client.*;
 import fr.uge.chadow.core.protocol.field.SocketField;
