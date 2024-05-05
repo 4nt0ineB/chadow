@@ -20,8 +20,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
-import java.nio.channels.SelectionKey;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -145,12 +143,14 @@ public class ClientAPI {
         for (var i = 0; i < socketResponse.sockets.length; i++) {
           var socketField = socketResponse.sockets[i];
           var socketAddress = new InetSocketAddress(InetAddress.getByAddress(socketField.ip()), socketField.port());
+          
           if (sockets.contains(socketAddress)) {
             continue; // already downloading from this sharer
           }
           var chainId = socketResponse.chainId != null ? socketResponse.chainId[i] : null;
           logger.info(STR."New downloader context for codex \{codexId} (sharer: \{socketField.ip()}:\{socketField.port()}) (hidden: \{chainId != null})");
           addDownloaderContext(codexId, socketField, chainId);
+          sockets.add(socketAddress);
         }
       }
     }
@@ -207,8 +207,11 @@ public class ClientAPI {
   public void registerDownloader(String codexId, InetSocketAddress sharerAddress) {
     lock.lock();
     try {
-      currentDownloads.get(codexId).add(sharerAddress);
-      logger.info(STR."REGISTER downloader for codex \{codexId} (sharer: \{sharerAddress})");
+      if(sharerAddress == null) {
+        return;
+      }
+      currentDownloads.computeIfAbsent(codexId, k -> new HashSet<>())
+              .add(sharerAddress);
     } finally {
       lock.unlock();
     }
@@ -231,6 +234,7 @@ public class ClientAPI {
     try {
       logger.info(STR."NUMBER OF DOWNLOADERS : \{currentDownloads.getOrDefault(codexId, Set.of())
               .size()}");
+      logger.info(STR."DISPLAY OF DOWNLOADERS : \{currentDownloads.getOrDefault(codexId, Set.of())}");
       return currentDownloads.getOrDefault(codexId, Set.of()).size();
     } finally {
       lock.unlock();
@@ -897,14 +901,20 @@ public class ClientAPI {
     // test codex
     var login = settings.getStr("login");
     if (login.equals("Alan1") || login.equals("Alan2") || login.equals("Alan3")) {
-      var status = codexController.createFromPath("my codex", "/mnt/d/testReseau2");
+      //var status = codexController.createFromPath("my codex", "/mnt/d/testReseau2");
       //var status = codexController.createFromPath("test", "/home/alan1/Documents/tmp/tablette");
       //var status = codexController.createFromPath("test", "/home/alan1/Pictures");
-      // var status = codexController.createFromPath("test", "/home/alan1/Downloads/aaa");
+      var status = codexController.createFromPath("test", "/home/alan1/Downloads/aaa");
       share(status.id());
       try {
         var status2 = codexController.createFromPath("test2", "/home/alan1/Downloads/u7xn3f.mp4");
         share(status2.id());
+      } catch (IOException e) {
+        logger.warning(e.getMessage());
+      }
+      try {
+        var status3 = codexController.createFromPath("test2", "/home/alan1/Downloads/bbb");
+        share(status3.id());
       } catch (IOException e) {
         logger.warning(e.getMessage());
       }

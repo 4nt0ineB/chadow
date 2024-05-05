@@ -47,7 +47,7 @@ public final class DownloaderContext extends Context {
     switch (frame) {
       case Denied denied -> {
         logger.warning(STR."Sharer denied sharing codex \{denied.codexId()}");
-        super.silentlyClose();
+        silentlyClose();
       }
       case HereChunk hereChunk -> {
         logger.info(STR."Received chunk (\{hereChunk.offset()},\{hereChunk.payload().length})");

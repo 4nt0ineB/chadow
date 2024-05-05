@@ -77,10 +77,12 @@ public sealed abstract class Context permits ClientAsServerContext, ClientContex
   }
 
   public void queueFrame(Frame frame) {
-    queue.addFirst(frame);
-    processOut();
-    updateInterestOps();
-    key.selector().wakeup();
+    if(!closed){
+      queue.addFirst(frame);
+      processOut();
+      updateInterestOps();
+      key.selector().wakeup();
+    }
   }
 
   public void clearFrameQueue() {

@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.util.ArrayDeque;
+import java.util.HashSet;
 import java.util.logging.Logger;
 
 public final class ServerContext extends Context implements ProxyBridgeLeftSideContext {
@@ -22,13 +23,13 @@ public final class ServerContext extends Context implements ProxyBridgeLeftSideC
   private boolean closed = false;
   private String login;
   private SocketField serverPublicAddress;
+  private final HashSet<String> sharedCodex = new HashSet<>();
   // proxy
   private Integer chainId;
   private Context bridgeRightSide;
   private boolean isClosed;
   private final ArrayDeque<Frame> framesForTheNextHop = new ArrayDeque<>();
   private boolean isProxy = false;
-
 
   public ServerContext(Server server, SelectionKey key, Settings settings) {
     super(key, BUFFER_SIZE);
@@ -105,6 +106,7 @@ public final class ServerContext extends Context implements ProxyBridgeLeftSideC
           return;
         }
         server.propose(propose.codex(), login);
+        sharedCodex.add(propose.codex().id());
       }
 
       case Request request -> {
@@ -219,7 +221,7 @@ public final class ServerContext extends Context implements ProxyBridgeLeftSideC
   @Override
   public void silentlyClose() {
     if (login != null) { // when the client is a downloader
-      server.removeClient(login);
+      server.removeClient(login, sharedCodex);
     }
     if (!isClosed && chainId != null && bridgeRightSide != null) {
       // close the bridge

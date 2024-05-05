@@ -376,7 +376,7 @@ public class Server {
 
   private static final Logger logger = Logger.getLogger(Server.class.getName());
   private final Map<String, SocketInfo> clients = new HashMap<>();
-  private final Map<CodexRecord, List<String>> codexes = new HashMap<>(); // codex -> list of usernames
+  private final Map<CodexRecord, Set<String>> codexes = new HashMap<>(); // codex -> list of usernames
   private TCPConnectionManager connectionManager;
 
   // Proxy part
@@ -443,7 +443,7 @@ public class Server {
                     clientCodexes -> clientCodexes.add(username),
                     () -> {
                       var newCodexRecord = new CodexRecord(codex, System.currentTimeMillis());
-                      codexes.put(newCodexRecord, new ArrayList<>(List.of(username)));
+                      codexes.put(newCodexRecord, new HashSet<>(List.of(username)));
                     }
             );
   }
@@ -553,7 +553,7 @@ public class Server {
             .map(Map.Entry::getValue)
             .findFirst()
             .orElseThrow()
-            .getFirst();
+        .stream().iterator().next();
     var sharerSocket = new SocketField(clients.get(sharerName).address().getAddress().getAddress(),
             clients.get(sharerName).address().getPort());
 
@@ -620,8 +620,13 @@ public class Server {
     return true;
   }
 
-  public void removeClient(String login) {
+  public void removeClient(String login, Set<String> sharedCodex) {
     logger.info(STR."Client \{login} has disconnected");
+    codexes.entrySet().stream()
+            .filter(e -> sharedCodex.contains(e.getKey().codex().id()))
+            .map(Map.Entry::getValue)
+            .findFirst()
+            .ifPresent(codexes -> codexes.remove(login));
     clients.remove(login);
     proxyHandler.removeAllInstancesOfClient(login);
     broadcast(new Event((byte) 0, login));

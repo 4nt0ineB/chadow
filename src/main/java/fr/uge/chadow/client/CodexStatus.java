@@ -255,16 +255,17 @@ public class CodexStatus {
     try {
       var fileIndex = fileIndex(offsetInCodex, length);
       var file = codex.files()[fileIndex];
-      Path path = null;
-      if(isDir) {
-         path = Paths.get(root, file.relativePath(), file.filename());
-      } else {
-          path = Paths.get(root);
-      }
+      
       var fileOffset = offsetInCodex - fileOffset(fileIndex);
       var data = new byte[length];
       var raf = sharedFiles[fileIndex];
       if (raf == null) {
+        Path path;
+        if(isDir) {
+          path = Paths.get(root, file.relativePath(), file.filename());
+        } else {
+          path = Paths.get(root);
+        }
         // we cache the file reader, will be closed when the codex is complete
         // or the sharing is stopped
         raf = new RandomAccessFile(path.toString(), "r");
@@ -296,10 +297,10 @@ public class CodexStatus {
       var offsetInFile = offsetInCodex - fileOffset(fileIndex);
       Objects.checkIndex(offsetInFile + payload.length, codex().totalSize() + 1);
       var file = codex().files()[fileIndex];
-      var path = Paths.get(root(), codex().name(), file.relativePath(), file.filename());
       totalBytesPassed += payload.length;
       // sequential download
       if (currentDownloadingFile == null) {
+        var path = Paths.get(root(), codex().name(), file.relativePath(), file.filename());
         currentDownloadingFile = new RandomAccessFile(path.toString(), "rw");
       }
       currentDownloadingFile.seek(offsetInFile);
