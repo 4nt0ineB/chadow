@@ -80,9 +80,11 @@ public class Server {
       var sharersList = codexes.entrySet().stream()
               .filter(e -> e.getKey().codex().id().equals(requestDownload.codexId()))
               .map(Map.Entry::getValue)
-              .limit(possibleSharers)
               .findFirst()
-              .orElseThrow();
+              .orElseThrow()
+              .stream()
+              .limit(possibleSharers)
+              .toList();
 
       var clientRequest = new ClientRequest(serverContext, requestDownload.codexId());
       var proxiesDetails = new ProxiesDetails(requestDownload.numberOfProxies(), possibleSharers, new HashMap<>());
@@ -213,7 +215,7 @@ public class Server {
 
     /**
      * Handles the confirmation of a proxy for a specific chain and manages the completion status of the associated request.
-     * If all proxies in the chain have confirmed the request, sends a response to the client.
+     * If all proxies in the chain have confirmed the request, send a response to the client.
      *
      * @param serverContext The server context of the confirming proxy.
      * @param chainId       The ID of the chain for which the proxy confirms the request.
@@ -283,6 +285,7 @@ public class Server {
      * @param username The username of the client to remove.
      */
     public void removeAllInstancesOfClient(String username) {
+      logger.info(STR."Removing all instances of \{username} from the proxy scores and requests");
       // Remove the client from the proxy scores
       proxyScores.remove(username);
 
@@ -328,17 +331,25 @@ public class Server {
     }
 
     /**
-     * Removes all requests and associated chain IDs for a given codex ID.
-     * This method is called when a client has finished downloading a codex.
+     * Removes all requests and associated data related to a specific codex ID and server context.
      *
-     * @param codexId The ID of the codex for which to remove requests and associated chain IDs.
+     * @param codexId       The ID of the codex to be removed.
+     * @param serverContext The server context associated with the requests to be removed.
      */
-    public void removeCodexId(String codexId) {
-      // Remove all chain IDs associated with the codex ID
-      chainIdToRequest.entrySet().removeIf(entry -> entry.getValue().codexId().equals(codexId));
+    public void removeCodexId(String codexId, ServerContext serverContext) {
+      var clientRequestToRemove = new ClientRequest(serverContext, codexId);
+      var proxiesDetails = requests.get(clientRequestToRemove);
 
-      // Remove all requests associated with the codex ID
-      requests.entrySet().removeIf(entry -> entry.getKey().codexId().equals(codexId));
+      // Decrease the score of the proxies that are in the chain
+      proxiesDetails.chains.values().forEach(chainDetails -> {
+        chainDetails.proxiesConfirmed.forEach(proxy -> proxyScores.put(proxy, proxyScores.get(proxy) - 1));
+      });
+
+      // Remove the chainIds associated with the client request from the chainIdToRequest map
+      proxiesDetails.chains.keySet().forEach(chainIdToRequest::remove);
+
+      // Remove the client request from the requests map
+      requests.remove(clientRequestToRemove);
     }
   }
 
@@ -581,12 +592,12 @@ public class Server {
     }
   }
 
-  public void update(String codexId, String client) {
+  public void update(String codexId, String client, ServerContext serverContext) {
     if (serverProxyDetails != null && serverProxyDetails.codexId().equals(codexId) && serverProxyDetails.client().equals(client)) {
       logger.info(STR."Server is no more a proxy for \{codexId}");
       serverProxyDetails = null;
     }
-    proxyHandler.removeCodexId(codexId);
+    proxyHandler.removeCodexId(codexId, serverContext);
   }
 
   public boolean setUpBridge(int chainId, ProxyBridgeLeftSideContext clientAsServerContext) {

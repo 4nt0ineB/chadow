@@ -179,7 +179,7 @@ public final class ServerContext extends Context implements ProxyBridgeLeftSideC
           silentlyClose();
           return;
         }
-        server.update(update.codexId(), login);
+        server.update(update.codexId(), login, this);
       }
 
       default -> {
