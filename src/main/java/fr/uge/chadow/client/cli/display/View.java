@@ -274,6 +274,14 @@ public interface View {
     return str.substring(0, length) + CLIColor.RESET;
   }
   
+  static String secondsDurationToHumanReadable(long seconds) {
+    long hrs = seconds / 3600;
+    long rem = seconds % 3600;
+    long mins = rem / 60;
+    long secs = rem % 60;
+    return String.format("%02d:%02d:%02d", hrs, mins, secs);
+  }
+  
   void setDimensions(int lines, int cols);
   
   void draw() throws IOException;

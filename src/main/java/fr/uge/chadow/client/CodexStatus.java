@@ -13,6 +13,7 @@ import java.util.logging.Logger;
 
 public class CodexStatus {
   
+ 
   public record Chunk(long offset, int length) {
   }
   private static final Logger logger = Logger.getLogger(CodexStatus.class.getName());
@@ -405,5 +406,17 @@ public class CodexStatus {
     if (downloadTimeInSeconds == 0) return 0;
     return (double) totalBytesPassed / downloadTimeInSeconds;
   }
+  
+  /**
+   * Get the ETA (Estimated Time of Arrival) in seconds
+   * @return the ETA in seconds
+   */
+  public long eta() {
+    long currentTime = System.currentTimeMillis();
+    long downloadTimeInSeconds = (currentTime - downloadStartTime) / 1000;
+    if (downloadTimeInSeconds == 0) return 0;
+    return (long) ((codex.totalSize() - totalBytesPassed) / getCurrentSpeed());
+  }
+  
   
 }

@@ -71,6 +71,10 @@ public class CodexView implements View {
           var currentDownloaders = api.howManyDownloaders(codexStatus.id());
           sb.append(STR."▓ Downloading \{codexStatus.isDownloadingHidden() ? "(hidden)" : ""}... - from \{currentDownloaders} sharers\n")
               .append(STR."▓ Download Speed: \{View.bytesToHumanReadable(currentDownloaders > 0 ? (long) codexStatus.getCurrentSpeed() : 0)}/s\n");
+          // ETA
+          var eta = codexStatus.eta();
+          var formatedEta = eta == Long.MAX_VALUE ? "∞" : View.secondsDurationToHumanReadable(eta);
+          sb.append(STR."▓ ETA: \{formatedEta}\n");
         } else {
           var currentSharers = api.howManySharers(codexStatus.id());
           sb.append(STR."▓ Sharing... - to \{currentSharers} clients\n")
