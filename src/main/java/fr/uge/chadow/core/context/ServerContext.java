@@ -28,12 +28,12 @@ public final class ServerContext extends Context implements ProxyBridgeLeftSideC
   private boolean isClosed;
   private final ArrayDeque<Frame> framesForTheNextHop = new ArrayDeque<>();
   private boolean isProxy = false;
-  
+
 
   public ServerContext(Server server, SelectionKey key, Settings settings) {
     super(key, BUFFER_SIZE);
     this.server = server;
-    this.settings= settings;
+    this.settings = settings;
   }
 
   @Override
@@ -47,7 +47,7 @@ public final class ServerContext extends Context implements ProxyBridgeLeftSideC
         }
         // TODO : Send error
         login = register.username();
-        if(login.length() > settings.getInt("maxLoginLength")) {
+        if (login.length() > settings.getInt("maxLoginLength")) {
           silentlyClose();
           return;
         }
@@ -150,10 +150,10 @@ public final class ServerContext extends Context implements ProxyBridgeLeftSideC
 
         server.proxyOk(this, proxyOk.chainId());
       }
-      
+
       case Hidden hidden -> {
         logger.info("Received hidden frame");
-        if(chainId == null) {
+        if (chainId == null) {
           // first frame received
           // bridgeContext not set yet;
           chainId = hidden.chainId();
@@ -161,8 +161,8 @@ public final class ServerContext extends Context implements ProxyBridgeLeftSideC
           isProxy = server.setUpBridge(chainId, this);
           logger.info(STR."Client is a \{isProxy ? "proxy" : "sharer"}");
         }
-        
-        if(isProxy && bridgeRightSide == null){
+
+        if (isProxy && bridgeRightSide == null) {
           // we are a proxy, but the bridge is not set yet
           // queue the frame
           framesForTheNextHop.addLast(hidden);
@@ -172,7 +172,7 @@ public final class ServerContext extends Context implements ProxyBridgeLeftSideC
           bridgeRightSide.queueFrame(hidden);
         }
       }
-      
+
       case Update update -> {
         if (!isAuthenticated()) {
           logger.warning(STR."Client \{super.getSocket().getRemoteAddress()} is not authenticated");
@@ -181,7 +181,7 @@ public final class ServerContext extends Context implements ProxyBridgeLeftSideC
         }
         server.update(update.codexId(), login);
       }
-      
+
       default -> {
         logger.warning("No action for the received frame ");
         silentlyClose();
@@ -192,7 +192,7 @@ public final class ServerContext extends Context implements ProxyBridgeLeftSideC
   public String login() {
     return login;
   }
-  
+
   public SocketField getServerPublicAddress() {
     return serverPublicAddress;
   }
@@ -200,28 +200,28 @@ public final class ServerContext extends Context implements ProxyBridgeLeftSideC
   private boolean isAuthenticated() {
     return login != null;
   }
-  
+
   @Override
   public void doConnect() throws IOException {
     super.doConnect();
     logger.info("client is connecting");
   }
-  
+
   @Override
   public void setBridge(Context bridgeRightSide) {
     this.bridgeRightSide = bridgeRightSide;
     // send queued frames
-    while(!framesForTheNextHop.isEmpty()) {
+    while (!framesForTheNextHop.isEmpty()) {
       this.bridgeRightSide.queueFrame(framesForTheNextHop.pollFirst());
     }
   }
-  
+
   @Override
   public void silentlyClose() {
     if (login != null) { // when the client is a downloader
       server.removeClient(login);
     }
-    if(!isClosed && chainId != null && bridgeRightSide != null) {
+    if (!isClosed && chainId != null && bridgeRightSide != null) {
       // close the bridge
       isClosed = true;
       bridgeRightSide.silentlyClose();

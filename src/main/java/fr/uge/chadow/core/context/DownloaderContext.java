@@ -25,14 +25,14 @@ public final class DownloaderContext extends Context {
   private final SelectionKey key;
   private final Integer chainId;
   private final FrameReader frameReader = new FrameReader();
-  
+
   public DownloaderContext(SelectionKey key, ClientAPI api, CodexStatus codexStatus, Integer chainId) {
     super(key, BUFFER_SIZE);
     this.api = api;
     this.codexStatus = codexStatus;
     this.key = key;
     this.chainId = chainId;
-    
+
     InetSocketAddress socketAddress = null;
     try {
       socketAddress = (InetSocketAddress) ((SocketChannel) key.channel()).getRemoteAddress();
@@ -41,7 +41,7 @@ public final class DownloaderContext extends Context {
     }
     this.sharerAddress = socketAddress;
   }
-  
+
   @Override
   void processCurrentOpcodeAction(Frame frame) {
     switch (frame) {
@@ -51,7 +51,7 @@ public final class DownloaderContext extends Context {
       }
       case HereChunk hereChunk -> {
         logger.info(STR."Received chunk (\{hereChunk.offset()},\{hereChunk.payload().length})");
-        if(downloadForbidden()) {
+        if (downloadForbidden()) {
           silentlyClose();
           return;
         }
@@ -62,7 +62,7 @@ public final class DownloaderContext extends Context {
           silentlyClose();
           return;
         }
-        if(codexStatus.isComplete()) {
+        if (codexStatus.isComplete()) {
           silentlyClose();
           return;
         }
@@ -76,8 +76,8 @@ public final class DownloaderContext extends Context {
         logger.info("Received hidden frame");
         // we received a response from our hidden download request
         var payload = ByteBuffer.allocate(hidden.payload().length)
-                                .put(hidden.payload());
-        if(frameReader.process(payload) != FrameReader.ProcessStatus.DONE) {
+                .put(hidden.payload());
+        if (frameReader.process(payload) != FrameReader.ProcessStatus.DONE) {
           logger.warning("Error while processing hidden frame");
           silentlyClose();
         }
@@ -90,29 +90,29 @@ public final class DownloaderContext extends Context {
       }
     }
   }
-  
+
   private boolean downloadForbidden() {
-    if(codexStatus == null) {
+    if (codexStatus == null) {
       return true;
     }
-    if(!codexStatus.isDownloading()){
+    if (!codexStatus.isDownloading()) {
       return true;
     }
-    if(!api.codexExists(codexStatus.codex().id())) {
+    if (!api.codexExists(codexStatus.codex().id())) {
       logger.warning(STR."Codex \{codexStatus.codex().id()} does not exist");
       return true;
     }
-    if(codexStatus.isComplete()) {
+    if (codexStatus.isComplete()) {
       logger.info(STR."Codex \{codexStatus.codex().id()} is complete");
       return true;
     }
-    if(chainId == null && codexStatus.isDownloadingHidden()) {
+    if (chainId == null && codexStatus.isDownloadingHidden()) {
       logger.info(STR."The current downloader was downloading Codex \{codexStatus.codex().id()} with open mode, but the codex is now hidden");
       return true;
     }
     return false;
   }
-  
+
   @Override
   public void doConnect() throws IOException {
     super.doConnect();
@@ -120,27 +120,27 @@ public final class DownloaderContext extends Context {
     logger.info(STR."opening connection with a sharer for the codex \{codexStatus.codex().id()} on port \{port}");
     initDownload();
   }
-  
+
   private void send(Frame frame) {
-    if(chainId != null) {
+    if (chainId != null) {
       var buffer = frame.toByteBuffer();
       frame = new Hidden(chainId, buffer.array());
     }
     queueFrame(frame);
   }
-  
+
   private void initDownload() {
-    if(downloadForbidden()) {
+    if (downloadForbidden()) {
       silentlyClose();
       return;
     }
     var handshake = new Handshake(codexStatus.codex().id());
     var chunk = codexStatus.nextRandomChunk();
     var needChunk = new NeedChunk(chunk.offset(), chunk.length());
-    if(chainId != null) {
+    if (chainId != null) {
       addFrame(new Hidden(chainId, handshake.toByteBuffer().array()));
       addFrame(new Hidden(chainId, needChunk.toByteBuffer().array()));
-    }else{
+    } else {
       addFrame(handshake);
       addFrame(needChunk);
     }
@@ -148,7 +148,7 @@ public final class DownloaderContext extends Context {
     processOut();
     getKey().interestOps(SelectionKey.OP_WRITE);
   }
-  
+
   @Override
   public void silentlyClose() {
     super.silentlyClose();

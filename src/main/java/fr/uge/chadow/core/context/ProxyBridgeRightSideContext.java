@@ -9,8 +9,8 @@ import java.util.Objects;
 import java.util.logging.Logger;
 
 /**
- * Context for when the app is a proxy between two clients
- * This context connect the current Client that is a proxy to the next node of the chain.
+ * Context for when the app is a proxy between two clients.
+ * This context connects the current Client that is a proxy to the next node of the chain.
  * It receives frames from the ClientAsServerContext that are meant to be forwarded to the next node.
  * Then received frames from the next node are forwarded back to the ClientAsServerContext.
  *
@@ -25,12 +25,12 @@ public final class ProxyBridgeRightSideContext extends Context {
   private static final int BUFFER_SIZE = 1024;
   private final ProxyBridgeLeftSideContext leftSide;
   private boolean isClosed;
-  
+
   public ProxyBridgeRightSideContext(SelectionKey key, ProxyBridgeLeftSideContext leftSide) {
     super(key, BUFFER_SIZE);
     this.leftSide = leftSide;
   }
-  
+
   @Override
   void processCurrentOpcodeAction(Frame frame) {
     if (Objects.requireNonNull(frame) instanceof Hidden) {
@@ -42,19 +42,19 @@ public final class ProxyBridgeRightSideContext extends Context {
       silentlyClose();
     }
   }
-  
+
   @Override
   public void doConnect() throws IOException {
     super.doConnect();
     logger.info("Received connection from a client");
     leftSide.setBridge(this);
   }
-  
+
   @Override
   public void silentlyClose() {
     // close the bridge
     super.silentlyClose();
-    if(leftSide != null && !isClosed) {
+    if (leftSide != null && !isClosed) {
       isClosed = true;
       leftSide.silentlyClose();
     }

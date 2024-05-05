@@ -19,12 +19,12 @@ public final class ClientContext extends Context {
   private static final Logger logger = Logger.getLogger(TCPConnectionManager.class.getName());
   private static final int BUFFER_SIZE = 1024;
   private final ClientAPI api;
-  
+
   public ClientContext(SelectionKey key, ClientAPI api) {
     super(key, BUFFER_SIZE);
     this.api = api;
   }
-  
+
   @Override
   public void processCurrentOpcodeAction(Frame frame) {
     logger.info("Processing frame");
@@ -58,7 +58,7 @@ public final class ClientContext extends Context {
         api.addSocketsClosedDownload(closedDownloadResponse.proxies());
       }
       case Event event -> {
-        if(event.code() == (byte) 0) {
+        if (event.code() == (byte) 0) {
           logger.info("Received event 0");
           api.removeUser(event.username());
         } else {
@@ -69,7 +69,7 @@ public final class ClientContext extends Context {
       case Proxy proxy -> {
         logger.info(STR."Received proxy request chainId: \{proxy.chainId()}");
         var response = api.saveProxyRoute(proxy.chainId(), proxy.socket());
-        if(response) {
+        if (response) {
           queueFrame(new ProxyOk(proxy.chainId()));
         }
       }
@@ -79,7 +79,7 @@ public final class ClientContext extends Context {
       }
     }
   }
-  
+
   @Override
   public void doConnect() throws IOException {
     try {
@@ -93,7 +93,7 @@ public final class ClientContext extends Context {
     getKey().interestOps(SelectionKey.OP_WRITE);
     super.processOut();
   }
-  
+
   @Override
   public void silentlyClose() {
     super.silentlyClose();

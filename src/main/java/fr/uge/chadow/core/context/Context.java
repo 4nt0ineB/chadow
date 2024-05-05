@@ -14,7 +14,7 @@ import java.util.ArrayDeque;
 import java.util.logging.Logger;
 
 public sealed abstract class Context permits ClientAsServerContext, ClientContext, DownloaderContext, ProxyBridgeRightSideContext, ServerContext {
-  
+
   private static final Logger logger = Logger.getLogger(Context.class.getName());
   private final ArrayDeque<Frame> queue = new ArrayDeque<>();
   private final SelectionKey key;
@@ -25,14 +25,14 @@ public sealed abstract class Context permits ClientAsServerContext, ClientContex
   private ByteBuffer processingFrame;
   private final Opcode currentOpcode = null;
   private boolean closed = false;
-  
+
   public Context(SelectionKey key, int BUFFER_SIZE) {
     this.key = key;
     this.sc = (SocketChannel) key.channel();
     bufferIn = ByteBuffer.allocate(BUFFER_SIZE);
     bufferOut = ByteBuffer.allocate(BUFFER_SIZE);
   }
-  
+
   /**
    * Process the content of bufferIn
    * <p>
@@ -42,7 +42,7 @@ public sealed abstract class Context permits ClientAsServerContext, ClientContex
   private void processIn() {
     for (; ; ) {
       Reader.ProcessStatus status = frameReader.process(bufferIn);
-      
+
       switch (status) {
         case DONE -> {
           try {
@@ -63,7 +63,7 @@ public sealed abstract class Context permits ClientAsServerContext, ClientContex
       }
     }
   }
-  
+
   /**
    * Processes the current opcode received from the client and performs the corresponding action.
    * The action performed depends on the value of the current opcode.
@@ -71,31 +71,28 @@ public sealed abstract class Context permits ClientAsServerContext, ClientContex
    * @throws IOException if an I/O error occurs while processing the opcode.
    */
   abstract void processCurrentOpcodeAction(Frame frame) throws IOException;
-  
+
   private void processCurrentOpcodeActionImpl() throws IOException {
     processCurrentOpcodeAction(frameReader.get());
   }
-  
+
   public void queueFrame(Frame frame) {
     queue.addFirst(frame);
     processOut();
     updateInterestOps();
     key.selector().wakeup();
   }
-  
+
   public void clearFrameQueue() {
     queue.clear();
     processOut();
     updateInterestOps();
   }
-  
+
   void addFrame(Frame frame) {
     queue.addFirst(frame);
   }
-  
-  
-  
-  
+
   /**
    * Try to fill bufferOut from the message queue
    */
@@ -103,7 +100,7 @@ public sealed abstract class Context permits ClientAsServerContext, ClientContex
     if (processingFrame == null && !queue.isEmpty()) {
       while (!queue.isEmpty()) {
         processingFrame = queue.pollLast()
-                               .toByteBuffer();
+                .toByteBuffer();
         processingFrame.flip();
         if (processingFrame.remaining() <= bufferOut.remaining()) {
           // If enough space in bufferOut, add the frame
@@ -118,7 +115,7 @@ public sealed abstract class Context permits ClientAsServerContext, ClientContex
       // No frame currently being processed or in the queue, exit the method
       return;
     }
-    
+
     // Processing the current frame being handled
     processingFrame.flip();
     if (processingFrame.hasRemaining()) {
@@ -138,7 +135,7 @@ public sealed abstract class Context permits ClientAsServerContext, ClientContex
       processingFrame = null;
     }
   }
-  
+
   /**
    * Update the interestOps of the key looking only at values of the boolean
    * closed and of both ByteBuffers.
@@ -161,7 +158,7 @@ public sealed abstract class Context permits ClientAsServerContext, ClientContex
       silentlyClose();
     }
   }
-  
+
   public void silentlyClose() {
     try {
       closed = true;
@@ -170,7 +167,7 @@ public sealed abstract class Context permits ClientAsServerContext, ClientContex
       throw new UncheckedIOException(e);
     }
   }
-  
+
   /**
    * Performs the read action on sc
    * <p>
@@ -187,7 +184,7 @@ public sealed abstract class Context permits ClientAsServerContext, ClientContex
     processIn();
     updateInterestOps();
   }
-  
+
   /**
    * Performs the write action on sc
    * <p>
@@ -196,26 +193,26 @@ public sealed abstract class Context permits ClientAsServerContext, ClientContex
    *
    * @throws IOException if an I/O error occurs while writing
    */
-  
+
   public void doWrite() throws IOException {
     sc.write(bufferOut.flip());
     bufferOut.compact();
     processOut();
     updateInterestOps();
   }
-  
+
   public void doConnect() throws IOException {
     if (!sc.finishConnect()) {
       logger.warning("the selector gave a bad hint");
     }
   }
-  
+
   SelectionKey getKey() {
     return key;
   }
-  
+
   SocketChannel getSocket() {
     return sc;
   }
-  
+
 }

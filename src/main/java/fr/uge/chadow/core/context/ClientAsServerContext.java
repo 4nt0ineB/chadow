@@ -29,23 +29,23 @@ public final class ClientAsServerContext extends Context implements ProxyBridgeL
   private boolean isClosed;
   private final ArrayDeque<Frame> framesForTheNextHop = new ArrayDeque<>();
   private boolean isProxy = false;
-  
+
   public ClientAsServerContext(SelectionKey key, ClientAPI api, int maxAcceptedChunkSize) {
     super(key, BUFFER_SIZE);
     this.api = api;
     this.maxAcceptedChunkSize = maxAcceptedChunkSize;
   }
-  
+
   @Override
   void processCurrentOpcodeAction(Frame frame) throws IOException {
     switch (frame) {
       case Handshake handshake -> {
         wantedCodexId = handshake.codexId();
-        if(allowedToShare()) {
+        if (allowedToShare()) {
           logger.info(STR."Ready to share codex \{wantedCodexId}");
           clientAddress = (InetSocketAddress) getSocket().getRemoteAddress();
           api.registerSharer(wantedCodexId);
-        }else {
+        } else {
           logger.info("Client wants to download a codex that is not shared");
           clearFrameQueue();
           send(new Denied(wantedCodexId));
@@ -54,10 +54,10 @@ public final class ClientAsServerContext extends Context implements ProxyBridgeL
       }
       case NeedChunk needChunk -> {
         logger.info(STR."\{clientAddress} needs chunk (\{needChunk.offset()},\{needChunk.length()})");
-        if(!allowedToShare()) {
+        if (!allowedToShare()) {
           silentlyClose();
         }
-        if(needChunk.length() > maxAcceptedChunkSize) {
+        if (needChunk.length() > maxAcceptedChunkSize) {
           logger.warning("Client requested a too big chunk");
           silentlyClose();
         }
@@ -71,14 +71,14 @@ public final class ClientAsServerContext extends Context implements ProxyBridgeL
           throw new RuntimeException(e);
         }
       }
-     case ProxyOpen proxyOpen -> {
+      case ProxyOpen proxyOpen -> {
         logger.info("Received proxy open request");
         chainId = proxyOpen.chainId();
         api.setUpBridge(chainId, this);
       }
       case Hidden hidden -> {
         logger.info("Received hidden frame");
-        if(chainId == null) {
+        if (chainId == null) {
           // first frame received
           // bridgeContext not set yet;
           chainId = hidden.chainId();
@@ -86,8 +86,8 @@ public final class ClientAsServerContext extends Context implements ProxyBridgeL
           isProxy = api.setUpBridge(chainId, this);
           logger.info(STR."Client is a \{isProxy ? "proxy" : "sharer"}");
         }
-        
-        if(isProxy && bridgeRightSide == null){
+
+        if (isProxy && bridgeRightSide == null) {
           // we are a proxy, but the bridge is not set yet
           // queue the frame
           framesForTheNextHop.addLast(hidden);
@@ -99,8 +99,8 @@ public final class ClientAsServerContext extends Context implements ProxyBridgeL
           // we are a sharer
           // extract payload and processIt
           var payload = ByteBuffer.allocate(hidden.payload().length)
-                                  .put(hidden.payload());
-          if(frameReader.process(payload) != FrameReader.ProcessStatus.DONE) {
+                  .put(hidden.payload());
+          if (frameReader.process(payload) != FrameReader.ProcessStatus.DONE) {
             logger.warning("Error while processing hidden frame");
             silentlyClose();
           }
@@ -114,48 +114,48 @@ public final class ClientAsServerContext extends Context implements ProxyBridgeL
       }
     }
   }
-  
+
   private void send(Frame frame) {
-    if(chainId != null) {
+    if (chainId != null) {
       var buffer = frame.toByteBuffer();
       frame = new Hidden(chainId, buffer.array());
     }
     queueFrame(frame);
   }
-  
+
   private boolean allowedToShare() {
     assert wantedCodexId != null;
     return api.codexExists(wantedCodexId)
-        && api.isSharing(wantedCodexId)
-        && !isProxy;
+            && api.isSharing(wantedCodexId)
+            && !isProxy;
   }
-  
+
   @Override
   public void doConnect() throws IOException {
     super.doConnect();
     logger.info("Received connection from a client");
   }
-  
+
   public void setBridge(Context bridgeRightSide) {
     this.bridgeRightSide = bridgeRightSide;
     api.registerProxy();
     // send queued frames
-    while(!framesForTheNextHop.isEmpty()) {
+    while (!framesForTheNextHop.isEmpty()) {
       this.bridgeRightSide.queueFrame(framesForTheNextHop.pollFirst());
     }
   }
-  
+
   @Override
   public void silentlyClose() {
     super.silentlyClose();
-    if(!isClosed && chainId != null && bridgeRightSide != null) {
+    if (!isClosed && chainId != null && bridgeRightSide != null) {
       // close the bridge
       isClosed = true;
       bridgeRightSide.silentlyClose();
       bridgeRightSide = null;
       api.unregisterProxy();
     }
-    if(!isProxy) {
+    if (!isProxy) {
       api.unregisterSharer(wantedCodexId);
     }
   }
