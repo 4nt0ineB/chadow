@@ -51,8 +51,8 @@ public class CodexController {
     defaultDownloadPath = dir;
   }
   
-  private CodexStatus addCodex(Codex codex, Path root) {
-    var codexStatus = new CodexStatus(codex, root.toString(), chunkSize);
+  private CodexStatus addCodex(Codex codex, Path root, boolean isDir) {
+    var codexStatus = new CodexStatus(codex, root.toString(), chunkSize, isDir);
     var existing = codexes.putIfAbsent(codex.id(), codexStatus);
     return existing == null ? codexStatus : existing;
   }
@@ -133,7 +133,7 @@ public class CodexController {
    * @return the status of the codex
    */
   CodexStatus addFromFetchedCodex(Codex codex) {
-    return addCodex(codex, defaultDownloadPath);
+    return addCodex(codex, defaultDownloadPath, true);
   }
   
   /**
@@ -213,12 +213,15 @@ public class CodexController {
     var rootPath = new File(directory);
     var fileInfoList = new ArrayList<Codex.FileInfo>();
     logger.info(STR."Creating codex of \"\{rootPath}\"");
+    var isDir = true;
     // get all files
     if(!rootPath.exists()){
       throw new IOException("File or directory not found");
     }
     if(rootPath.isFile()){
       fileInfoList.add(fileInfofromPath(rootPath.getPath(), rootPath.toPath()));
+      logger.info(STR."File \{rootPath.getName()} added to the codex");
+      isDir = false;
     }if(rootPath.isDirectory()) {
       Path start = Paths.get(rootPath.getAbsolutePath());
       try(var walker = Files.walk(start).filter(Files::isRegularFile).sorted(Comparator.comparing(Path::toString))){
@@ -235,7 +238,7 @@ public class CodexController {
       files[i] = fileInfoList.get(i);
     }
     var codex = new Codex(id, codexName, files);
-    addCodex(codex, rootPath.toPath()) ;
+    addCodex(codex, rootPath.toPath(), isDir) ;
     var codexStatus = codexes.get(id);
     codexStatus.setAllComplete();
     return codexStatus;

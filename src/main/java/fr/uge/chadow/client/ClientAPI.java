@@ -1,7 +1,7 @@
 package fr.uge.chadow.client;
 
 
-import fr.uge.chadow.Settings;
+import fr.uge.chadow.core.Settings;
 import fr.uge.chadow.core.ProxyManager;
 import fr.uge.chadow.core.context.*;
 import fr.uge.chadow.core.TCPConnectionManager;
@@ -28,7 +28,6 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Function;
 import java.util.logging.Logger;
 
 /**
@@ -382,7 +381,7 @@ public class ClientAPI {
       lock.unlock();
     }
   }
-
+  
   /**
    * Unbind the client context from the API
    * This method is called by the context when the connection is closed
@@ -397,7 +396,7 @@ public class ClientAPI {
       lock.unlock();
     }
   }
-
+  
   /**
    * Wait for the connection to be established and the client to be ready
    * to interact with the server.
@@ -417,7 +416,7 @@ public class ClientAPI {
       lock.unlock();
     }
   }
-
+  
   /**
    * Check if the client is connected to the server
    *
@@ -431,7 +430,7 @@ public class ClientAPI {
       lock.unlock();
     }
   }
-
+  
   public List<YellMessage> getPublicMessages() {
     lock.lock();
     try {
@@ -440,7 +439,7 @@ public class ClientAPI {
       lock.unlock();
     }
   }
-
+  
   /**
    * Send instructions to the selector via a BlockingQueue and wake it up
    *
@@ -455,17 +454,17 @@ public class ClientAPI {
       lock.unlock();
     }
   }
-
-
+  
+  
   public void propose(String id) {
     codexController.getCodexStatus(id)
-            .ifPresent(codexStatus -> {
-              var codex = codexStatus.codex();
-              logger.info(STR."(propose) codex \{codex.name()} (id: \{codex.id()}) queued");
-              clientContext.queueFrame(new Propose(codex));
-            });
+                   .ifPresent(codexStatus -> {
+                     var codex = codexStatus.codex();
+                     logger.info(STR."(propose) codex \{codex.name()} (id: \{codex.id()}) queued");
+                     clientContext.queueFrame(new Propose(codex));
+                   });
   }
-
+  
   public List<String> users() {
     lock.lock();
     try {
@@ -474,19 +473,19 @@ public class ClientAPI {
       lock.unlock();
     }
   }
-
-
+  
+  
   /**
    * Add a codex to the client
    */
   public CodexStatus addCodex(String name, String path) throws IOException, NoSuchAlgorithmException {
     return codexController.createFromPath(name, path);
   }
-
+  
   public List<CodexStatus> codexes() {
     return List.copyOf(codexController.codexesStatus());
   }
-
+  
   public Optional<CodexStatus> getCodex(String codexId) {
     var codex = codexController.getCodexStatus(codexId);
     if (codex.isPresent()) {
@@ -508,8 +507,13 @@ public class ClientAPI {
     }
     return Optional.of(codexController.addFromFetchedCodex(fetchedCodex.orElseThrow()));
   }
-
-
+  
+  /**
+   * Get the codex id or the first guess if the codex does not exist
+   *
+   * @param codexId the id of the codex
+   * @return the given codex id or the first guess
+   */
   public String codexIdOrFirstGuess(String codexId) {
     lock.lock();
     try {
@@ -703,7 +707,12 @@ public class ClientAPI {
       lock.unlock();
     }
   }
-
+  
+  /**
+   * Share a codex
+   * changes the status of the codex to shared
+   * and send a propose message to the server
+   */
   public void share(String codexId) {
     codexController.share(codexId);
     propose(codexId);
@@ -743,26 +752,34 @@ public class ClientAPI {
       lock.unlock();
     }
   }
-
+  
+  /**
+   * Remove a user from the chat
+   * @param username the username of the user
+   */
   public void removeUser(String username) {
     lock.lock();
     try {
       users.remove(username);
       getDirectMessagesOf(username)
-              .ifPresent(dm -> {
-                var random = new Random();
-                var newUsername = STR."\{dm.username()}[\{random.nextInt(1000)}]";
-                dm.changeUsername(newUsername);
-                dm.addMessage(new WhisperMessage("<--", STR."User \{username} left", System.currentTimeMillis()));
-                dm.addMessage(new WhisperMessage("<--", STR."\{username} renamed as \{newUsername}", System.currentTimeMillis()));
-              });
+          .ifPresent(dm -> {
+            var random = new Random();
+            var newUsername = STR."\{dm.username()}[\{random.nextInt(1000)}]";
+            dm.changeUsername(newUsername);
+            dm.addMessage(new WhisperMessage("<--", STR."User \{username} left", System.currentTimeMillis()));
+            dm.addMessage(new WhisperMessage("<--", STR."\{username} renamed as \{newUsername}", System.currentTimeMillis()));
+          });
       addMessage(new YellMessage("<--", STR."\{username} left", System.currentTimeMillis()));
     } finally {
       lock.unlock();
     }
   }
-
-  public void addUserFromDiscovery(List<String> usernames) {
+  
+  /**
+   * Update the presence of users
+   * @param usernames the list of users
+   */
+  public void addUsersFromDiscovery(List<String> usernames) {
     lock.lock();
     try {
       users.addAll(usernames);
@@ -770,16 +787,28 @@ public class ClientAPI {
       lock.unlock();
     }
   }
-
+  
+  /**
+   * Get the listening port of the client
+   */
   public int listeningPort() {
     return connectionManager.listeningPort();
   }
-
+  
+  /**
+   * Save received sockets for the request of an open download.
+   * @param sockets the sockets of the sharers
+   */
   public void addSocketsOpenDownload(SocketField[] sockets) {
     sharersSocketQueue.add(new SocketResponse(sockets, null));
   }
-
-  public void addSocketsClosedDownload(ProxyNodeSocket[] proxySockets) {
+  
+  /**
+   * Save received sockets for the request of a hidden download.
+   * Used by the client context
+   * @param proxySockets the sockets of proxy nodes
+   */
+  public void addSocketsHiddenDownload(ProxyNodeSocket[] proxySockets) {
     var sockets = new SocketField[proxySockets.length];
     var chainId = new int[proxySockets.length];
     for (int i = 0; i < proxySockets.length; i++) {
@@ -805,8 +834,12 @@ public class ClientAPI {
       lock.unlock();
     }
   }
-
-
+  
+  /**
+   * Search for codexes with a specific name on the server
+   * @param search the search query
+   * @return the search response
+   */
   public Optional<SearchResponse> searchCodexes(Search search) {
     try {
       searchResponseQueue.clear();
@@ -822,7 +855,12 @@ public class ClientAPI {
       return Optional.empty();
     }
   }
-
+  
+  /**
+   * Save the search response in the queue
+   * Used by the client context
+   * @param response the search response
+   */
   public void saveSearchResponse(SearchResponse response) {
     lock.lock();
     try {
@@ -864,6 +902,12 @@ public class ClientAPI {
       //var status = codexController.createFromPath("test", "/home/alan1/Pictures");
       // var status = codexController.createFromPath("test", "/home/alan1/Downloads/aaa");
       share(status.id());
+      try {
+        var status2 = codexController.createFromPath("test2", "/home/alan1/Downloads/u7xn3f.mp4");
+        share(status2.id());
+      } catch (IOException e) {
+        logger.warning(e.getMessage());
+      }
     }
   }
 

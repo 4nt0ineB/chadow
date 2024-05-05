@@ -3,7 +3,7 @@
 
 ############ CHANGE ME
 
-#hostname=217.182.68.48
+# hostname=217.182.68.48
 hostname=localhost
 port=7777
 log=true

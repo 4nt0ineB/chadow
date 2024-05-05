@@ -7,7 +7,7 @@ import java.util.*;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 
-import fr.uge.chadow.Settings;
+import fr.uge.chadow.core.Settings;
 import fr.uge.chadow.core.ProxyManager;
 import fr.uge.chadow.core.TCPConnectionManager;
 import fr.uge.chadow.core.context.*;

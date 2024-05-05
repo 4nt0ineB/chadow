@@ -1,4 +1,4 @@
-package fr.uge.chadow;
+package fr.uge.chadow.core;
 
 import java.io.IOException;
 import java.util.*;

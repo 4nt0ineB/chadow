@@ -3,6 +3,8 @@ package fr.uge.chadow;
 import fr.uge.chadow.client.ClientAPI;
 import fr.uge.chadow.client.ClientConsoleController;
 import fr.uge.chadow.client.CodexController;
+import fr.uge.chadow.core.Settings;
+import fr.uge.chadow.core.SettingsParser;
 import fr.uge.chadow.server.Server;
 
 import java.io.IOException;

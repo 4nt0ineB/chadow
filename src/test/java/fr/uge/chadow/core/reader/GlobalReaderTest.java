@@ -1,6 +1,6 @@
 package fr.uge.chadow.core.reader;
 
-import fr.uge.chadow.Settings;
+import fr.uge.chadow.core.Settings;
 import fr.uge.chadow.client.CodexController;
 import fr.uge.chadow.client.CodexStatus;
 import fr.uge.chadow.core.protocol.YellMessage;
