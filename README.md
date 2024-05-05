@@ -138,7 +138,21 @@ Selectable mode (also scrollable):
   :f, :find [:at(:before|:after)) <date>] [(name|date):(asc|desc)] <name>
     Interrogate the server for codexes
     
-  :f - Back to the last search results
+    :at - Search at a specific date
+    :before - Search before a specific date
+    :after - Search after a specific date
+    <date> - The date to search (dd/MM/yyyy or MM/dd/yyyy with optionally HH:mm)
+    name/date - Sort by name or date
+    asc/desc - Sort ascending or descending. Default is ascending
+    
+    Examples:
+      :f :at:before 12/12/2021 name:asc my road trip photos
+      :f date:desc the.matrix.1999
+     
+      To search all codexes
+      :f <space>
+    
+  :f - Go back to the last search results
   
   :mycdx
     Display the [CODEX LIST]
@@ -147,6 +161,13 @@ Selectable mode (also scrollable):
     Retrieves and display the [CODEX] info with the given SHA-1
     if the codex is not present locally, the server will be interrogated
     
+    Example:
+      :cdx:2da27a8b8c8e96970bf37fe44ba11945ad2a891f
+       is equivalent to
+      :cdx:2da27a8
+      
+      Supposing the SHA-1 no other codexes start with 2da27a8
+      
   :exit - Exit the application
   
 [CHAT]
@@ -169,8 +190,10 @@ Selectable mode (also scrollable):
 [CODEX]
   (scrollable)
   :share - Share/stop sharing the codex
-  :dl, :download (h|hidden)
+  :dl, :download (h|hidden) (size)
     Download/stop downloading the codex, when downloading live refresh is enabled
+    When start downloading goes into live refresh to see the download progress
+    
   :live - Switch to live refresh to see the changes in real time
 ```
 
