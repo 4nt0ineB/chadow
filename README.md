@@ -7,7 +7,7 @@
 
 [Final project](http://igm.univ-mlv.fr/coursprogreseau/tds/projet2024.html) for the Network Programming class in the first year of a master's degree in softwtare development.
 
-Implementation of the Chadow protocole described in [rfc_chadow.txt](./rfc_chadow.txt) (french)
+Implementation of the Chadow protocole described in [rfc_chadow.txt](./doc/rfc_chadow.txt) (french)
 
 
 <img src="https://gitlab.com/4nt0ineB/chadow-bastos-sebbah/-/raw/b3ad80c5d58557ee1909c365c47786c469218c8b/img/chadow-chat.png" height="150" width="300"/>
